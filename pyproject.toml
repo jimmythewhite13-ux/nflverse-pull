@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "nfl_data_py>=0.3.2",
     "pandas>=2.0",
+    "openpyxl>=3.1",
 ]
 
 [dependency-groups]

@@ -5,7 +5,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:nflreadr.nflverse.com)",
       "Bash(uv run pytest:*)",
-      "Bash(uv run ruff:*)"
+      "Bash(uv run ruff:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv run python -m nflverse_pull.pull:*)",
+      "Bash(uv run python -m nflverse_pull.efficiency:*)",
+      "Bash(uv run python -m nflverse_pull.update_workbook:*)",
+      "Bash(uv run python -m nflverse_pull.email_results:*)"
     ],
     "deny": [],
     "ask": []

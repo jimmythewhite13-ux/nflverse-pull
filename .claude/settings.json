@@ -10,7 +10,8 @@
       "Bash(uv run python -m nflverse_pull.pull:*)",
       "Bash(uv run python -m nflverse_pull.efficiency:*)",
       "Bash(uv run python -m nflverse_pull.update_workbook:*)",
-      "Bash(uv run python -m nflverse_pull.email_results:*)"
+      "Bash(uv run python -m nflverse_pull.email_results:*)",
+      "Bash(uv run python -m nflverse_pull.main:*)"
     ],
     "deny": [],
     "ask": []

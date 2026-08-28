@@ -45,20 +45,26 @@ needs no internet access and won't hit nflverse's servers on every CI run.
 
 ## Wiring data into the workbook
 
-`nflverse_pull.update_workbook` pulls fresh PPG (`pull.py`) and efficiency metrics
-(`efficiency.py`) and writes them directly into the workbook's two placeholder input
-tables (`YoY Baseline Engine` Section 1 and `Advanced Efficiency Metrics` Section 1),
-in place -- every formula downstream of those tables recalculates itself the next time
-the workbook is opened in Excel.
+`nflverse_pull.main` is the single entry point for the full pipeline: it pulls fresh PPG
+(`pull.py`) and efficiency metrics (`efficiency.py`), writes them directly into the
+workbook's two placeholder input tables (`YoY Baseline Engine` Section 1 and `Advanced
+Efficiency Metrics` Section 1) via `update_workbook.py`, then emails a results summary via
+`email_results.py` (skipped, non-fatally, if the email credentials below aren't set).
+Every formula downstream of those two tables recalculates itself the next time the
+workbook is opened in Excel.
 
 ```bash
-uv run python -m nflverse_pull.update_workbook "C:\path\to\NFL_Prediction_Model.xlsx"
+uv run python -m nflverse_pull.main "C:\path\to\NFL_Prediction_Model.xlsx"
 ```
+
+Each piece also runs standalone if you only want part of the pipeline --
+`uv run python -m nflverse_pull.update_workbook "<path>"` skips the email, and
+`uv run python -m nflverse_pull.pull` / `.efficiency` just produce a CSV (see Usage above).
 
 ## Automated scheduled updates
 
-Two Windows Scheduled Tasks run `scripts/run_scheduled_update.ps1`, which updates the
-workbook and then emails a results summary:
+Two Windows Scheduled Tasks run `scripts/run_scheduled_update.ps1`, which calls
+`nflverse_pull.main` above and logs the result:
 
 | Task | Schedule |
 |---|---|
@@ -92,13 +98,14 @@ src/nflverse_pull/efficiency.py         fetch_pbp() [network] + compute_raw_effi
                                          compute_weighted_efficiency() [pure] + main()
 src/nflverse_pull/update_workbook.py    writes pull.py + efficiency.py output into the workbook's placeholder tables
 src/nflverse_pull/email_results.py      emails a combined PPG + efficiency report via Gmail SMTP
-scripts/run_scheduled_update.ps1        entry point for the two Windows Scheduled Tasks (see above)
+src/nflverse_pull/main.py               single entry point: update_workbook.py, then email_results.py
+scripts/run_scheduled_update.ps1        calls nflverse_pull.main; entry point for the two Windows Scheduled Tasks
 tests/                                   offline unit tests for every pure/transform function above
 ```
 
 ## Note on `.claude/settings.json`
 
 The allowlist covers `uv sync`, `uv run pytest`/`ruff`, and `uv run python -m nflverse_pull.*`
-for all four modules (`pull`, `efficiency`, `update_workbook`, `email_results`), plus WebFetch
-for github.com / raw.githubusercontent.com / nflreadr.nflverse.com -- so none of the commands
-in this README should prompt for approval.
+for all five modules (`pull`, `efficiency`, `update_workbook`, `email_results`, `main`), plus
+WebFetch for github.com / raw.githubusercontent.com / nflreadr.nflverse.com -- so none of the
+commands in this README should prompt for approval.

@@ -75,6 +75,69 @@ def compute_current_starters(depth_charts: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def resolve_scored_population(
+    current_starters: pd.DataFrame,
+    overrides: pd.DataFrame,
+    position: str,
+) -> pd.DataFrame:
+    """
+    Pure function, no network. Combines Part 1's pulled current-roster data with Part 2's
+    manual overrides into the final Team | Role | Player Name | Player ID population to be
+    scored in a Section 3/5 -- this is what makes Part 3's "a true rookie still gets a full
+    row" possible: current_starters carries a Player ID (gsis_id) for every player
+    regardless of whether he has any historical stats, so a true zero-history rookie
+    identified here flows straight into the existing Section 3
+    IF(COUNTIFS(...)=0, RookieBaseline, ...) formula chain (unchanged -- no new Excel
+    formula logic needed) and correctly gets a full row: all three Y-1/Y-2/Y-3 slots
+    substituted with the Rookie Baseline, Years of Real History = 0. The formula mechanism
+    already exists; this function is what ensures such a player is even a scoring candidate
+    in the first place, which the old historical-attempts-only population never could be,
+    since it only ever considered players who already had a qualifying historical season.
+
+    `overrides` columns: Team | Manual Starter Override | Manual Backup Override (either
+    override column may be blank/NaN per row -- blank means "use the pulled data for that
+    role"). A filled-in override name takes precedence over the pulled current-roster
+    starter/backup for that team+role. The override is matched against `current_starters`
+    first (covers a name already on SOME team's depth chart, just not this slot) and, if not
+    found there, is returned with a null Player ID and Source="override (unresolved -- no
+    Player ID found)" rather than silently dropped or guessed at; a caller can still use the
+    row (e.g. flag it for the user to supply an ID by hand) but it won't feed a
+    decay-weighted formula chain without one.
+    """
+    pos_data = current_starters[current_starters["Position"] == position]
+    by_team_role: dict[tuple[str, str], dict] = {}
+    for row in pos_data.to_dict("records"):
+        role = "Starter" if row["Depth Order"] == 1 else "Backup"
+        by_team_role[(row["Team"], role)] = {
+            "Player Name": row["Player Name"], "Player ID": row["Player ID"],
+            "Source": row["Source"],
+        }
+
+    # Build a name -> Player ID lookup from the pulled data, for resolving an override.
+    name_to_id = {r["Player Name"]: r["Player ID"] for r in pos_data.to_dict("records")}
+
+    override_cols = [("Starter", "Manual Starter Override"), ("Backup", "Manual Backup Override")]
+    for orow in overrides.to_dict("records"):
+        team = orow["Team"]
+        for role, col in override_cols:
+            name = orow.get(col)
+            is_blank = name is None or (isinstance(name, float) and pd.isna(name))
+            if is_blank or str(name).strip() == "":
+                continue
+            name = str(name).strip()
+            player_id = name_to_id.get(name)
+            source = "override" if player_id else "override (unresolved -- no Player ID found)"
+            by_team_role[(team, role)] = {
+                "Player Name": name, "Player ID": player_id, "Source": source,
+            }
+
+    out_rows = [
+        {"Team": team, "Role": role, **info} for (team, role), info in by_team_role.items()
+    ]
+    out = pd.DataFrame(out_rows, columns=["Team", "Role", "Player Name", "Player ID", "Source"])
+    return out.sort_values(["Team", "Role"], ascending=[True, False]).reset_index(drop=True)
+
+
 def main(years: list[int] | None = None, output_path: str = "current_starters.csv") -> pd.DataFrame:
     years = years or [2026]
     depth_charts = fetch_depth_charts(years)

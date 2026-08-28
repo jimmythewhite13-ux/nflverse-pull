@@ -1,13 +1,20 @@
 """
-Writes freshly pulled nflverse data into the NFL Prediction Model workbook's placeholder
-input tables, replacing the SAMPLE PLACEHOLDER rows in place:
+Writes freshly pulled nflverse data into the NFL Prediction Model workbook's Section 1
+input tables, in place:
 
     'YoY Baseline Engine' Section 1          <- pull.py (per-team, per-season Off/Def PPG)
-    'Advanced Efficiency Metrics' Section 1  <- efficiency.py (per-team EPA/Success Rate/NY/A)
+    'Advanced Efficiency Metrics' Section 1  <- efficiency.py (per-team, per-season EPA/
+                                                 Success Rate/NY/A -- the Multi-Year
+                                                 Efficiency Engine, see
+                                                 claude_code_spec_efficiency_engine.md)
 
 Only those two input tables are touched -- every formula elsewhere in the workbook
-(Section 2/3 on both tabs, Team Ratings, Week 1 Matchups, etc.) is left alone and
+(Sections 2-5 on both tabs, Team Ratings, Week 1 Matchups, etc.) is left alone and
 recalculates itself from the new inputs the next time the workbook is opened in Excel.
+
+Requires the 'Advanced Efficiency Metrics' tab to already be in its 5-section Multi-Year
+Efficiency Engine shape (built once via scripts/build_efficiency_engine.py) -- this module
+only refreshes Section 1's raw values, it does not build the tab's structure/formulas.
 
 Run this whenever you want the workbook refreshed with the latest nflverse data:
 
@@ -20,16 +27,18 @@ import argparse
 import openpyxl
 import pandas as pd
 
-from nflverse_pull.efficiency import compute_raw_efficiency, fetch_pbp
+from nflverse_pull.efficiency import compute_team_season_efficiency, fetch_pbp
 from nflverse_pull.pull import fetch_schedules, transform_to_team_season
 
 YOY_SHEET = "YoY Baseline Engine"
 EFFICIENCY_SHEET = "Advanced Efficiency Metrics"
 
-# Column order matches efficiency.py's compute_raw_efficiency() output and the
-# 'Advanced Efficiency Metrics' Section 1 headers (columns B-H).
-EFFICIENCY_COLUMNS = [
-    "epa_off", "epa_def", "success_off", "success_def", "nya_off", "nya_def", "proe",
+# Column order matches efficiency.py's compute_team_season_efficiency() output and the
+# 'Advanced Efficiency Metrics' Section 1 headers (columns C-I, after Team/Season).
+EFFICIENCY_SEASON_COLUMNS = [
+    "EPA/Play (Off)", "EPA/Play Allowed (Def)",
+    "Success Rate (Off)", "Success Rate Allowed (Def)",
+    "NY/A (Off)", "NY/A Allowed (Def)", "PROE (Off)",
 ]
 
 
@@ -46,13 +55,18 @@ def build_yoy_updates(ppg: pd.DataFrame) -> dict[tuple[str, int], tuple[float, f
     }
 
 
-def build_efficiency_updates(raw: pd.DataFrame) -> dict[str, tuple[float, ...]]:
+def build_efficiency_updates(
+    season_eff: pd.DataFrame,
+) -> dict[tuple[str, int], tuple[float, ...]]:
     """
-    Pure function. Maps efficiency.compute_raw_efficiency()'s output to
-    {Team: (epa_off, epa_def, success_off, success_def, nya_off, nya_def, proe)}, for
-    writing into Advanced Efficiency Metrics Section 1.
+    Pure function. Maps efficiency.compute_team_season_efficiency()'s per-season output to
+    {(Team, Season): (epa_off, epa_def, success_off, success_def, nya_off, nya_def, proe)},
+    for writing into Advanced Efficiency Metrics Section 1.
     """
-    return {r["Team"]: tuple(r[c] for c in EFFICIENCY_COLUMNS) for r in raw.to_dict("records")}
+    return {
+        (r["Team"], int(r["Season"])): tuple(r[c] for c in EFFICIENCY_SEASON_COLUMNS)
+        for r in season_eff.to_dict("records")
+    }
 
 
 def _write_yoy_section(ws, updates: dict[tuple[str, int], tuple[float, float]]) -> int:
@@ -74,19 +88,23 @@ def _write_yoy_section(ws, updates: dict[tuple[str, int], tuple[float, float]]) 
     return written
 
 
-def _write_efficiency_section(ws, updates: dict[str, tuple[float, ...]]) -> int:
-    """Writes the 7 raw metric columns into every Team row of Section 1 until the first
-    blank row. Returns the number of rows written."""
+def _write_efficiency_section(
+    ws, updates: dict[tuple[str, int], tuple[float, ...]]
+) -> int:
+    """Writes the 7 raw metric columns into every (Team, Season) row of Section 1 until the
+    first blank row. Returns the number of rows written."""
     written = 0
     row = 5
     while ws.cell(row=row, column=1).value is not None:
         team = ws.cell(row=row, column=1).value
-        if team not in updates:
+        season = ws.cell(row=row, column=2).value
+        key = (team, int(season))
+        if key not in updates:
             raise KeyError(
-                f"No pulled efficiency data for {team!r} (row {row}) -- workbook/pull mismatch"
+                f"No pulled efficiency data for {key} (row {row}) -- workbook/pull mismatch"
             )
-        for offset, value in enumerate(updates[team]):
-            ws.cell(row=row, column=2 + offset, value=value)
+        for offset, value in enumerate(updates[key]):
+            ws.cell(row=row, column=3 + offset, value=value)
         written += 1
         row += 1
     return written
@@ -104,11 +122,13 @@ def update_workbook(workbook_path: str, years: list[int] | None = None) -> dict[
     ppg = transform_to_team_season(sched)
 
     pbp = fetch_pbp(years)
-    raw_eff = compute_raw_efficiency(pbp)
+    season_eff = compute_team_season_efficiency(pbp)
 
     wb = openpyxl.load_workbook(workbook_path)
     yoy_written = _write_yoy_section(wb[YOY_SHEET], build_yoy_updates(ppg))
-    eff_written = _write_efficiency_section(wb[EFFICIENCY_SHEET], build_efficiency_updates(raw_eff))
+    eff_written = _write_efficiency_section(
+        wb[EFFICIENCY_SHEET], build_efficiency_updates(season_eff)
+    )
     wb.save(workbook_path)
 
     return {"yoy_rows": yoy_written, "efficiency_rows": eff_written}

@@ -1,0 +1,25 @@
+[project]
+name = "nflverse-pull"
+version = "0.1.0"
+description = "Pulls nflverse schedule data and shapes it for the NFL Prediction Model workbook's YoY Baseline Engine."
+requires-python = ">=3.10"
+dependencies = [
+    "nfl_data_py>=0.3.2",
+    "pandas>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

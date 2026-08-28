@@ -1,22 +1,19 @@
 """
-Single entry point for the full nflverse-pull pipeline: writes fresh PPG and efficiency
-data into the workbook's placeholder tables (update_workbook.py), then emails a results
-summary (email_results.py). This is what scripts/run_scheduled_update.ps1 -- and so the
-two Windows Scheduled Tasks -- should invoke; run it yourself any time you want the same
-on-demand refresh:
+Single entry point for the nflverse-pull pipeline: writes fresh PPG and efficiency data
+into the workbook's Section 1 input tables (update_workbook.py). This is what
+scripts/run_scheduled_update.ps1 -- and so the two Windows Scheduled Tasks -- invoke; run
+it yourself any time you want the same on-demand refresh:
 
     uv run python -m nflverse_pull.main "C:\\path\\to\\NFL_Prediction_Model.xlsx"
 
-The email step is optional and non-fatal: if NFLVERSE_SMTP_FROM_EMAIL /
-NFLVERSE_SMTP_APP_PASSWORD aren't set (see email_results.py), this logs that it's
-skipping the email rather than failing the whole run -- the workbook is already updated
-by that point regardless.
+Emailing a results summary is no longer part of this pipeline -- it's not a required step.
+If you want that on demand, run nflverse_pull.email_results directly (see its module
+docstring for the Gmail App Password setup it needs).
 """
 from __future__ import annotations
 
 import argparse
 
-from nflverse_pull.email_results import build_report_csv, send_report_email
 from nflverse_pull.update_workbook import EFFICIENCY_SHEET, YOY_SHEET, update_workbook
 
 DEFAULT_YEARS = [2023, 2024, 2025]
@@ -30,13 +27,6 @@ def run(workbook_path: str, years: list[int] | None = None) -> None:
         f"Updated {result['yoy_rows']} rows in '{YOY_SHEET}' and "
         f"{result['efficiency_rows']} rows in '{EFFICIENCY_SHEET}'."
     )
-
-    try:
-        csv_text, out = build_report_csv(years)
-        send_report_email(csv_text, len(out))
-        print(f"Emailed a results summary for {len(out)} teams.")
-    except RuntimeError as exc:
-        print(f"Skipped the email step: {exc}")
 
 
 def main() -> None:

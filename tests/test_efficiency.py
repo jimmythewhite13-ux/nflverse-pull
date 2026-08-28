@@ -2,8 +2,10 @@ import pandas as pd
 import pytest
 
 from nflverse_pull.efficiency import (
+    SEASON_OUTPUT_COLUMNS,
     compute_league_stats,
     compute_raw_efficiency,
+    compute_team_season_efficiency,
     compute_weighted_efficiency,
 )
 
@@ -12,33 +14,34 @@ def _fake_pbp():
     # BUF offense vs MIA defense: a run, a completed pass, an incomplete pass, and a sack.
     # MIA offense vs BUF defense: a run and a completed pass.
     # Plus one postseason play and one non-scrimmage play (kickoff) that must both be
-    # excluded from every metric.
+    # excluded from every metric. All plays are season 2025 -- compute_raw_efficiency()
+    # ignores the season column (it pools), compute_team_season_efficiency() uses it.
     rows = [
         {"season_type": "REG", "play_type": "run", "posteam": "BUF", "defteam": "MIA",
-         "epa": 1.0, "success": 1, "pass_attempt": 0, "sack": 0,
+         "season": 2025, "epa": 1.0, "success": 1, "pass_attempt": 0, "sack": 0,
          "passing_yards": None, "yards_gained": 5, "pass_oe": -20},
         {"season_type": "REG", "play_type": "pass", "posteam": "BUF", "defteam": "MIA",
-         "epa": -1.0, "success": 0, "pass_attempt": 1, "sack": 0,
+         "season": 2025, "epa": -1.0, "success": 0, "pass_attempt": 1, "sack": 0,
          "passing_yards": 0, "yards_gained": 0, "pass_oe": 10},
         {"season_type": "REG", "play_type": "pass", "posteam": "BUF", "defteam": "MIA",
-         "epa": 2.0, "success": 1, "pass_attempt": 1, "sack": 0,
+         "season": 2025, "epa": 2.0, "success": 1, "pass_attempt": 1, "sack": 0,
          "passing_yards": 20, "yards_gained": 20, "pass_oe": 30},
         {"season_type": "REG", "play_type": "pass", "posteam": "BUF", "defteam": "MIA",
-         "epa": -2.0, "success": 0, "pass_attempt": 0, "sack": 1,
+         "season": 2025, "epa": -2.0, "success": 0, "pass_attempt": 0, "sack": 1,
          "passing_yards": None, "yards_gained": -7, "pass_oe": 40},
         {"season_type": "REG", "play_type": "run", "posteam": "MIA", "defteam": "BUF",
-         "epa": -0.5, "success": 1, "pass_attempt": 0, "sack": 0,
+         "season": 2025, "epa": -0.5, "success": 1, "pass_attempt": 0, "sack": 0,
          "passing_yards": None, "yards_gained": 2, "pass_oe": -10},
         {"season_type": "REG", "play_type": "pass", "posteam": "MIA", "defteam": "BUF",
-         "epa": 1.5, "success": 1, "pass_attempt": 1, "sack": 0,
+         "season": 2025, "epa": 1.5, "success": 1, "pass_attempt": 1, "sack": 0,
          "passing_yards": 8, "yards_gained": 8, "pass_oe": 5},
         # Must be excluded -- postseason.
         {"season_type": "POST", "play_type": "pass", "posteam": "BUF", "defteam": "MIA",
-         "epa": 999, "success": 1, "pass_attempt": 1, "sack": 0,
+         "season": 2025, "epa": 999, "success": 1, "pass_attempt": 1, "sack": 0,
          "passing_yards": 999, "yards_gained": 999, "pass_oe": 999},
         # Must be excluded -- not a pass or run play.
         {"season_type": "REG", "play_type": "kickoff", "posteam": "BUF", "defteam": "MIA",
-         "epa": -999, "success": 0, "pass_attempt": 0, "sack": 0,
+         "season": 2025, "epa": -999, "success": 0, "pass_attempt": 0, "sack": 0,
          "passing_yards": None, "yards_gained": 0, "pass_oe": None},
     ]
     return pd.DataFrame(rows)
@@ -113,3 +116,40 @@ def test_weighted_efficiency_carries_proe_unweighted():
     weighted = compute_weighted_efficiency(raw)
     buf = weighted[weighted["Team"] == "Buffalo Bills"].iloc[0]
     assert buf["PROE"] == pytest.approx(0.15)
+
+
+def test_team_season_efficiency_computes_one_row_per_team_per_season():
+    # Add a single 2024 BUF-offense play on top of the fixture's all-2025 plays, to confirm
+    # seasons are kept separate rather than pooled together.
+    row_2024 = pd.DataFrame([
+        {"season_type": "REG", "play_type": "run", "posteam": "BUF", "defteam": "MIA",
+         "season": 2024, "epa": 3.0, "success": 1, "pass_attempt": 0, "sack": 0,
+         "passing_yards": None, "yards_gained": 4, "pass_oe": -5},
+    ])
+    pbp = pd.concat([_fake_pbp(), row_2024], ignore_index=True)
+
+    out = compute_team_season_efficiency(pbp)
+
+    assert list(out.columns) == SEASON_OUTPUT_COLUMNS
+
+    buf_2025 = out[(out["Team"] == "Buffalo Bills") & (out["Season"] == 2025)].iloc[0]
+    buf_2024 = out[(out["Team"] == "Buffalo Bills") & (out["Season"] == 2024)].iloc[0]
+
+    # 2025 matches the pooled compute_raw_efficiency() result for the same plays.
+    assert buf_2025["EPA/Play (Off)"] == pytest.approx(0.0)
+    assert buf_2025["Success Rate (Off)"] == pytest.approx(0.5)
+    assert buf_2025["NY/A (Off)"] == pytest.approx(13 / 3)
+    assert buf_2025["PROE (Off)"] == pytest.approx(0.15)
+    # 2024 is the single extra play, kept as its own row.
+    assert buf_2024["EPA/Play (Off)"] == pytest.approx(3.0)
+    assert buf_2024["Success Rate (Off)"] == pytest.approx(1.0)
+
+
+def test_team_season_efficiency_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([
+        {"season_type": "REG", "play_type": "pass", "posteam": "ZZZ", "defteam": "MIA",
+         "season": 2025, "epa": 1.0, "success": 1, "pass_attempt": 1, "sack": 0,
+         "passing_yards": 10, "yards_gained": 10, "pass_oe": 5},
+    ])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_efficiency(df)

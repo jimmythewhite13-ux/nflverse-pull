@@ -24,15 +24,23 @@ def test_build_yoy_updates_maps_team_season_to_ppg():
     assert len(updates) == 3
 
 
-def test_build_efficiency_updates_maps_team_to_metric_tuple():
-    raw = pd.DataFrame([
-        {"Team": "Buffalo Bills", "epa_off": 0.1, "epa_def": -0.05, "success_off": 0.48,
-         "success_def": 0.43, "nya_off": 6.6, "nya_def": 5.3, "proe": -0.02},
+def test_build_efficiency_updates_maps_team_season_to_metric_tuple():
+    season_eff = pd.DataFrame([
+        {"Team": "Buffalo Bills", "Season": 2023, "EPA/Play (Off)": 0.1,
+         "EPA/Play Allowed (Def)": -0.05, "Success Rate (Off)": 0.48,
+         "Success Rate Allowed (Def)": 0.43, "NY/A (Off)": 6.6, "NY/A Allowed (Def)": 5.3,
+         "PROE (Off)": -0.02},
+        {"Team": "Buffalo Bills", "Season": 2024, "EPA/Play (Off)": 0.15,
+         "EPA/Play Allowed (Def)": -0.03, "Success Rate (Off)": 0.49,
+         "Success Rate Allowed (Def)": 0.42, "NY/A (Off)": 6.8, "NY/A Allowed (Def)": 5.2,
+         "PROE (Off)": -0.01},
     ])
 
-    updates = build_efficiency_updates(raw)
+    updates = build_efficiency_updates(season_eff)
 
-    assert updates["Buffalo Bills"] == (0.1, -0.05, 0.48, 0.43, 6.6, 5.3, -0.02)
+    assert updates[("Buffalo Bills", 2023)] == (0.1, -0.05, 0.48, 0.43, 6.6, 5.3, -0.02)
+    assert updates[("Buffalo Bills", 2024)] == (0.15, -0.03, 0.49, 0.42, 6.8, 5.2, -0.01)
+    assert len(updates) == 2
 
 
 class _FakeCell:
@@ -85,17 +93,33 @@ def test_write_yoy_section_raises_on_workbook_pull_mismatch():
         _write_yoy_section(ws, {})  # no pulled data for the team/season the sheet expects
 
 
-def test_write_efficiency_section_writes_all_seven_metric_columns():
+def test_write_efficiency_section_writes_all_seven_metric_columns_per_team_season():
+    # Team, Season, then 7 metric columns (C-I) -- matches the Multi-Year Efficiency
+    # Engine's Section 1 shape (same (Team, Season) keying as YoY Section 1).
     sheet_rows = [[None]] * 4 + [
-        ["Buffalo Bills", 0, 0, 0, 0, 0, 0, 0],
-        [None] * 8,
+        ["Buffalo Bills", 2023, 0, 0, 0, 0, 0, 0, 0],
+        ["Buffalo Bills", 2024, 0, 0, 0, 0, 0, 0, 0],
+        [None] * 9,
     ]
     ws = _FakeSheet(sheet_rows)
-    updates = {"Buffalo Bills": (0.1, -0.05, 0.48, 0.43, 6.6, 5.3, -0.02)}
+    updates = {
+        ("Buffalo Bills", 2023): (0.1, -0.05, 0.48, 0.43, 6.6, 5.3, -0.02),
+        ("Buffalo Bills", 2024): (0.15, -0.03, 0.49, 0.42, 6.8, 5.2, -0.01),
+    }
 
     written = _write_efficiency_section(ws, updates)
 
-    assert written == 1
-    assert [ws.cell(row=5, column=c).value for c in range(2, 9)] == [
+    assert written == 2
+    assert [ws.cell(row=5, column=c).value for c in range(3, 10)] == [
         0.1, -0.05, 0.48, 0.43, 6.6, 5.3, -0.02,
     ]
+    assert [ws.cell(row=6, column=c).value for c in range(3, 10)] == [
+        0.15, -0.03, 0.49, 0.42, 6.8, 5.2, -0.01,
+    ]
+
+
+def test_write_efficiency_section_raises_on_workbook_pull_mismatch():
+    sheet_rows = [[None]] * 4 + [["Buffalo Bills", 2023, 0, 0, 0, 0, 0, 0, 0]]
+    ws = _FakeSheet(sheet_rows)
+    with pytest.raises(KeyError):
+        _write_efficiency_section(ws, {})

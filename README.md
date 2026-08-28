@@ -45,21 +45,22 @@ needs no internet access and won't hit nflverse's servers on every CI run.
 
 ## Wiring data into the workbook
 
-`nflverse_pull.main` is the single entry point for the full pipeline: it pulls fresh PPG
-(`pull.py`) and efficiency metrics (`efficiency.py`), writes them directly into the
-workbook's two placeholder input tables (`YoY Baseline Engine` Section 1 and `Advanced
-Efficiency Metrics` Section 1) via `update_workbook.py`, then emails a results summary via
-`email_results.py` (skipped, non-fatally, if the email credentials below aren't set).
-Every formula downstream of those two tables recalculates itself the next time the
-workbook is opened in Excel.
+`nflverse_pull.main` is the single entry point for the pipeline: it pulls fresh PPG
+(`pull.py`) and efficiency metrics (`efficiency.py`), and writes them directly into the
+workbook's Section 1 input tables (`YoY Baseline Engine` and `Advanced Efficiency
+Metrics`) via `update_workbook.py`. Every formula downstream of those two tables
+recalculates itself the next time the workbook is opened in Excel.
 
 ```bash
 uv run python -m nflverse_pull.main "C:\path\to\NFL_Prediction_Model.xlsx"
 ```
 
-Each piece also runs standalone if you only want part of the pipeline --
-`uv run python -m nflverse_pull.update_workbook "<path>"` skips the email, and
-`uv run python -m nflverse_pull.pull` / `.efficiency` just produce a CSV (see Usage above).
+Emailing a results summary is not part of this pipeline -- it's available on demand, not
+required. Run `uv run python -m nflverse_pull.email_results` directly if you want that
+(see the "Optional: emailed results" section below for setup).
+
+`pull.py` / `.efficiency` also run standalone if you only want a CSV, not a workbook write
+(see Usage above).
 
 ## Automated scheduled updates
 
@@ -75,18 +76,24 @@ Inspect or change them with `schtasks /Query /TN "NFLPredictionModel_DailyUpdate
 via Task Scheduler's GUI. Each run's output is logged to `logs/update_<timestamp>.log`
 (gitignored).
 
-The email step (`nflverse_pull.email_results`) needs a Gmail App Password, set once as a
-User-scope environment variable -- **run this yourself**, in your own PowerShell prompt
-(replace the placeholders; requires 2-Step Verification enabled on the Google account,
-then Google Account -> Security -> App Passwords):
+## Optional: emailed results
+
+`nflverse_pull.email_results` isn't part of the scheduled/`main.py` pipeline -- run it
+yourself, whenever you want a results summary emailed:
+
+```bash
+uv run python -m nflverse_pull.email_results
+```
+
+It needs a Gmail App Password, set once as a User-scope environment variable -- **run this
+yourself**, in your own PowerShell prompt (replace the placeholders; requires 2-Step
+Verification enabled on the Google account, then Google Account -> Security -> App
+Passwords):
 
 ```powershell
 [Environment]::SetEnvironmentVariable("NFLVERSE_SMTP_FROM_EMAIL", "you@gmail.com", "User")
 [Environment]::SetEnvironmentVariable("NFLVERSE_SMTP_APP_PASSWORD", "xxxxxxxxxxxxxxxx", "User")
 ```
-
-Until those are set, the scheduled runs still update the workbook -- they just log that
-the email step was skipped, rather than failing the whole run.
 
 ## Project layout
 
@@ -98,7 +105,7 @@ src/nflverse_pull/efficiency.py         fetch_pbp() [network] + compute_raw_effi
                                          compute_weighted_efficiency() [pure] + main()
 src/nflverse_pull/update_workbook.py    writes pull.py + efficiency.py output into the workbook's placeholder tables
 src/nflverse_pull/email_results.py      emails a combined PPG + efficiency report via Gmail SMTP
-src/nflverse_pull/main.py               single entry point: update_workbook.py, then email_results.py
+src/nflverse_pull/main.py               single pipeline entry point: calls update_workbook.py
 scripts/run_scheduled_update.ps1        calls nflverse_pull.main; entry point for the two Windows Scheduled Tasks
 tests/                                   offline unit tests for every pure/transform function above
 ```

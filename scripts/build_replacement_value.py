@@ -10,6 +10,7 @@ Usage:
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -45,6 +46,20 @@ INPUT_FONT = Font(name="Arial", size=10, color="FF0000FF")
 FORMULA_FONT = Font(name="Arial", size=10, color="FF000000")
 LINK_FONT = Font(name="Arial", size=10, color="FF008000")
 NOTE_FONT = Font(name="Arial", size=9, color="FF808080")
+
+
+def append_term_once(formula: str, term: str) -> str:
+    """
+    Pure function. Appends `term` (e.g. "+AS3") to the end of `formula` exactly once,
+    stripping any number of pre-existing trailing copies first. Makes re-running this
+    script against a workbook it already touched idempotent instead of re-appending and
+    silently multiplying the term on every run -- this bit the ongoing automated pipeline
+    for real (see commit history): three manual test runs left Z3 reading
+    "...+AS3+AS3+AS3" before this existed.
+    """
+    escaped = re.escape(term)
+    stripped = re.sub(rf"({escaped})+$", "", formula)
+    return f"{stripped}{term}"
 
 
 def _section_title(ws, row: int, last_col: int, text: str) -> None:
@@ -249,10 +264,11 @@ def build(workbook_path: str) -> None:
 
         # Append the new adjustment to the existing Model Home/Away Score formulas (Z/AA),
         # at full weight -- same convention the existing V/W injury columns already use.
+        # append_term_once() keeps this idempotent across repeated runs (see its docstring).
         z_cell = wm.cell(row=r, column=26)  # Z
         aa_cell = wm.cell(row=r, column=27)  # AA
-        z_cell.value = f"{z_cell.value}+AS{r}"
-        aa_cell.value = f"{aa_cell.value}+AT{r}"
+        z_cell.value = append_term_once(z_cell.value, f"+AS{r}")
+        aa_cell.value = append_term_once(aa_cell.value, f"+AT{r}")
 
     note_row_wm = max(game_rows) + 3
     wm.merge_cells(start_row=note_row_wm, start_column=1, end_row=note_row_wm, end_column=20)

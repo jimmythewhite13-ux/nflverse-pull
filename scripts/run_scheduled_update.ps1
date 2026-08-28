@@ -15,7 +15,7 @@
 $ErrorActionPreference = "Stop"
 
 $ProjectDir = Split-Path -Parent $PSScriptRoot
-$WorkbookPath = "C:\Users\smp_p\Downloads\NFL_Prediction_Model_4.xlsx"
+$WorkbookPath = "C:\Users\smp_p\Downloads\NFL_Prediction_Model.xlsx"
 $LogDir = Join-Path $ProjectDir "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("update_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))

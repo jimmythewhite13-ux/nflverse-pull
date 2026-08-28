@@ -59,6 +59,27 @@ def test_transform_output_shape_and_columns():
     assert len(out) == 2  # one row per team for the single season present
 
 
+def test_transform_rounds_ppg_to_one_decimal_place():
+    # BUF scores 10, 10, 11 across three games (avg 31/3 = 10.333...) and allows
+    # 5 every time (avg 5.0, already exact). Only the offense average actually
+    # needs rounding, which none of the other fixtures exercise since they all
+    # land on clean halves.
+    sched = pd.DataFrame([
+        {"season": 2025, "game_type": "REG", "home_team": "BUF", "away_team": "MIA",
+         "home_score": 10, "away_score": 5},
+        {"season": 2025, "game_type": "REG", "home_team": "BUF", "away_team": "MIA",
+         "home_score": 10, "away_score": 5},
+        {"season": 2025, "game_type": "REG", "home_team": "BUF", "away_team": "MIA",
+         "home_score": 11, "away_score": 5},
+    ])
+
+    out = transform_to_team_season(sched)
+    buf = out[out["Team"] == "Buffalo Bills"].iloc[0]
+
+    assert buf["Off PPG"] == pytest.approx(10.3)
+    assert buf["Def PPG"] == pytest.approx(5.0)
+
+
 def test_transform_raises_on_missing_columns():
     bad_df = pd.DataFrame([{"season": 2025, "home_team": "BUF"}])  # missing required columns
     with pytest.raises(ValueError, match="missing expected columns"):

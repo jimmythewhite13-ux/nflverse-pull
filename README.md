@@ -98,13 +98,7 @@ tests/                                   offline unit tests for every pure/trans
 
 ## Note on `.claude/settings.json`
 
-The current allowlist covers `uv run pytest` and `uv run ruff` only, plus WebFetch for
-github.com / raw.githubusercontent.com / nflreadr.nflverse.com (useful if you ask Claude Code to
-consult nflverse docs directly). Running the actual pull (`uv sync`, `uv run python -m ...`) will
-still prompt for approval under this config. Add these two entries if you want the full pull to
-run without prompts too:
-
-```json
-"Bash(uv sync:*)",
-"Bash(uv run python -m nflverse_pull.pull:*)"
-```
+The allowlist covers `uv sync`, `uv run pytest`/`ruff`, and `uv run python -m nflverse_pull.*`
+for all four modules (`pull`, `efficiency`, `update_workbook`, `email_results`), plus WebFetch
+for github.com / raw.githubusercontent.com / nflreadr.nflverse.com -- so none of the commands
+in this README should prompt for approval.

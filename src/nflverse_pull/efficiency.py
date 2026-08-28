@@ -97,6 +97,86 @@ def compute_raw_efficiency(pbp: pd.DataFrame) -> pd.DataFrame:
     return out[["Team", *RAW_METRIC_COLS, "proe"]]
 
 
+SEASON_OUTPUT_COLUMNS = [
+    "Team", "Season", "EPA/Play (Off)", "EPA/Play Allowed (Def)",
+    "Success Rate (Off)", "Success Rate Allowed (Def)",
+    "NY/A (Off)", "NY/A Allowed (Def)", "PROE (Off)",
+]
+
+
+def compute_team_season_efficiency(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Same metrics and filters as compute_raw_efficiency(), but
+    grouped by team AND season instead of pooled across every season present in `pbp` --
+    one row per team per season, matching pull.py's transform_to_team_season() shape
+    (Team | Season | ...). Feeds the Multi-Year Efficiency Engine on 'Advanced Efficiency
+    Metrics', which needs a real 3-year history per metric instead of a single pooled
+    snapshot.
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    plays = reg[reg["play_type"].isin(["pass", "run"])]
+
+    # join() on a MultiIndex aligns by matching LEVEL NAMES, not positions/values (unlike a
+    # single-level Index, where alignment is by value regardless of name) -- so every one of
+    # these must share the same ["team_abbr", "season"] axis names before joining, or pandas
+    # treats posteam/defteam as two distinct extra levels instead of aligning them.
+    axis_names = ["team_abbr", "season"]
+
+    off = plays.groupby(["posteam", "season"]).agg(
+        epa_off=("epa", "mean"), success_off=("success", "mean")
+    ).rename_axis(axis_names)
+    defn = plays.groupby(["defteam", "season"]).agg(
+        epa_def=("epa", "mean"), success_def=("success", "mean")
+    ).rename_axis(axis_names)
+
+    attempts = reg[reg["pass_attempt"] == 1]
+    sacks = reg[reg["sack"] == 1]
+
+    def _nya(group_cols: list[str]) -> pd.Series:
+        att_yards = attempts.groupby(group_cols)["passing_yards"].sum()
+        att_count = attempts.groupby(group_cols).size()
+        sack_yards = sacks.groupby(group_cols)["yards_gained"].sum()
+        sack_count = sacks.groupby(group_cols).size()
+        denom = att_count.add(sack_count, fill_value=0)
+        numer = att_yards.add(sack_yards, fill_value=0)
+        return (numer / denom).rename_axis(axis_names)
+
+    nya_off = _nya(["posteam", "season"]).rename("nya_off")
+    nya_def = _nya(["defteam", "season"]).rename("nya_def")
+
+    proe = (
+        plays.groupby(["posteam", "season"])["pass_oe"].mean().rename_axis(axis_names) / 100
+    )
+
+    out = (
+        off.join(defn, how="outer")
+        .join(nya_off, how="outer")
+        .join(nya_def, how="outer")
+        .join(proe.rename("proe"), how="outer")
+    )
+    out = out.reset_index()
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+    out = out.rename(
+        columns={
+            "season": "Season",
+            "epa_off": "EPA/Play (Off)",
+            "epa_def": "EPA/Play Allowed (Def)",
+            "success_off": "Success Rate (Off)",
+            "success_def": "Success Rate Allowed (Def)",
+            "nya_off": "NY/A (Off)",
+            "nya_def": "NY/A Allowed (Def)",
+            "proe": "PROE (Off)",
+        }
+    )
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[SEASON_OUTPUT_COLUMNS]
+
+
 def compute_league_stats(raw: pd.DataFrame) -> pd.DataFrame:
     """Pure function. Section 2 equivalent: league average and population std-dev per metric."""
     return pd.DataFrame(
@@ -136,16 +216,30 @@ def compute_weighted_efficiency(raw: pd.DataFrame) -> pd.DataFrame:
     return z
 
 
-def main(years: list[int] | None = None, output_path: str = "team_efficiency.csv") -> pd.DataFrame:
+def main(
+    years: list[int] | None = None,
+    output_path: str = "team_efficiency.csv",
+    season_output_path: str = "team_season_efficiency.csv",
+) -> pd.DataFrame:
     years = years or [2023, 2024, 2025]
     pbp = fetch_pbp(years)
+
     raw = compute_raw_efficiency(pbp)
     out = compute_weighted_efficiency(raw)
     out.to_csv(output_path, index=False)
     print(out.head(10))
     print(f"\nSaved {len(out)} rows to {output_path}")
+
+    season_out = compute_team_season_efficiency(pbp)
+    season_out.to_csv(season_output_path, index=False)
+    print(f"Saved {len(season_out)} rows to {season_output_path}")
+
     return out
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    # Positional years, e.g. `uv run python -m nflverse_pull.efficiency 2023 2024 2025`.
+    cli_years = [int(a) for a in sys.argv[1:]] or None
+    main(years=cli_years)

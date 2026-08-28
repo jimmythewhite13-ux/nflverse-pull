@@ -1,24 +1,21 @@
 <#
 .SYNOPSIS
-    Runs the full nflverse_pull.main pipeline (update the workbook, then email a results
-    summary) and logs it. Invoked by the "NFLPredictionModel_DailyUpdate" and
+    Runs the nflverse_pull.main pipeline (updates the workbook's Section 1 input tables)
+    and logs it. Invoked by the "NFLPredictionModel_DailyUpdate" and
     "NFLPredictionModel_SundayUpdate" Windows Scheduled Tasks -- see README.md for the
     schedule and how to inspect/change it.
 
 .NOTES
     Scheduled Tasks run with a minimal environment (no user PATH), so this script rebuilds
     PATH from the machine+user environment variables before calling `uv`, the same way the
-    interactive setup in this project does. The email step needs NFLVERSE_SMTP_FROM_EMAIL
-    and NFLVERSE_SMTP_APP_PASSWORD set as User-scope environment variables (see
-    src/nflverse_pull/email_results.py) -- if they aren't set, nflverse_pull.main still
-    updates the workbook and just logs why it skipped the email, rather than failing the
-    whole run (that non-fatal handling lives in main.py, not here).
+    interactive setup in this project does. Emailing a results summary is not part of this
+    pipeline -- run nflverse_pull.email_results directly if you want that on demand.
 #>
 
 $ErrorActionPreference = "Stop"
 
 $ProjectDir = Split-Path -Parent $PSScriptRoot
-$WorkbookPath = "C:\Users\smp_p\Downloads\NFL_Prediction_Model_2.xlsx"
+$WorkbookPath = "C:\Users\smp_p\Downloads\NFL_Prediction_Model_4.xlsx"
 $LogDir = Join-Path $ProjectDir "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("update_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))

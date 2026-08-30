@@ -51,14 +51,28 @@ NOTE_FONT = Font(name="Arial", size=9, color="FF808080")
 def append_term_once(formula: str, term: str) -> str:
     """
     Pure function. Appends `term` (e.g. "+AS3") to the end of `formula` exactly once,
-    stripping any number of pre-existing trailing copies first. Makes re-running this
-    script against a workbook it already touched idempotent instead of re-appending and
-    silently multiplying the term on every run -- this bit the ongoing automated pipeline
-    for real (see commit history): three manual test runs left Z3 reading
-    "...+AS3+AS3+AS3" before this existed.
+    stripping any number of pre-existing copies first. Makes re-running this script (or any
+    other script that appends its OWN different term the same way -- see
+    build_defensive_matchup_wiring.py, which imports this function rather than
+    reimplementing it) against a workbook it already touched idempotent instead of
+    re-appending and silently multiplying the term on every run -- this bit the ongoing
+    automated pipeline for real (see commit history): three manual test runs left Z3
+    reading "...+AS3+AS3+AS3" before this existed.
+
+    UPDATED: originally only stripped a TRAILING run of `term` (anchored with `$`), which
+    was correct as long as `term` was always the LAST thing ever appended to the formula.
+    That assumption broke for real once a second script started appending its OWN different
+    term after this one (build_defensive_matchup_wiring.py's "+BG{r}"/"+BH{r}", appended
+    after Replacement Value's own "+AS{r}"/"+AT{r}") -- re-running BOTH scripts left Z
+    reading "...+AS3+BG3+AS3+BG3+AS3+BG3" (each script's trailing-anchored strip found
+    nothing to remove, since its own term was no longer at the very end). Now strips every
+    occurrence of `term` ANYWHERE in the formula (with a negative lookahead so "+AS3" can't
+    accidentally eat the leading digits of a different row's "+AS30"), not just a trailing
+    run, before re-appending it once at the end -- correct regardless of what other terms
+    were appended after it, and regardless of run order between multiple appending scripts.
     """
     escaped = re.escape(term)
-    stripped = re.sub(rf"({escaped})+$", "", formula)
+    stripped = re.sub(rf"{escaped}(?!\d)", "", formula)
     return f"{stripped}{term}"
 
 

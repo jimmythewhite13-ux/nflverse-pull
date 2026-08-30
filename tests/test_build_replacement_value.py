@@ -35,3 +35,26 @@ def test_append_term_once_does_not_confuse_similarly_named_rows():
     # +AS3 must not be stripped by a call meant for +AS30, or vice versa.
     formula = "=A1+B1+AS30"
     assert append_term_once(formula, "+AS3") == "=A1+B1+AS30+AS3"
+
+
+def test_append_term_once_stays_idempotent_when_a_different_term_is_appended_after_it():
+    """
+    Real bug found live (claude_code_spec_defensive_matchup_engine.md Part C): the original
+    fix only stripped a TRAILING run of `term`, correct as long as `term` was always the
+    LAST thing ever appended. That broke once a second script (build_defensive_matchup_
+    wiring.py) started appending its OWN different term ("+BG{r}") after Replacement
+    Value's "+AS{r}" -- re-running both left Z reading
+    "...+AS3+BG3+AS3+BG3+AS3+BG3" because each script's trailing-anchored strip found
+    nothing to remove (its own term was no longer at the very end). Simulates exactly that
+    two-script interleaving.
+    """
+    formula = "=A1+B1"
+    formula = append_term_once(formula, "+AS3")  # Replacement Value's own term
+    formula = append_term_once(formula, "+BG3")  # a second script's different term
+    # Re-running BOTH scripts again must not duplicate either term, regardless of order.
+    formula = append_term_once(formula, "+AS3")
+    formula = append_term_once(formula, "+BG3")
+    formula = append_term_once(formula, "+AS3")
+    formula = append_term_once(formula, "+BG3")
+
+    assert formula == "=A1+B1+AS3+BG3"

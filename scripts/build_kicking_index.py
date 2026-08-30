@@ -51,10 +51,15 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from add_manual_override_table import read_existing_overrides  # noqa: E402
 
 from nflverse_pull.current_roster import (  # noqa: E402
+    attach_real_rookie_season,
     compute_current_starters,
     fetch_depth_charts,
+    fetch_seasonal_rosters,
     resolve_scored_population,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
@@ -155,25 +160,36 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n.alignment = Alignment(wrap_text=True, vertical="top")
 
 
-def _pull_data() -> dict:
+def _pull_data(overrides: pd.DataFrame) -> dict:
     print(f"Pulling {HISTORICAL_YEARS} play-by-play data for kicking stats...")
     pbp = fetch_pbp(HISTORICAL_YEARS)
     season_stats = compute_team_season_kicking_stats(pbp)
 
+    # claude_code_spec_consolidated_fixes.md Part 1: kicking_stats' own Is Rookie Season is
+    # a "first season observed in the pulled window" proxy -- overwrite it with real
+    # per-season entry_year data (confirmed live this was contaminating the Rookie Baseline
+    # with real veterans: Butker, McPherson both had a pulled-window season wrongly flagged
+    # True).
+    print(f"Pulling {HISTORICAL_YEARS} seasonal rosters for real Is Rookie Season data...")
+    seasonal_rosters = fetch_seasonal_rosters(HISTORICAL_YEARS)
+    season_stats = attach_real_rookie_season(season_stats, seasonal_rosters)
+
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster K1 population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
     current_starters = compute_current_starters(depth_charts)
-    empty_overrides = pd.DataFrame(
-        columns=["Team", "Manual Starter Override", "Manual Backup Override"]
-    )
-    population = resolve_scored_population(current_starters, empty_overrides, "PK")
+    population = resolve_scored_population(current_starters, overrides, "PK")
     print(f"{len(population)} current-roster K1s identified.")
 
     return {"season_stats": season_stats, "population": population}
 
 
 def build(workbook_path: str) -> dict:
-    data = _pull_data()
+    wb = openpyxl.load_workbook(workbook_path)
+    overrides = read_existing_overrides(wb, SHEET_NAME, ["K1"])
+    print(f"Read back {len(overrides)} existing manual-override row(s) from Section 7 "
+          "before rebuilding the sheet.")
+
+    data = _pull_data(overrides)
     season_stats = data["season_stats"]
     population = data["population"]
     n_kickers = len(population)
@@ -187,7 +203,6 @@ def build(workbook_path: str) -> dict:
     else:
         print("No current K1 has zero qualifying pbp history.")
 
-    wb = openpyxl.load_workbook(workbook_path)
     add_model_assumptions_weights(wb)
 
     if SHEET_NAME in wb.sheetnames:

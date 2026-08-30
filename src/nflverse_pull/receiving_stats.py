@@ -25,6 +25,20 @@ incomplete, never a real target). `receiver_player_id` vs `receiver_id` was also
 unlike the passer_id/rusher_id quirks, these two are functionally identical on real target
 plays (1 mismatch out of 17,535 real 2025 targets) -- receiver_player_id/receiver_player_name
 are used here for consistency with the other stats modules' "_player_" convention.
+
+Avg Separation / YAC Over Expectation: real, OFFICIAL NFL Next Gen Stats data
+(nfl_data_py.import_ngs_data("receiving", years)), not derived from pbp -- NGS's own
+tracking-data measures of route-running/get-open skill (average yards of separation from the
+nearest defender at the moment of catch) and after-catch playmaking isolated from the type of
+catch (actual YAC minus a model's expected YAC given the catch's context). Unlike QB Index's
+NGS context additions, BOTH of these are SCORED here (same treatment as RB Index's RYOE/Att):
+each has an unambiguous "higher is better" direction and measures a real skill this tab's
+existing 3 metrics (EPA/Target, Success Rate, YPT -- all outcome/value measures) don't isolate
+on their own. Verified live before adding this: NGS receiving applies its OWN, higher
+qualifying-volume threshold (2023-2025 minimum real targets: 45) than this module's own
+MIN_QUALIFYING_TARGETS=40, so some real, qualifying receiver-seasons here won't have real NGS
+values -- handled as a genuinely missing data point (left blank), not zero-filled or assumed,
+same pattern as RYOE/Att and everywhere else in this project.
 """
 from __future__ import annotations
 
@@ -101,6 +115,51 @@ def compute_team_season_receiving_stats(pbp: pd.DataFrame) -> pd.DataFrame:
         ["Team", "Season", "Targets"], ascending=[True, True, False]
     ).reset_index(drop=True)
     return out[SEASON_STATS_COLUMNS]
+
+
+def fetch_ngs_receiving(years: list[int]) -> pd.DataFrame:
+    """Network call -- real, official NFL Next Gen Stats receiving data (weekly + season-
+    aggregate rows; compute_player_season_ngs_receiving filters to the real season
+    aggregates)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_ngs_data("receiving", years)
+
+
+# NGS quirk verified live before writing this (same check already done for qb_stats.py's
+# and rb_stats.py's own NGS pulls): NGS uses "LAR" for the Rams consistently across
+# 2023-2025 -- the Raiders' "LV" matches TEAM_NAMES correctly, so only LAR needs remapping.
+_NGS_TEAM_REMAP = {"LAR": "LA"}
+
+
+def compute_player_season_ngs_receiving(ngs_receiving: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-player season Avg Separation and YAC Over
+    Expectation, from NFL Next Gen Stats' own season-aggregate rows (`week == 0` --
+    verified live this is the real seasonal total, not something to average from weekly
+    rows). Both SCORED metrics -- see this module's own docstring for why.
+
+    YAC Over Expectation = avg_yac - avg_expected_yac (NGS provides both separately; this
+    module computes the difference itself since NGS doesn't ship it as a single column).
+
+    Columns: Player ID | Season | Team | Avg Separation | YAC Over Expectation
+    """
+    season = ngs_receiving[ngs_receiving["week"] == 0].copy()
+    season = season[season["player_gsis_id"].notna()]
+    season["team_abbr"] = season["team_abbr"].replace(_NGS_TEAM_REMAP)
+
+    unmapped = sorted(set(season["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+
+    out = pd.DataFrame({
+        "Player ID": season["player_gsis_id"],
+        "Season": season["season"],
+        "Team": season["team_abbr"].map(TEAM_NAMES),
+        "Avg Separation": season["avg_separation"],
+        "YAC Over Expectation": season["avg_yac"] - season["avg_expected_yac"],
+    })
+    return out.reset_index(drop=True)
 
 
 def main(

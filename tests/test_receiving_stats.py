@@ -4,6 +4,7 @@ import pytest
 from nflverse_pull.receiving_stats import (
     MIN_QUALIFYING_TARGETS,
     SEASON_STATS_COLUMNS,
+    compute_player_season_ngs_receiving,
     compute_team_season_receiving_stats,
 )
 
@@ -100,3 +101,48 @@ def test_receiving_stats_flags_rookie_season_as_first_qualifying_season():
 
     assert list(out["Season"]) == [2025]  # 2024 excluded, not zero-filled
     assert out.iloc[0]["Is Rookie Season"]
+
+
+def _ngs_row(player_id, season, team_abbr, week, avg_separation, avg_yac, avg_expected_yac):
+    return {
+        "player_gsis_id": player_id, "season": season, "team_abbr": team_abbr,
+        "week": week, "avg_separation": avg_separation, "avg_yac": avg_yac,
+        "avg_expected_yac": avg_expected_yac,
+    }
+
+
+def test_ngs_receiving_uses_real_season_aggregate_rows_only():
+    # week=0 is the real season aggregate; weekly rows must be ignored, not averaged
+    # manually -- NGS already computes the season total itself.
+    rows = [
+        _ngs_row("P1", 2025, "BUF", 0, 3.2, 6.5, 6.0),
+        _ngs_row("P1", 2025, "BUF", 1, 2.9, 5.0, 5.5),
+        _ngs_row("P1", 2025, "BUF", 2, 3.5, 7.0, 6.2),
+    ]
+    out = compute_player_season_ngs_receiving(pd.DataFrame(rows)).set_index("Player ID")
+    assert len(out) == 1
+    assert out.loc["P1", "Avg Separation"] == pytest.approx(3.2)
+    assert out.loc["P1", "YAC Over Expectation"] == pytest.approx(0.5)  # 6.5 - 6.0
+    assert out.loc["P1", "Team"] == "Buffalo Bills"
+
+
+def test_ngs_receiving_remaps_ngs_lar_to_la():
+    rows = [_ngs_row("P1", 2025, "LAR", 0, 3.0, 6.0, 5.5)]
+    out = compute_player_season_ngs_receiving(pd.DataFrame(rows))
+    assert out.iloc[0]["Team"] == "Los Angeles Rams"
+
+
+def test_ngs_receiving_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_ngs_row("P1", 2025, "ZZZ", 0, 3.0, 6.0, 5.5)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_ngs_receiving(df)
+
+
+def test_ngs_receiving_skips_rows_with_no_real_player_id():
+    rows = [
+        _ngs_row(None, 2025, "BUF", 0, 3.0, 6.0, 5.5),
+        _ngs_row("P1", 2025, "BUF", 0, 3.1, 6.1, 5.6),
+    ]
+    out = compute_player_season_ngs_receiving(pd.DataFrame(rows))
+    assert len(out) == 1
+    assert out.iloc[0]["Player ID"] == "P1"

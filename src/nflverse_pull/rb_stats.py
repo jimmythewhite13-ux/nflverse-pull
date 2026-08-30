@@ -91,6 +91,23 @@ def compute_team_season_rb_stats(pbp: pd.DataFrame) -> pd.DataFrame:
     return out[SEASON_STATS_COLUMNS]
 
 
+def compute_historical_rb_roles(season_stats: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Historical, attempts-ranking-based Role per (Player ID,
+    Season) -- same pattern as qb_stats.compute_qb_roles(), ranking by Carries instead of
+    Dropbacks. Per the spec: this is ONLY used to label each PAST season's role for Section
+    1/2 (e.g. so the league-average-among-Starters+Backups filter makes sense historically);
+    it is explicitly NOT used to determine the CURRENT Starter/Backup for Section 3/5/6 or
+    Team Ratings -- that comes from current_roster.py's live depth-chart data instead.
+
+    Output: Team | Season | Player Name | Player ID | Role | Carries
+    """
+    rank = season_stats.groupby(["Team", "Season"])["Carries"].rank(method="first", ascending=False)
+    out = season_stats.copy()
+    out["Role"] = rank.map({1: "Starter", 2: "Backup"}).fillna("Other")
+    return out[["Team", "Season", "Player Name", "Player ID", "Role", "Carries"]]
+
+
 def compute_carry_share(population: pd.DataFrame, season_stats: pd.DataFrame) -> pd.DataFrame:
     """
     Pure function, no network. For each team with BOTH a Starter and a Backup in

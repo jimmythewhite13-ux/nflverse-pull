@@ -140,3 +140,23 @@ def test_carry_share_skips_team_missing_a_role():
     population = _population([["Buffalo Bills", "Starter", "R.Solo", "P1"]])  # no backup
     out = compute_carry_share(population, _season_stats_for_carries([]))
     assert len(out) == 0
+
+
+def test_historical_rb_roles_ranks_by_carries_within_team_season():
+    from nflverse_pull.rb_stats import compute_historical_rb_roles
+
+    team, season = "Buffalo Bills", 2025
+
+    def _row(name, player_id, carries):
+        return {"Team": team, "Season": season, "Player Name": name,
+                "Player ID": player_id, "Carries": carries}
+
+    season_stats = pd.DataFrame([
+        _row("R.Lead", "P1", 200),
+        _row("R.Change", "P2", 80),
+        _row("R.Third", "P3", 55),
+    ])
+    out = compute_historical_rb_roles(season_stats).set_index("Player ID")
+    assert out.loc["P1", "Role"] == "Starter"
+    assert out.loc["P2", "Role"] == "Backup"
+    assert out.loc["P3", "Role"] == "Other"

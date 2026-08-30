@@ -28,14 +28,28 @@ sack plays, same "pass_attempt is TRUE on a sack too" quirk documented in
 receiving_stats.py). TFL Rate uses ALL real defensive plays faced (TFL can happen on a run
 OR a pass play, unlike the other four which are pass-play-only).
 
-Scheme context (Blitz Rate, Avg Box Count): real, per-play charting from FTN Fantasy
-(nfl_data_py.import_ftn_data), joined against pbp by game_id/play_id -- verified live 100%
-real coverage on a real team's pass plays faced. Blitz Rate = share of real pass plays
-faced with at least one charted blitzer (n_blitzers > 0); Avg Box Count = mean n_defense_box
-across all real defensive plays. Deliberately informational/contextual, NOT part of the
-weighted Z-score composite on Front Seven & D-Line Index -- a higher or lower blitz rate
-isn't inherently "better," it's a scheme choice, unlike Sack/TFL/QB-Hit Rate which are
-unambiguously "higher is better."
+Scheme context (Blitz Rate, Avg Box Count): CORRECTED per claude_code_spec_ftn_fix.md --
+originally sourced from FTN Fantasy's real per-play charting (nfl_data_py.import_ftn_data),
+which turned out to be a real, free, CC-BY-SA-licensed public dataset (verified: FTN Data
+donated a charting subset for open publication via nflverse's GitHub Releases, no API key
+or subscription required -- this was NOT fabricated data and NOT the paid FTN Fantasy
+product, but the user asked for a second, independent free source as well). Now sourced
+from nflverse's own official PARTICIPATION data instead: `number_of_pass_rushers` and
+`defenders_in_box`, both already merged into every pbp pull this project makes by
+nfl_data_py.import_pbp_data's own default `include_participation=True` (verified live:
+these columns pull from the SAME nflverse-data GitHub Releases family the pbp/schedules
+data already used everywhere in this project comes from -- no separate fetch call needed,
+0 nulls on real 2025 pass/run plays). Blitz Rate = share of real pass plays faced with 5+
+pass rushers (the standard definition of a blitz -- a named, documented threshold, not a
+magic number); Avg Box Count = mean defenders_in_box across real SCRIMMAGE plays only (pass
+or run) -- caught live while verifying this: defenders_in_box is 0, not null, on kickoffs/
+punts/extra points/kneels/spikes (no real front-seven alignment to chart there), so
+averaging over every "defensive" row including special teams plays would silently deflate
+every team's real number (Arizona 2023: 4.96 unrestricted vs. the real 6.11 restricted to
+actual snaps). Deliberately informational/contextual, NOT part of the weighted Z-score
+composite on Front
+Seven & D-Line Index -- a higher or lower blitz rate isn't inherently "better," it's a
+scheme choice, unlike Sack/TFL/QB-Hit Rate which are unambiguously "higher is better."
 """
 from __future__ import annotations
 
@@ -257,40 +271,44 @@ def compute_player_season_secondary_stats(pbp: pd.DataFrame) -> pd.DataFrame:
     return _finalize_player_frame(combined, value_cols)
 
 
-def fetch_ftn(years: list[int]) -> pd.DataFrame:
-    """Network call -- FTN Fantasy's real per-play charting (blitz/box counts, sack fault,
-    play-action, drops, etc.)."""
-    import nfl_data_py as nfl
-
-    return nfl.import_ftn_data(years)
+# Standard definition of a blitz: 5 or more pass rushers. A named, documented, tunable
+# threshold (like every other judgment-call constant in this project -- QB's 100-dropback
+# minimum, RB's 50-carry minimum), not a magic number buried in a formula.
+BLITZ_MIN_PASS_RUSHERS = 5
 
 
-def compute_team_season_scheme_context(pbp: pd.DataFrame, ftn: pd.DataFrame) -> pd.DataFrame:
+def compute_team_season_participation_context(pbp: pd.DataFrame) -> pd.DataFrame:
     """
     Pure function, no network. Real, per-play scheme-tendency context for Front Seven & D-
-    Line Index -- Blitz Rate and Avg Box Count, joined from FTN Fantasy's real charting by
-    game_id/play_id. Deliberately informational (see module docstring): neither is a
-    "higher is better" quality signal, so neither feeds the tab's weighted Z-score
-    composite.
+    Line Index -- Blitz Rate and Avg Box Count, from nflverse's own official participation
+    data (`number_of_pass_rushers` / `defenders_in_box`), already present in `pbp` -- no
+    separate fetch or join needed, unlike the FTN-sourced version this replaced (see module
+    docstring for the correction history). Deliberately informational (see module
+    docstring): neither is a "higher is better" quality signal, so neither feeds the tab's
+    weighted Z-score composite.
+
+    Blitz Rate = share of real pass plays faced with BLITZ_MIN_PASS_RUSHERS (5) or more pass
+    rushers. Avg Box Count = mean defenders_in_box across all real SCRIMMAGE plays (pass or
+    run) -- found live while verifying this against a direct pull: `defenders_in_box` is 0
+    (not null) on kickoffs/punts/extra points/field goals/kneels/spikes, since there's no
+    real front-seven alignment to chart on those -- Arizona's real 2023 average was 4.96
+    including those non-scrimmage 0's dragging it down, vs. 6.11 restricted to real
+    pass/run plays (matches real NFL box-count ranges); the unrestricted version would have
+    shipped a real accuracy bug, not just a labeling one.
 
     Columns: Team | Season | Blitz Rate | Avg Box Count
     """
     reg = pbp[pbp["season_type"] == "REG"].copy()
     reg = reg[reg["defteam"].notna()]
-    reg["play_id"] = reg["play_id"].astype("Int64")
+    scrimmage = reg[reg["play_type"].isin(["pass", "run"])]
 
-    ftn_join = ftn[["nflverse_game_id", "nflverse_play_id", "n_blitzers", "n_defense_box"]].copy()
-    ftn_join["nflverse_play_id"] = ftn_join["nflverse_play_id"].astype("Int64")
-
-    merged = reg.merge(
-        ftn_join, left_on=["game_id", "play_id"],
-        right_on=["nflverse_game_id", "nflverse_play_id"], how="left",
+    box_avg = (
+        scrimmage.groupby(["defteam", "season"])["defenders_in_box"]
+        .mean().rename("Avg Box Count")
     )
 
-    box_avg = merged.groupby(["defteam", "season"])["n_defense_box"].mean().rename("Avg Box Count")
-
-    pass_faced = merged[merged["pass_attempt"] == 1].copy()
-    pass_faced["blitzed"] = pass_faced["n_blitzers"] > 0
+    pass_faced = reg[reg["pass_attempt"] == 1].copy()
+    pass_faced["blitzed"] = pass_faced["number_of_pass_rushers"] >= BLITZ_MIN_PASS_RUSHERS
     blitz_rate = pass_faced.groupby(["defteam", "season"])["blitzed"].mean().rename("Blitz Rate")
 
     out = blitz_rate.to_frame().join(box_avg).reset_index()

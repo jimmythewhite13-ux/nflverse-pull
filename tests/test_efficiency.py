@@ -160,38 +160,66 @@ def test_team_season_efficiency_raises_on_unmapped_team_abbreviation():
 
 
 def _matchup_row(posteam, defteam, season, play_type, yards_gained, pass_attempt=0, sack=0,
-                  complete_pass=None):
+                  complete_pass=None, epa=0.0, success=0):
     return {
         "season_type": "REG", "play_type": play_type, "posteam": posteam, "defteam": defteam,
         "season": season, "yards_gained": yards_gained, "pass_attempt": pass_attempt,
-        "sack": sack, "complete_pass": complete_pass,
+        "sack": sack, "complete_pass": complete_pass, "epa": epa, "success": success,
     }
 
 
 def _fake_matchup_pbp():
     """
     BUF offense vs MIA defense, 2025:
-      - 4 real pass attempts (sack=0): 2 completions (10 yd, 20 yd -- the 20-yd one is
-        explosive, EXPLOSIVE_PASS_YARDS=15), 2 incompletions (0 yd each).
+      - 4 real pass attempts (sack=0): 2 completions (10 yd/epa 1.0/success 1, 20 yd/epa
+        2.0/success 1 -- the 20-yd one is explosive, EXPLOSIVE_PASS_YARDS=15), 2
+        incompletions (0 yd/epa -1.0/success 0 each).
         Completion % Allowed (MIA) = 2/4 = 0.5.
         Explosive Pass Rate (Off, BUF) -- denominator is ALL play_type=="pass" rows,
         which includes the 1 sack below (5 total) = 1/5 = 0.2.
-      - 1 sack (play_type=="pass", pass_attempt=0, sack=1, -7 yards) -- excluded from
-        Completion % (not a real attempt), included in Explosive Pass Rate's denominator.
-      - 3 runs: 12 yd (explosive, EXPLOSIVE_RUN_YARDS=10), 3 yd (neither), -1 yd (stuffed).
+        EPA/Dropback Allowed (MIA) = mean(1.0, 2.0, -1.0, -1.0, sack's -3.0) = -0.4.
+        Pass Success Rate Allowed (MIA) = mean(1, 1, 0, 0, sack's 0) = 2/5 = 0.4.
+      - 1 sack (play_type=="pass", pass_attempt=0, sack=1, -7 yards, epa=-3.0, success=0) --
+        excluded from Completion % (not a real attempt), included in Explosive Pass Rate's
+        AND EPA/Dropback Allowed's denominator (a real dropback outcome).
+      - 3 runs: 12 yd/epa 1.5/success 1 (explosive, EXPLOSIVE_RUN_YARDS=10), 3 yd/epa
+        0.1/success 0 (neither), -1 yd/epa -1.2/success 0 (stuffed).
         Explosive Run Rate (Off, BUF) = 1/3. Stuff Rate (Off, BUF) = 1/3.
+        EPA/Rush Allowed (MIA) = mean(1.5, 0.1, -1.2) = 0.1333...
+        Run Success Rate Allowed (MIA) = mean(1, 0, 0) = 1/3.
+        Yards/Carry Allowed (MIA) = mean(12, 3, -1) = 14/3.
     """
     rows = [
-        _matchup_row("BUF", "MIA", 2025, "pass", 10, pass_attempt=1, complete_pass=1),
-        _matchup_row("BUF", "MIA", 2025, "pass", 20, pass_attempt=1, complete_pass=1),
-        _matchup_row("BUF", "MIA", 2025, "pass", 0, pass_attempt=1, complete_pass=0),
-        _matchup_row("BUF", "MIA", 2025, "pass", 0, pass_attempt=1, complete_pass=0),
-        _matchup_row("BUF", "MIA", 2025, "pass", -7, pass_attempt=0, sack=1),
-        _matchup_row("BUF", "MIA", 2025, "run", 12),
-        _matchup_row("BUF", "MIA", 2025, "run", 3),
-        _matchup_row("BUF", "MIA", 2025, "run", -1),
+        _matchup_row("BUF", "MIA", 2025, "pass", 10, pass_attempt=1, complete_pass=1,
+                     epa=1.0, success=1),
+        _matchup_row("BUF", "MIA", 2025, "pass", 20, pass_attempt=1, complete_pass=1,
+                     epa=2.0, success=1),
+        _matchup_row("BUF", "MIA", 2025, "pass", 0, pass_attempt=1, complete_pass=0,
+                     epa=-1.0, success=0),
+        _matchup_row("BUF", "MIA", 2025, "pass", 0, pass_attempt=1, complete_pass=0,
+                     epa=-1.0, success=0),
+        _matchup_row("BUF", "MIA", 2025, "pass", -7, pass_attempt=0, sack=1,
+                     epa=-3.0, success=0),
+        _matchup_row("BUF", "MIA", 2025, "run", 12, epa=1.5, success=1),
+        _matchup_row("BUF", "MIA", 2025, "run", 3, epa=0.1, success=0),
+        _matchup_row("BUF", "MIA", 2025, "run", -1, epa=-1.2, success=0),
     ]
     return pd.DataFrame(rows)
+
+
+def test_matchup_metrics_epa_dropback_and_pass_success_allowed_include_sacks():
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["EPA/Dropback Allowed (Def)"] == pytest.approx((1.0 + 2.0 - 1.0 - 1.0 - 3.0) / 5)
+    assert mia["Pass Success Rate Allowed (Def)"] == pytest.approx(2 / 5)
+
+
+def test_matchup_metrics_epa_rush_success_and_ypc_allowed():
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["EPA/Rush Allowed (Def)"] == pytest.approx((1.5 + 0.1 - 1.2) / 3)
+    assert mia["Run Success Rate Allowed (Def)"] == pytest.approx(1 / 3)
+    assert mia["Yards/Carry Allowed (Def)"] == pytest.approx((12 + 3 - 1) / 3)
 
 
 def test_matchup_metrics_computes_completion_pct_allowed_excluding_sacks():

@@ -185,8 +185,11 @@ EXPLOSIVE_RUN_YARDS = 10
 
 MATCHUP_SEASON_OUTPUT_COLUMNS = [
     "Team", "Season",
+    "EPA/Dropback Allowed (Def)", "Pass Success Rate Allowed (Def)",
     "Completion % Allowed (Def)",
     "Explosive Pass Rate (Off)", "Explosive Pass Rate Allowed (Def)",
+    "EPA/Rush Allowed (Def)", "Run Success Rate Allowed (Def)",
+    "Yards/Carry Allowed (Def)",
     "Explosive Run Rate (Off)", "Explosive Run Rate Allowed (Def)",
     "Stuff Rate (Off)", "Stuff Rate Allowed (Def)",
 ]
@@ -213,8 +216,21 @@ def compute_team_season_matchup_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
     (matches EPA/Success Rate's own snap-count convention above), whereas "was this pass
     COMPLETED" is a question a sack was never a candidate to answer at all.
 
-    Columns: Team | Season | Completion % Allowed (Def) | Explosive Pass Rate (Off) |
-    Explosive Pass Rate Allowed (Def) | Explosive Run Rate (Off) |
+    ALSO adds the real PHASE-SPLIT defense-allowed metrics Pass/Run Defense Matchup need
+    (EPA/Dropback Allowed, Pass/Run Success Rate Allowed, Yards/Carry Allowed) -- deliberately
+    NOT reusing compute_team_season_efficiency()'s epa_def/success_def, which are COMBINED
+    across pass AND run plays (play_type.isin(["pass","run"])). Using that combined number
+    for both the Pass and Run Defense Matchup tabs would put the identical non-split figure
+    in both tabs, defeating the entire point of splitting the matchup by phase -- confirmed
+    with the user before building this. NY/A Allowed (Def) is NOT duplicated here: efficiency
+    .py's existing `nya_def` is ALREADY pass-only (built from pass_attempt/sack plays, no rush
+    yardage), so Pass Defense Matchup's build script references that column directly rather
+    than recomputing it.
+
+    Columns: Team | Season | EPA/Dropback Allowed (Def) | Pass Success Rate Allowed (Def) |
+    Completion % Allowed (Def) | Explosive Pass Rate (Off) |
+    Explosive Pass Rate Allowed (Def) | EPA/Rush Allowed (Def) |
+    Run Success Rate Allowed (Def) | Yards/Carry Allowed (Def) | Explosive Run Rate (Off) |
     Explosive Run Rate Allowed (Def) | Stuff Rate (Off) | Stuff Rate Allowed (Def)
     """
     reg = pbp[pbp["season_type"] == "REG"]
@@ -236,6 +252,14 @@ def compute_team_season_matchup_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
         pass_plays.groupby(["defteam", "season"])["explosive"].mean()
         .rename_axis(axis_names).rename("Explosive Pass Rate Allowed (Def)")
     )
+    epa_dropback_def = (
+        pass_plays.groupby(["defteam", "season"])["epa"].mean()
+        .rename_axis(axis_names).rename("EPA/Dropback Allowed (Def)")
+    )
+    pass_success_def = (
+        pass_plays.groupby(["defteam", "season"])["success"].mean()
+        .rename_axis(axis_names).rename("Pass Success Rate Allowed (Def)")
+    )
 
     run_plays = reg[reg["play_type"] == "run"].copy()
     run_plays["explosive"] = run_plays["yards_gained"] >= EXPLOSIVE_RUN_YARDS
@@ -256,15 +280,30 @@ def compute_team_season_matchup_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
         run_plays.groupby(["defteam", "season"])["stuffed"].mean()
         .rename_axis(axis_names).rename("Stuff Rate Allowed (Def)")
     )
+    epa_rush_def = (
+        run_plays.groupby(["defteam", "season"])["epa"].mean()
+        .rename_axis(axis_names).rename("EPA/Rush Allowed (Def)")
+    )
+    run_success_def = (
+        run_plays.groupby(["defteam", "season"])["success"].mean()
+        .rename_axis(axis_names).rename("Run Success Rate Allowed (Def)")
+    )
+    ypc_def = (
+        run_plays.groupby(["defteam", "season"])["yards_gained"].mean()
+        .rename_axis(axis_names).rename("Yards/Carry Allowed (Def)")
+    )
 
     out = (
-        comp_pct_def.to_frame()
+        epa_dropback_def.to_frame()
+        .join(pass_success_def, how="outer").join(comp_pct_def, how="outer")
         .join(exp_pass_off, how="outer").join(exp_pass_def, how="outer")
+        .join(epa_rush_def, how="outer").join(run_success_def, how="outer")
+        .join(ypc_def, how="outer")
         .join(exp_run_off, how="outer").join(exp_run_def, how="outer")
         .join(stuff_off, how="outer").join(stuff_def, how="outer")
         .reset_index()
     )
-    out = out.rename(columns={"team_abbr": "team_abbr", "season": "Season"})
+    out = out.rename(columns={"season": "Season"})
 
     unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
     if unmapped:

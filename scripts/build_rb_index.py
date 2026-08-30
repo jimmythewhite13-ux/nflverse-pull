@@ -741,12 +741,22 @@ def build(workbook_path: str) -> dict:
         "Carry Share\n(Y-1)", "Starter Carries\n(Y-1)", "Backup Carries\n(Y-1)",
     ])
 
-    score_range = f"$I${sec5_first_row}:$I${sec5_last_row}"
-    key_range = f"$K${sec5_first_row}:$K${sec5_last_row}"
+    # Real bug fixed here (found while wiring the Defensive Matchup Engine's Part C into
+    # Week 1 Matchups, claude_code_spec_defensive_matchup_engine.md): this key column was
+    # hardcoded to column 11 (K), which happened to be correct when RB Index had 3 METRICS
+    # (wz_col=8, so wz_col+3=11=K) but silently started CLOBBERING Section 5's own "Years
+    # of Real History" column once RYOE/Att expanded METRICS to 4 (wz_col=9, so Years of
+    # Real History moved to wz_col+2=K, colliding with this hardcoded write) -- verified
+    # live: every real RB's Years of Real History was being overwritten with the Team|Role
+    # key string on every build since RYOE/Att shipped. Now computed as wz_col+3, matching
+    # every other tab's own dynamic (not hardcoded) key-column convention.
+    key_col = get_column_letter(wz_col + 3)
+    score_range = f"$J${sec5_first_row}:$J${sec5_last_row}"
+    key_range = f"${key_col}${sec5_first_row}:${key_col}${sec5_last_row}"
     name_range = f"$A${sec5_first_row}:$A${sec5_last_row}"
 
     for r in range(sec5_first_row, sec5_last_row + 1):
-        ws.cell(row=r, column=11, value=f'=C{r}&"|"&D{r}').font = FORMULA_FONT
+        ws.cell(row=r, column=wz_col + 3, value=f'=C{r}&"|"&D{r}').font = FORMULA_FONT
 
     carry_lookup = {
         r["Team"]: r for r in carry_share.to_dict("records")

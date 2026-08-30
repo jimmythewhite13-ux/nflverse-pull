@@ -7,11 +7,20 @@ Two stages:
   1. update_workbook.py -- writes fresh PPG and efficiency data into YoY Baseline Engine /
      Advanced Efficiency Metrics Section 1 (fixed 96/32-row shape, values refreshed in
      place).
-  2. QB Index / Replacement Value / Availability Index -- fully REBUILT from scratch each
-     run (not a Section-1-only value refresh), because their row counts are inherently
-     dynamic: which QBs currently qualify as a Starter/Backup, how many games have been
-     played this season, etc. Skipped, non-fatally, on a workbook that doesn't have
-     'Advanced Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
+  2. QB Index / Replacement Value / Manual Override table / RB Value Index / Availability
+     Index -- fully REBUILT from scratch each run (not a Section-1-only value refresh),
+     because their row counts are inherently dynamic: which players currently qualify as a
+     Starter/Backup, how many games have been played this season, etc. Skipped, non-fatally,
+     on a workbook that doesn't have 'Advanced Efficiency Metrics' yet (run
+     scripts/build_efficiency_engine.py once first).
+
+     Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
+     whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
+     Override) along with it -- those two must be rebuilt AFTER it, every run, or a scheduled
+     run silently leaves the sheet missing its override input cells. This was a real bug
+     (found while verifying the RB Value Index build): RB Value Index and the Section 7
+     rebuild were never wired into this pipeline at all, so a scheduled run left Section 7
+     gone and RB Value Index stale after the very first QB Index rebuild that followed it.
 
 Emailing a results summary is not part of this pipeline -- it's not a required step. If you
 want that on demand, run nflverse_pull.email_results directly (see its module docstring for
@@ -42,22 +51,33 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     wb.close()
     if not has_efficiency_engine:
         print(
-            f"Skipped QB Index / Replacement Value / Availability Index: this workbook "
-            f"doesn't have '{EFFICIENCY_SHEET}' yet (run scripts/build_efficiency_engine.py "
-            f"once first)."
+            f"Skipped QB Index / RB Value Index / Availability Index: this workbook doesn't "
+            f"have '{EFFICIENCY_SHEET}' yet (run scripts/build_efficiency_engine.py once "
+            f"first)."
         )
         return
 
     if str(SCRIPTS_DIR) not in sys.path:
         sys.path.insert(0, str(SCRIPTS_DIR))
+    import add_manual_override_table
     import build_availability_index
     import build_qb_index
+    import build_rb_index
     import build_replacement_value
 
-    # NOTE: these three scripts each pull their own fixed [2023, 2024, 2025] internally --
-    # the `years` argument to this module's run()/main() does not (yet) override them.
+    # NOTE: these scripts each pull their own fixed [2023, 2024, 2025] internally -- the
+    # `years` argument to this module's run()/main() does not (yet) override them.
+    #
+    # Order is load-bearing (see the module docstring): build_qb_index deletes/recreates the
+    # whole 'QB Index' sheet, so Section 6 (Replacement Value) and Section 7 (Manual
+    # Override) must be rebuilt immediately after it, every run. build_rb_index rebuilds its
+    # own sheet wholesale too, but nothing downstream depends on rebuilding after it the way
+    # QB Index's Section 6/7 do, so its position relative to Availability Index doesn't
+    # matter -- kept here, after the QB Index chain, for readability.
     build_qb_index.build(workbook_path)
     build_replacement_value.build(workbook_path)
+    add_manual_override_table.build(workbook_path)
+    build_rb_index.build(workbook_path)
     build_availability_index.build(workbook_path)
 
 

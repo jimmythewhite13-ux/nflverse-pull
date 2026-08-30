@@ -8,10 +8,16 @@ Key differences from QB Index (per claude_code_spec_rb_index.md and the kickoff 
 Step 3 instruction to use current-roster + ADP-informed rookie assumptions "natively",
 not the historical-attempts-only proxy QB Index still uses as of this writing):
 
-- Section 1 uses RB-specific metrics (Rushing EPA/Play, Rushing Success Rate, YPC) and
-  still computes a HISTORICAL, attempts-ranking Role per past season (rb_stats.
-  compute_historical_rb_roles) -- used only to label Section 1 rows and filter Section 2's
-  league averages to Starters+Backups, never to decide who is scored in Section 3/5/6.
+- Section 1 uses RB-specific metrics (Rushing EPA/Play, Rushing Success Rate, YPC, and --
+  UPDATED, per explicit user instruction to incorporate NFL Next Gen Stats -- real,
+  official RYOE/Att) and still computes a HISTORICAL, attempts-ranking Role per past season
+  (rb_stats.compute_historical_rb_roles) -- used only to label Section 1 rows and filter
+  Section 2's league averages to Starters+Backups, never to decide who is scored in
+  Section 3/5/6. RYOE/Att is NOT full-coverage the way the other 3 metrics are (NGS applies
+  its own, higher qualifying-volume threshold -- confirmed live: 51 NGS-tracked RBs vs. 78
+  RBs this tab's own 50-carry threshold considers qualifying), so it needs its own
+  existence check in Section 3 (see _ysub's partial_coverage branch) rather than the shared
+  row-exists check the other 3 metrics use.
 - Section 3/5/6 population comes from current_roster.resolve_scored_population's live
   2026 depth-chart pull instead -- a true zero-history rookie identified as a current
   Starter/Backup still gets a full row (see Section 2B below), which the old
@@ -69,7 +75,9 @@ from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.rb_stats import (  # noqa: E402
     compute_carry_share,
     compute_historical_rb_roles,
+    compute_player_season_ryoe,
     compute_team_season_rb_stats,
+    fetch_ngs_rushing,
 )
 from nflverse_pull.rookie_crosswalk import (  # noqa: E402
     assign_rookie_assumptions,
@@ -91,6 +99,13 @@ METRICS = [
     {"key": "success", "col": "Rushing Success Rate", "label": "Rushing\nSuccess Rate",
      "fmt": "0.00"},
     {"key": "ypc", "col": "YPC", "label": "YPC", "fmt": "0.00"},
+    # Real, official NFL Next Gen Stats data -- NOT full coverage the way the other 3
+    # metrics are (NGS applies its own, higher qualifying-volume threshold), so this one
+    # metric needs its own "does this player-season actually have a value" existence check
+    # in Section 3, not the shared row-exists check the other 3 metrics use. See
+    # rb_stats.py's own module docstring and this script's _ysub for the full reasoning.
+    {"key": "ryoe", "col": "RYOE/Att", "label": "RYOE/Att\n(NGS)", "fmt": "0.00",
+     "partial_coverage": True},
 ]
 
 # Same canonical 32-team row order as build_replacement_value.py (copied, not imported --
@@ -152,22 +167,34 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
     title.fill = HEADER_FILL
 
     rows = [
-        (44, "Rushing EPA/Play Weight (RB Index, pts per SD)", 0.5,
-         "EPA/play is the most complete single rushing stat -- weighted highest, same "
-         "logic as every other efficiency weighting in this model."),
-        (45, "Rushing Success Rate Weight (RB Index, pts per SD)", 0.4,
+        (44, "Rushing EPA/Play Weight (RB Index, pts per SD)", 0.35,
+         "EPA/play is a complete single rushing stat -- weighted down from this tab's "
+         "original 0.5 now that RYOE/Att (C82, real official NGS data) exists as a "
+         "more precise, tracking-data-based isolate of the runner's own skill."),
+        (45, "Rushing Success Rate Weight (RB Index, pts per SD)", 0.25,
          "Correlates with EPA but isolates consistency (positive-EPA rate) rather than "
-         "magnitude -- weighted lower to avoid double-counting."),
-        (46, "YPC Weight (RB Index, pts per SD)", 0.3,
+         "magnitude -- weighted lower to avoid double-counting. Weighted down from 0.4 "
+         "for the same 4-metric rebalancing as C44."),
+        (46, "YPC Weight (RB Index, pts per SD)", 0.15,
          "Traditional, well-understood counting stat; plays the same role ANY/A plays "
          "for QB Index -- a sanity check alongside the EPA-based metrics, not the "
-         "primary signal."),
+         "primary signal. Weighted down from 0.3 for the same rebalancing."),
         (47, "RB Index Points-to-Game-Points Conversion", 0.08,
          "A starting guess, like every other coefficient in this model -- deliberately "
          "smaller than QB's C39 (0.15): one RB touches the ball on a subset of "
          "offensive plays, unlike a QB who's on every snap, so replacement-value swings "
          "should have less aggregate scoring impact. This is a SEPARATE constant from "
          "C39 -- changing QB's conversion does not change this one, or vice versa."),
+        (82, "RYOE/Att Weight (RB Index, pts per SD, real NFL Next Gen Stats)", 0.35,
+         "Added after the fact once real, official NGS Rush Yards Over Expected data "
+         "was found -- appended here rather than inserted next to C44-C46 to avoid "
+         "shifting every row reference every later tab's build script already "
+         "hardcodes (WR/TE/Kicking/OL/Front-Seven/Secondary/Special-Teams start at "
+         "C48/C52/C57/C68/C73/C77, and OL's own appended weight is at C81). Weighted "
+         "equal-highest with EPA/Play -- NGS's own tracking-data model of expected "
+         "yards per carry is arguably the single most precise real signal available "
+         "here, isolating the runner's own skill from blocking/scheme more directly "
+         "than EPA (which conflates play-calling and blocking context) can."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -197,6 +224,18 @@ def _pull_data() -> dict:
     season_stats = season_stats.sort_values(
         ["Team", "Season", "Carries"], ascending=[True, True, False]
     ).reset_index(drop=True)
+
+    print(f"Pulling {HISTORICAL_YEARS} Next Gen Stats rushing data for real RYOE/Att...")
+    ngs_rushing = fetch_ngs_rushing(HISTORICAL_YEARS)
+    ryoe = compute_player_season_ryoe(ngs_rushing)
+    # Left join -- a real, qualifying-here player without a real NGS row (below NGS's own,
+    # higher volume threshold) genuinely has no RYOE value; left blank, not zero-filled.
+    season_stats = season_stats.merge(
+        ryoe, on=["Player ID", "Season", "Team"], how="left"
+    )
+    n_missing_ryoe = season_stats["RYOE/Att"].isna().sum()
+    print(f"{len(season_stats) - n_missing_ryoe} of {len(season_stats)} RB-seasons have a "
+          f"real RYOE/Att value ({n_missing_ryoe} below NGS's own qualifying threshold).")
 
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster RB population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
@@ -296,12 +335,13 @@ def build(workbook_path: str) -> dict:
     ws.column_dimensions["A"].width = 18.0
     ws.column_dimensions["C"].width = 20.0
 
-    ws.merge_cells("A1:J1")
+    ws.merge_cells("A1:K1")
     t = ws.cell(row=1, column=1, value=(
         "RB Value Index -- Multi-Year Decay-Weighted RUSHING Rating (Rushing EPA/Play, "
-        "Rushing Success Rate, YPC). Receiving work out of the backfield is explicitly "
-        "OUT OF SCOPE for this version -- a pass-catching RB will be undervalued here; "
-        "see the closing note below before treating this as a complete RB value measure."
+        "Rushing Success Rate, YPC from nflverse pbp; RYOE/Att from real, official NFL "
+        "Next Gen Stats). Receiving work out of the backfield is explicitly OUT OF SCOPE "
+        "for this version -- a pass-catching RB will be undervalued here; see the closing "
+        "note below before treating this as a complete RB value measure."
     ))
     t.font = Font(name="Arial", size=12, bold=True)
 
@@ -309,36 +349,39 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(season_stats) - 1
     _section_title(
-        ws, 3, 10,
+        ws, 3, 11,
         "Section 1 \u2014 Raw 3-Year Data per RB-Season (from nflverse pbp; Role here is "
         "HISTORICAL attempts-ranking per past season -- labeling only, NOT used to pick "
-        "who is scored in Section 3/5/6, see Section 3's population note)",
+        "who is scored in Section 3/5/6, see Section 3's population note). RYOE/Att (K) "
+        "is real NFL Next Gen Stats data with its OWN, higher qualifying threshold -- "
+        "blank means genuinely no real NGS value for that player-season, not zero.",
     )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "Carries", "Rushing EPA/Play",
-         "Rushing Success Rate", "YPC", "Is Rookie Season", "Role"],
+         "Rushing Success Rate", "YPC", "Is Rookie Season", "Role", "RYOE/Att\n(NGS)"],
     )
     for i, r in enumerate(season_stats.to_dict("records")):
         row = sec1_first_row + i
+        ryoe_v = float(r["RYOE/Att"]) if pd.notna(r.get("RYOE/Att")) else None
         values = [
             r["Player Name"], r["Player ID"], r["Team"], int(r["Season"]), int(r["Carries"]),
             float(r["Rushing EPA/Play"]), float(r["Rushing Success Rate"]), float(r["YPC"]),
-            bool(r["Is Rookie Season"]), r["Role"],
+            bool(r["Is Rookie Season"]), r["Role"], ryoe_v,
         ]
         for col, v in enumerate(values, start=1):
             cell = ws.cell(row=row, column=col, value=v)
             cell.font = INPUT_FONT
             if col == 6:
                 cell.number_format = "0.000"
-            elif col in (7, 8):
+            elif col in (7, 8, 11):
                 cell.number_format = "0.00"
 
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
     rookie_range = f"$I${sec1_first_row}:$I${sec1_last_row}"
     role_range = f"$J${sec1_first_row}:$J${sec1_last_row}"
-    sec1_col_of = {"epa": "F", "success": "G", "ypc": "H"}
+    sec1_col_of = {"epa": "F", "success": "G", "ypc": "H", "ryoe": "K"}
     metric_ranges = {
         m["key"]: (
             f"${sec1_col_of[m['key']]}${sec1_first_row}:${sec1_col_of[m['key']]}${sec1_last_row}"
@@ -355,7 +398,7 @@ def build(workbook_path: str) -> dict:
     rookie_count_row = rookie_baseline_row + 1
 
     _section_title(
-        ws, sec2_title_row, 4,
+        ws, sec2_title_row, 1 + len(METRICS),
         "Section 2 \u2014 League Average per Season (historical Starters + Backups only) "
         "and flat Rookie Baseline (all qualifying rookie seasons, any role, across every "
         "pulled year -- the fallback used when a player isn't in Section 2B below)",
@@ -410,7 +453,7 @@ def build(workbook_path: str) -> dict:
     sec2b_last_row = sec2b_first_row + max(n_2b, 1) - 1
 
     _section_title(
-        ws, sec2b_title_row, 8,
+        ws, sec2b_title_row, 5 + len(METRICS),
         "Section 2B \u2014 Individual Rookie Assumptions (ADP/trade-value-informed, "
         "current draft class only -- see rookie_crosswalk.py / "
         "claude_code_spec_rookie_adp_crosswalk.md). Only lists current-roster RB "
@@ -432,7 +475,12 @@ def build(workbook_path: str) -> dict:
                 ws.cell(row=row, column=col, value=v).font = INPUT_FONT
             for j, m in enumerate(METRICS):
                 v = r.get(m["col"])
-                cell = ws.cell(row=row, column=5 + j, value=float(v) if v is not None else None)
+                # pd.notna(), not `v is not None` -- a partial-coverage metric (RYOE/Att)
+                # can legitimately produce a real NaN tier average (e.g. a whole tier with
+                # zero real NGS-covered rookie seasons in the pulled window), and NaN is
+                # NOT None in Python -- writing a literal NaN float into a cell produces an
+                # invalid Excel value, not a blank one.
+                cell = ws.cell(row=row, column=5 + j, value=float(v) if pd.notna(v) else None)
                 cell.font = INPUT_FONT
                 cell.number_format = m["fmt"]
             src = ws.cell(row=row, column=5 + len(METRICS), value=r.get("Source"))
@@ -512,15 +560,32 @@ def build(workbook_path: str) -> dict:
             flat_cell = flat_rookie_cell[m["key"]]
             twob_metric_range = sec2b_metric_range[m["key"]]
 
+            # RYOE/Att has its OWN, real qualifying threshold from NGS -- narrower than the
+            # other 3 metrics' shared row-exists check. A player can have a real Section 1
+            # row for a season (real EPA/Success/YPC) with a genuinely blank RYOE cell, so
+            # RYOE's own existence check must ALSO require that specific cell to be
+            # non-blank, not just that a row exists for that player-season.
+            extra_existence_criteria = f",{mrange},\"<>\"" if m.get("partial_coverage") else ""
+
             def _ysub(offset: int, mrange=mrange, flat_cell=flat_cell,
-                       twob_metric_range=twob_metric_range) -> str:
-                rookie_sub = (
-                    f"IFERROR(INDEX({twob_metric_range},MATCH($B{row},{sec2b_id_range},0)),"
-                    f"{flat_cell})"
-                )
+                       twob_metric_range=twob_metric_range,
+                       extra_existence_criteria=extra_existence_criteria,
+                       partial_coverage=bool(m.get("partial_coverage"))) -> str:
+                index_match = f"INDEX({twob_metric_range},MATCH($B{row},{sec2b_id_range},0))"
+                if partial_coverage:
+                    # A partial-coverage metric's Section 2B row can exist (player found)
+                    # but hold a genuinely BLANK cell for this one metric (e.g. a whole
+                    # historical tier with zero real NGS-covered rookie seasons) -- ISBLANK
+                    # catches that; plain IFERROR alone would not, since a successful
+                    # INDEX/MATCH returning blank isn't an error.
+                    rookie_sub = f"IF(ISBLANK({index_match}),{flat_cell},{index_match})"
+                    rookie_sub = f"IFERROR({rookie_sub},{flat_cell})"
+                else:
+                    rookie_sub = f"IFERROR({index_match},{flat_cell})"
                 return (
                     f"=IF(COUNTIFS({id_range},$B{row},{season_range},"
-                    f"'Model Assumptions'!$C$18-{offset})=0,{rookie_sub},"
+                    f"'Model Assumptions'!$C$18-{offset}{extra_existence_criteria})=0,"
+                    f"{rookie_sub},"
                     f"SUMIFS({mrange},{id_range},$B{row},{season_range},"
                     f"'Model Assumptions'!$C$18-{offset}))"
                 )
@@ -556,7 +621,8 @@ def build(workbook_path: str) -> dict:
     avg_row, std_row = sec4_header_row + 1, sec4_header_row + 2
 
     _section_title(
-        ws, sec4_title_row, 4, "Section 4 \u2014 League Average & Std. Dev. of the 3-Yr Baselines"
+        ws, sec4_title_row, 1 + len(METRICS),
+        "Section 4 \u2014 League Average & Std. Dev. of the 3-Yr Baselines",
     )
     _header_row(ws, sec4_header_row, ["Stat", *[m["label"] for m in METRICS]], height=18)
 
@@ -582,8 +648,8 @@ def build(workbook_path: str) -> dict:
     sec5_last_row = sec5_first_row + n_rb - 1
 
     _section_title(
-        ws, sec5_title_row, 10,
-        "Section 5 \u2014 Z-Scores and RB Index Score (all three metrics are \"higher is "
+        ws, sec5_title_row, 7 + len(METRICS),
+        "Section 5 \u2014 Z-Scores and RB Index Score (all four metrics are \"higher is "
         "better\" for a RB -- no sign-flip needed. Baseline/points-per-SD reuse QB "
         "Index's own Model Assumptions cells C37/C38 by design, so a score means the same "
         "thing on both tabs.)",
@@ -600,7 +666,7 @@ def build(workbook_path: str) -> dict:
     std_cell_ref = {
         m["key"]: f"${get_column_letter(2 + j)}${std_row}" for j, m in enumerate(METRICS)
     }
-    weight_cells = {"epa": "$C$44", "success": "$C$45", "ypc": "$C$46"}
+    weight_cells = {"epa": "$C$44", "success": "$C$45", "ypc": "$C$46", "ryoe": "$C$82"}
 
     for i in range(n_rb):
         sec3_row = sec3_first_row + i
@@ -738,7 +804,12 @@ def build(workbook_path: str) -> dict:
         "WORK OUT OF THE BACKFIELD IS NOT INCLUDED ANYWHERE ON THIS TAB -- a "
         "pass-catching specialist RB will be undervalued by this rushing-only index; "
         "this is a documented Phase 1 scope limit, not an oversight (see "
-        "claude_code_spec_rb_index.md). The 2026 depth-chart snapshot this tab's "
+        "claude_code_spec_rb_index.md). RYOE/Att (Section 1 col K) is real, official NFL "
+        "Next Gen Stats data with its OWN, higher qualifying-volume threshold than this "
+        "tab's 50-carry minimum -- a real, qualifying RB-season with no real RYOE value "
+        "shows blank there and correctly falls back to the flat Section 2 Rookie Baseline "
+        "(or Section 2B's individual assumption) in Section 3, not a fabricated 0. The "
+        "2026 depth-chart snapshot this tab's "
         "current-roster population (Section 3/5/6) is built from was pulled BEFORE "
         "final 53-man roster cuts -- same caveat as the rookie ADP/trade-value "
         "crosswalk in Section 2B, per the user's explicit decision to proceed anyway "

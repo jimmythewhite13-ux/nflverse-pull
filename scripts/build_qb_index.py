@@ -57,7 +57,12 @@ from nflverse_pull.current_roster import (  # noqa: E402
     resolve_scored_population,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
-from nflverse_pull.qb_stats import compute_qb_roles, compute_team_season_qb_stats  # noqa: E402
+from nflverse_pull.qb_stats import (  # noqa: E402
+    compute_player_season_qb_ngs_context,
+    compute_qb_roles,
+    compute_team_season_qb_stats,
+    fetch_ngs_passing,
+)
 from nflverse_pull.rookie_crosswalk import (  # noqa: E402
     assign_rookie_assumptions,
     compute_historical_tier_averages,
@@ -248,6 +253,18 @@ def build(workbook_path: str) -> dict:
     stats = stats.sort_values(["Team", "Season", "Dropbacks"], ascending=[True, True, False])
     stats = stats.reset_index(drop=True)
 
+    print(f"Pulling {YEARS} Next Gen Stats passing data for real Time to Throw / "
+          "Aggressiveness context...")
+    ngs_passing = fetch_ngs_passing(YEARS)
+    ngs_context = compute_player_season_qb_ngs_context(ngs_passing)
+    # Left join -- context only, never scored (see qb_stats.py's own module docstring for
+    # why); a real, qualifying-here QB-season without a real NGS row (below NGS's own,
+    # higher volume threshold) genuinely has no context value, left blank not zero-filled.
+    stats = stats.merge(ngs_context, on=["Player ID", "Season", "Team"], how="left")
+    n_missing_ngs = stats["Avg Time to Throw"].isna().sum()
+    print(f"{len(stats) - n_missing_ngs} of {len(stats)} QB-seasons have real NGS context "
+          f"({n_missing_ngs} below NGS's own qualifying threshold).")
+
     # Retrofit per claude_code_spec_current_roster_fix.md Part 4: the OLD population (kept
     # here, renamed, as the fallback for a team the current-roster pull/override didn't
     # cover) was every historical Starter/Backup in the most recent pulled season.
@@ -295,11 +312,17 @@ def build(workbook_path: str) -> dict:
     # ==== Section 1: Raw 3-year data per QB-season ========================================
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(stats) - 1
-    _section_title(ws, 3, 9, "Section 1 \u2014 Raw 3-Year Data per QB-Season (from nflverse pbp)")
+    _section_title(
+        ws, 3, 11,
+        "Section 1 \u2014 Raw 3-Year Data per QB-Season (from nflverse pbp). Avg Time to "
+        "Throw / Aggressiveness (J/K, real NFL Next Gen Stats) are CONTEXT ONLY -- not part "
+        "of the weighted composite in Section 5 (see this tab's closing note for why).",
+    )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "EPA/Play", "CPOE", "ANY/A",
-         "Is Rookie Season", "Role"],
+         "Is Rookie Season", "Role", "Avg Time to Throw\n(context only)",
+         "Aggressiveness\n(context only)"],
     )
     for i, r in enumerate(stats.to_dict("records")):
         row = sec1_first_row + i
@@ -315,6 +338,15 @@ def build(workbook_path: str) -> dict:
                 cell.number_format = "0.000"
             elif col in (6, 7):
                 cell.number_format = "0.00"
+
+        ttt_v = float(r["Avg Time to Throw"]) if pd.notna(r.get("Avg Time to Throw")) else None
+        agg_v = float(r["Aggressiveness"]) if pd.notna(r.get("Aggressiveness")) else None
+        ttt_cell = ws.cell(row=row, column=10, value=ttt_v)
+        agg_cell = ws.cell(row=row, column=11, value=agg_v)
+        ttt_cell.font = INPUT_FONT
+        agg_cell.font = INPUT_FONT
+        ttt_cell.number_format = "0.00"
+        agg_cell.number_format = "0.00%"
 
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
@@ -618,15 +650,23 @@ def build(workbook_path: str) -> dict:
 
     # ---- Closing note --------------------------------------------------------------------
     note_row = sec5_last_row + 2
-    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=10)
+    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=11)
     note = ws.cell(row=note_row, column=1, value=(
         "Mirrors Advanced Efficiency Metrics' 5-section decay-weighted/regressed pattern, "
         "run per QB instead of per team. Section 1 is the raw per-QB-season table from "
         "nflverse_pull.qb_stats (EPA/Play, CPOE, ANY/A; QB-seasons under 100 dropbacks are "
-        "excluded entirely, not zero-filled). Is Rookie Season is a proxy (first pbp-"
-        "observed qualifying season within the pulled years, not real draft data) -- a "
-        "veteran whose first pulled-window season happens to be the earliest year pulled "
-        "will show as a false rookie; this is a documented simplification, not a bug. "
+        "excluded entirely, not zero-filled), plus real NGS Avg Time to Throw / "
+        "Aggressiveness context (J/K) -- CONTEXT ONLY, never scored (see qb_stats.py's own "
+        "module docstring for why neither has an unambiguous \"higher is better\" direction, "
+        "and why NGS's own official CPOE was deliberately not added as a second scored "
+        "accuracy metric alongside this tab's existing pbp-based CPOE). UPDATED per "
+        "claude_code_spec_consolidated_fixes.md Part 1: Is Rookie Season now uses "
+        "current_roster.attach_real_rookie_season's real per-season entry_year data (the "
+        "same source Offensive Line Index's attach_experience already used), not the old "
+        "\"first pbp-observed qualifying season within the pulled years\" proxy that "
+        "silently mislabeled a veteran as a rookie whenever his first pulled-window season "
+        "happened to be the earliest year pulled -- verified live: Mahomes/Allen/Jackson/"
+        "Hurts/Lawrence all correctly show False in every real season now. "
         "Section 2 computes each metric's league average among Starters+Backups per season "
         "(Role here is the OLD historical-attempts-ranking label, used ONLY for this filter, "
         "same as RB Value Index's Section 1), plus a flat Rookie Baseline (average of every "

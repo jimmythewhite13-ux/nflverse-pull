@@ -21,9 +21,18 @@ the sklearn-fitted matchup coefficient (needs real historical game-margin backte
 this pipeline doesn't have) -- both are real, legitimate ideas worth a future extension,
 just out of scope for this build.
 
-Section 1: raw 3-year TEAM-level data (Pass_Protection, Run_Blocking) from oline_stats.py --
-           genuinely team-level, not per-player, unlike every other position in this
-           project (there is no honest "this specific left tackle's own stat line").
+UPDATED: added a third real metric, Sack-Free Rate (Fault-Adjusted), per explicit user
+instruction to incorporate FTN Fantasy's real per-play charting (already accessible via
+nfl_data_py.import_ftn_data). PFR's Pass_Protection blames the O-line for every sack, even
+ones charted as the QB's own fault -- FTN's real is_qb_fault_sack column (verified live:
+100% coverage on 2025's real sack plays, 34.6% charted as QB-fault) lets this tab correct
+for that. See oline_stats.py's updated docstring for the full reasoning.
+
+Section 1: raw 3-year TEAM-level data (Pass_Protection, Run_Blocking from Pro Football
+           Reference; Sack-Free Rate (Fault-Adjusted) from real nflverse pbp + FTN
+           charting) from oline_stats.py -- genuinely team-level, not per-player, unlike
+           every other position in this project (there is no honest "this specific left
+           tackle's own stat line").
 Section 2: league average per season (simple average across all 32 teams -- there's no
            per-player Role/threshold filter to apply to a team-level stat)
 Section 3: per-team 3-Yr decay-weighted, regressed baseline -- population is all 32 teams
@@ -65,8 +74,11 @@ from nflverse_pull.current_roster import (  # noqa: E402
     fetch_seasonal_rosters,
     resolve_scored_population,
 )
+from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.oline_stats import (  # noqa: E402
     compute_team_season_oline_stats,
+    compute_team_season_sack_fault_stats,
+    fetch_ftn,
     fetch_pfr_pass,
     fetch_pfr_rush,
 )
@@ -84,6 +96,8 @@ OL_POSITIONS = ["LT", "LG", "C", "RG", "RT"]
 METRICS = [
     {"key": "pp", "col": "Pass_Protection", "label": "Pass\nProtection", "fmt": "0.0"},
     {"key": "rb", "col": "Run_Blocking", "label": "Run\nBlocking", "fmt": "0.00"},
+    {"key": "sfa", "col": "Sack-Free Rate (Fault-Adjusted)", "label": "Sack-Free\nRate",
+     "fmt": "0.00%"},
 ]
 
 TEAM_ORDER = [
@@ -137,14 +151,16 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
     title.fill = HEADER_FILL
 
     rows = [
-        (58, "Pass Protection Weight (OL Index, pts per SD)", 0.5,
+        (58, "Pass Protection Weight (OL Index, pts per SD)", 0.4,
          "Real, team-level pressure-rate-allowed proxy (Pro Football Reference) -- "
-         "weighted equally with Run Blocking since both are genuinely real signals, "
-         "unlike every other position's 3-metric split (there's no honest third "
-         "team-level OL metric available)."),
-        (59, "Run Blocking Weight (OL Index, pts per SD)", 0.5,
+         "weighted down from this tab's original 0.5 now that Sack-Free Rate "
+         "(Fault-Adjusted, C81) exists as a more precise, fault-attributed real "
+         "signal specifically for sacks; Pass_Protection still captures pressure "
+         "beyond just sacks (hits, hurries), so it stays the largest single weight."),
+        (59, "Run Blocking Weight (OL Index, pts per SD)", 0.35,
          "Real, team-level Yards-Before-Contact-per-Attempt proxy (Pro Football "
-         "Reference)."),
+         "Reference) -- weighted down from 0.5 for the same 3-metric rebalancing "
+         "as C58."),
         (60, "Rookie Starter Penalty -- LT/LG/RG/RT (pts)", 1.0,
          "Applied to a real current starter's individual score when he's a true "
          "rookie (0 years NFL experience, from real roster data) -- a documented, "
@@ -169,6 +185,15 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          "A starting guess, like every other coefficient in this model. This is a "
          "DIRECT quality adjustment, not a Replacement Value swap -- there's no "
          "'backup offensive line' to swap in, same reasoning as Kicking Index's C56."),
+        (81, "Sack-Free Rate (Fault-Adjusted) Weight (OL Index, pts per SD)", 0.25,
+         "Added after the fact once FTN Fantasy's real per-play charting "
+         "(is_qb_fault_sack) was found -- appended here rather than inserted next "
+         "to C58/C59 to avoid shifting every row reference every later tab's build "
+         "script already hardcodes (Front Seven/Secondary/Special Teams start at "
+         "C68/C73/C77). Real, fault-attributed sack rate: excludes sacks charted "
+         "as the QB's own fault from the O-line's blame -- weighted lower than "
+         "Pass Protection/Run Blocking since it's a narrower, partially-redundant "
+         "slice of what Pass_Protection already measures."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -186,6 +211,13 @@ def _pull_data() -> dict:
     pfr_pass = fetch_pfr_pass(HISTORICAL_YEARS)
     pfr_rush = fetch_pfr_rush(HISTORICAL_YEARS)
     season_stats = compute_team_season_oline_stats(pfr_pass, pfr_rush)
+
+    print(f"Pulling {HISTORICAL_YEARS} play-by-play + FTN charting for fault-adjusted "
+          "sack rate...")
+    pbp = fetch_pbp(HISTORICAL_YEARS)
+    ftn = fetch_ftn(HISTORICAL_YEARS)
+    sack_fault_stats = compute_team_season_sack_fault_stats(pbp, ftn)
+    season_stats = season_stats.merge(sack_fault_stats, on=["Team", "Season"], how="outer")
 
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for the 5 current-roster OL starters...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
@@ -234,7 +266,8 @@ def build(workbook_path: str) -> dict:
     ws.merge_cells("A1:H1")
     t = ws.cell(row=1, column=1, value=(
         "Offensive Line Index -- Multi-Year Decay-Weighted TEAM-Level Blocking Rating "
-        "(Pass Protection, Run Blocking; real Pro Football Reference data). NO individual "
+        "(Pass Protection and Run Blocking from Pro Football Reference; Sack-Free Rate "
+        "Fault-Adjusted from real nflverse pbp + FTN Fantasy charting). NO individual "
         "lineman is graded anywhere on this tab -- see the closing note for why, and how "
         "the individual-level section instead uses real NFL experience."
     ))
@@ -244,23 +277,27 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(season_stats) - 1
     _section_title(
-        ws, 3, 4,
-        "Section 1 \u2014 Raw 3-Year TEAM-Level Data (Pro Football Reference -- genuinely "
-        "team-level, not per-player; see this tab's opening note)",
+        ws, 3, 2 + len(METRICS),
+        "Section 1 \u2014 Raw 3-Year TEAM-Level Data (Pass Protection/Run Blocking: Pro "
+        "Football Reference; Sack-Free Rate (Fault-Adjusted): real nflverse pbp + FTN "
+        "Fantasy charting -- genuinely team-level, not per-player; see this tab's opening "
+        "note)",
     )
     _header_row(ws, 4, ["Team", "Season", *[m["label"] for m in METRICS]])
     for i, r in enumerate(season_stats.to_dict("records")):
         row = sec1_first_row + i
-        values = [r["Team"], int(r["Season"]), r["Pass_Protection"], r["Run_Blocking"]]
+        values = [r["Team"], int(r["Season"])] + [
+            (float(r[m["col"]]) if pd.notna(r.get(m["col"])) else None) for m in METRICS
+        ]
         for col, v in enumerate(values, start=1):
             cell = ws.cell(row=row, column=col, value=v)
             cell.font = INPUT_FONT
-        ws.cell(row=row, column=3).number_format = "0.0"
-        ws.cell(row=row, column=4).number_format = "0.00"
+        for j, m in enumerate(METRICS):
+            ws.cell(row=row, column=3 + j).number_format = m["fmt"]
 
     team_range = f"$A${sec1_first_row}:$A${sec1_last_row}"
     season_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
-    sec1_col_of = {"pp": "C", "rb": "D"}
+    sec1_col_of = {"pp": "C", "rb": "D", "sfa": "E"}
     metric_ranges = {
         m["key"]: (
             f"${sec1_col_of[m['key']]}${sec1_first_row}:${sec1_col_of[m['key']]}${sec1_last_row}"
@@ -274,7 +311,7 @@ def build(workbook_path: str) -> dict:
     season_rows = {yr: sec2_header_row + 1 + i for i, yr in enumerate(HISTORICAL_YEARS)}
 
     _section_title(
-        ws, sec2_title_row, 3,
+        ws, sec2_title_row, 1 + len(METRICS),
         "Section 2 \u2014 League Average per Season (simple average across all 32 teams -- "
         "no per-player Role filter applies to a team-level stat)",
     )
@@ -382,7 +419,8 @@ def build(workbook_path: str) -> dict:
     avg_row, std_row = sec4_header_row + 1, sec4_header_row + 2
 
     _section_title(
-        ws, sec4_title_row, 3, "Section 4 \u2014 League Average & Std. Dev. of the 3-Yr Baselines"
+        ws, sec4_title_row, 1 + len(METRICS),
+        "Section 4 \u2014 League Average & Std. Dev. of the 3-Yr Baselines",
     )
     _header_row(ws, sec4_header_row, ["Stat", *[m["label"] for m in METRICS]], height=18)
 
@@ -408,9 +446,9 @@ def build(workbook_path: str) -> dict:
     sec5_last_row = sec5_first_row + n_teams - 1
 
     _section_title(
-        ws, sec5_title_row, 6,
-        "Section 5 \u2014 Z-Scores and Team OL Score (both metrics are \"higher is better\" "
-        "-- no sign-flip needed. Baseline/points-per-SD reuse QB Index's own Model "
+        ws, sec5_title_row, 1 + len(METRICS) + 3,
+        "Section 5 \u2014 Z-Scores and Team OL Score (all three metrics are \"higher is "
+        "better\" -- no sign-flip needed. Baseline/points-per-SD reuse QB Index's own Model "
         "Assumptions cells C37/C38.)",
     )
     _header_row(
@@ -425,7 +463,7 @@ def build(workbook_path: str) -> dict:
     std_cell_ref = {
         m["key"]: f"${get_column_letter(2 + j)}${std_row}" for j, m in enumerate(METRICS)
     }
-    weight_cells = {"pp": "$C$58", "rb": "$C$59"}
+    weight_cells = {"pp": "$C$58", "rb": "$C$59", "sfa": "$C$81"}
 
     for i in range(n_teams):
         sec3_row = sec3_first_row + i
@@ -580,13 +618,18 @@ def build(workbook_path: str) -> dict:
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=10)
     note = ws.cell(row=note_row, column=1, value=(
         "NO INDIVIDUAL LINEMAN IS GRADED ANYWHERE ON THIS TAB. Section 1-5 use REAL, free, "
-        "TEAM-level Pro Football Reference data (Pass Protection = 100 - the team's "
-        "attempt-weighted pressure rate allowed; Run Blocking = the team's attempt-"
-        "weighted Yards Before Contact per Attempt) -- there is no honest free per-lineman "
-        "performance grade anywhere (that's PFF's proprietary domain; confirmed live that "
-        "PFF IDs exist in nflverse's own player crosswalk for cross-referencing only, not "
-        "grade values). Section 6's Individual Effective Score applies a real-rookie-"
-        "status-based modifier (Model Assumptions C60/C61) to the TEAM's real score -- it "
+        "TEAM-level data: Pass Protection (= 100 - the team's attempt-weighted pressure "
+        "rate allowed) and Run Blocking (= the team's attempt-weighted Yards Before "
+        "Contact per Attempt) from Pro Football Reference; Sack-Free Rate (Fault-Adjusted) "
+        "from real nflverse play-by-play joined against FTN Fantasy's real per-play "
+        "charting (is_qb_fault_sack) -- excludes sacks charted as the QB's own fault "
+        "(held the ball too long, etc.) from the O-line's blame, verified live to have "
+        "100% real coverage on 2025's actual sack plays. There is no honest free per-"
+        "lineman performance grade anywhere (that's PFF's proprietary domain; confirmed "
+        "live that PFF IDs exist in nflverse's own player crosswalk for cross-referencing "
+        "only, not grade values). Section 6's Individual Effective Score applies a "
+        "real-rookie-status-based modifier (Model Assumptions C60/C61) to the TEAM's "
+        "real score -- it "
         "reflects real continuity risk (a true rookie's first NFL start, especially at "
         "Center, is a genuinely different risk profile), not this specific player's own "
         "invented skill number. Section 7's positional weights (LT/RT emphasized) are a "

@@ -14,13 +14,20 @@ from that draft: the decay-weighted baseline and Z-score-to-points conversion --
 techniques, applied to real inputs. NOT kept: the positional 0-100 grades, and the
 Scheme_Shell_Type layer (coverage-shell charting has no free public source at all).
 
-UPDATED: added real Blitz Rate / Avg Box Count context (Section 1, columns F/G), per
-explicit user instruction to incorporate FTN Fantasy's real per-play charting (already
-accessible via nfl_data_py.import_ftn_data -- see defense_stats.compute_team_season_
-scheme_context). Deliberately informational, NOT part of the weighted Z-score composite: a
-higher or lower blitz rate isn't inherently "better," it's a scheme choice, unlike Sack/
-TFL/QB-Hit Rate which are unambiguously higher-is-better -- this was the exact future
-contextual addition flagged when this tab was first built.
+UPDATED: added real Blitz Rate / Avg Box Count context (Section 1, columns F/G). CORRECTED
+per claude_code_spec_ftn_fix.md: this was originally sourced from FTN Fantasy's real
+per-play charting (nfl_data_py.import_ftn_data) -- investigated and confirmed that data was
+real and genuinely free (FTN Data's own CC-BY-SA-licensed public release via nflverse's
+GitHub Releases, no paid subscription or API key involved, verified by reading nfl_data_py's
+own source and a live unauthenticated pull), so nothing here was ever fabricated. Still
+switched to a second, independent free source per explicit user request: nflverse's own
+official PARTICIPATION data (number_of_pass_rushers / defenders_in_box), already merged into
+every pbp pull this project makes (nfl_data_py.import_pbp_data's own default
+include_participation=True) -- see defense_stats.compute_team_season_participation_context.
+No separate fetch call needed anymore. Deliberately informational, NOT part of the weighted
+Z-score composite: a higher or lower blitz rate isn't inherently "better," it's a scheme
+choice, unlike Sack/TFL/QB-Hit Rate which are unambiguously higher-is-better -- this was the
+exact future contextual addition flagged when this tab was first built.
 
 Structural note vs. Offensive Line Index: this tab does NOT need a Section-7-style
 positional-weighted blend step. O-line's real data (Pass Protection/Run Blocking) was
@@ -73,8 +80,7 @@ from nflverse_pull.current_roster import (  # noqa: E402
 from nflverse_pull.defense_stats import (  # noqa: E402
     compute_player_season_front7_stats,
     compute_team_season_front7_stats,
-    compute_team_season_scheme_context,
-    fetch_ftn,
+    compute_team_season_participation_context,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 
@@ -219,9 +225,10 @@ def _pull_data() -> dict:
     team_stats = compute_team_season_front7_stats(pbp)
     player_stats = compute_player_season_front7_stats(pbp)
 
-    print(f"Pulling {HISTORICAL_YEARS} FTN charting for real blitz-rate/box-count context...")
-    ftn = fetch_ftn(HISTORICAL_YEARS)
-    scheme_context = compute_team_season_scheme_context(pbp, ftn)
+    # claude_code_spec_ftn_fix.md: real blitz-rate/box-count context now comes from
+    # nflverse's own participation data, already present in `pbp` (import_pbp_data's own
+    # default include_participation=True) -- no separate fetch call needed.
+    scheme_context = compute_team_season_participation_context(pbp)
     # Context-only columns -- deliberately NOT part of METRICS/the weighted Z-score
     # composite (see defense_stats.py's module docstring for why).
     team_stats = team_stats.merge(scheme_context, on=["Team", "Season"], how="left")
@@ -289,10 +296,10 @@ def build(workbook_path: str) -> dict:
     t = ws.cell(row=1, column=1, value=(
         "Front Seven & D-Line Index -- Multi-Year Decay-Weighted TEAM-Level Pass-Rush/"
         "Run-Stop Rating (Sack Rate, TFL Rate, QB Hit Rate; real nflverse play-by-play "
-        "counting stats), plus real Blitz Rate / Avg Box Count context from FTN Fantasy "
-        "charting. Scoped to EDGE/interior line/linebacker -- secondary (CB/S, INT/PBU) "
-        "is a separate future phase, not built here. NO invented per-position grade "
-        "appears anywhere -- see the closing note."
+        "counting stats), plus real Blitz Rate / Avg Box Count context from nflverse's own "
+        "participation data. Scoped to EDGE/interior line/linebacker -- secondary (CB/S, "
+        "INT/PBU) is a separate future phase, not built here. NO invented per-position "
+        "grade appears anywhere -- see the closing note."
     ))
     t.font = Font(name="Arial", size=12, bold=True)
 
@@ -303,8 +310,9 @@ def build(workbook_path: str) -> dict:
         ws, 3, 7,
         "Section 1 \u2014 Raw 3-Year TEAM-Level Rates (real nflverse play-by-play counting "
         "stats, rolled up from every real contributing player). Blitz Rate / Avg Box "
-        "Count (F/G, real FTN Fantasy charting) are CONTEXT ONLY -- not part of the "
-        "weighted composite in Section 5 (see this tab's closing note for why).",
+        "Count (F/G, real nflverse participation data -- number_of_pass_rushers / "
+        "defenders_in_box) are CONTEXT ONLY -- not part of the weighted composite in "
+        "Section 5 (see this tab's closing note for why).",
     )
     _header_row(ws, 4, [
         "Team", "Season", *[m["label"] for m in METRICS],
@@ -636,12 +644,20 @@ def build(workbook_path: str) -> dict:
         "PLAYER'S OWN real 2025 totals -- informational only, not re-fed into scoring. "
         "SCOPE: this tab covers EDGE/interior line/linebacker only -- secondary (CB/S, "
         "INT/PBU) is a separate future phase (built separately as 'Secondary Index'). "
-        "Section 1's Blitz Rate / Avg Box Count (F/G) are real, per-play FTN Fantasy "
-        "charting (n_blitzers, n_defense_box, joined by game_id/play_id) -- DELIBERATELY "
-        "CONTEXT ONLY, not part of Section 5's weighted composite: a higher or lower "
-        "blitz rate isn't inherently 'better,' it's a scheme choice, unlike Sack/TFL/QB-"
-        "Hit Rate which are unambiguously higher-is-better. NOT INCLUDED: coverage-shell "
-        "scheme charting (single-high/two-high) has no free public source at all. The "
+        "Section 1's Blitz Rate / Avg Box Count (F/G) are real nflverse participation "
+        "data (number_of_pass_rushers, defenders_in_box -- already merged into every pbp "
+        "pull by nfl_data_py.import_pbp_data's own default include_participation=True, no "
+        "separate fetch needed). CORRECTED per claude_code_spec_ftn_fix.md: this was "
+        "originally FTN Fantasy's real per-play charting (nfl_data_py.import_ftn_data) -- "
+        "investigated and confirmed that data was real and genuinely free (FTN Data's own "
+        "CC-BY-SA-licensed public release via nflverse, no paid subscription involved), "
+        "not fabricated, but switched to this second independent free source per explicit "
+        "user request. DELIBERATELY CONTEXT ONLY, not part of Section 5's weighted "
+        "composite: a higher or lower blitz rate isn't inherently 'better,' it's a scheme "
+        "choice, unlike Sack/TFL/QB-Hit Rate which are unambiguously higher-is-better. "
+        "NOT INCLUDED: coverage-shell scheme charting (single-high/two-high) has no free "
+        "public source at all -- this remains genuinely proprietary (paid FTN/Fantasy "
+        "Points charting only) and was NOT approximated with a fabricated proxy. The "
         "2026 depth-chart snapshot Section 6's starters are pulled from was pulled BEFORE "
         "final 53-man roster cuts -- same caveat as every other current-roster-driven tab "
         "in this workbook."

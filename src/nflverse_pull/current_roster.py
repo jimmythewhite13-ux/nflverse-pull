@@ -138,6 +138,41 @@ def resolve_scored_population(
     return out.sort_values(["Team", "Role"], ascending=[True, False]).reset_index(drop=True)
 
 
+def merge_with_historical_fallback(
+    current_population: pd.DataFrame, historical_proxy: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Pure function, no network. Part 4 of claude_code_spec_current_roster_fix.md: "falling
+    back to the historical proxy only if no current data or override exists for that team."
+
+    `current_population`: Team | Role | Player Name | Player ID | Source (Part 1/2's output
+    from resolve_scored_population -- current-roster pull plus any manual override).
+    `historical_proxy`: Team | Role | Player Name | Player ID (the OLD historical-attempts-
+    ranking population -- e.g. QB Index's pre-fix "current season's Starters/Backups by
+    dropback rank"). For every (Team, Role) present in `historical_proxy` but MISSING from
+    `current_population` (the depth-chart pull had no slot for it, and no override filled
+    the gap), adds a row sourced from the historical proxy -- tagged so it stays visible
+    which path each row took. Never overrides a row current_population already has: current
+    data (pulled or overridden) always wins when both exist for the same (Team, Role).
+    """
+    have = {(r["Team"], r["Role"]) for r in current_population.to_dict("records")}
+    fallback_rows = [
+        {
+            "Team": r["Team"], "Role": r["Role"], "Player Name": r["Player Name"],
+            "Player ID": r["Player ID"],
+            "Source": "historical-proxy fallback (no current-roster or override data)",
+        }
+        for r in historical_proxy.to_dict("records")
+        if (r["Team"], r["Role"]) not in have
+    ]
+    if not fallback_rows:
+        return current_population.copy()
+    combined = pd.concat(
+        [current_population, pd.DataFrame(fallback_rows)], ignore_index=True
+    )
+    return combined.sort_values(["Team", "Role"], ascending=[True, False]).reset_index(drop=True)
+
+
 def main(years: list[int] | None = None, output_path: str = "current_starters.csv") -> pd.DataFrame:
     years = years or [2026]
     depth_charts = fetch_depth_charts(years)

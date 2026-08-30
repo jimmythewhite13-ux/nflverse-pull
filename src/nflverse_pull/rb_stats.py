@@ -91,6 +91,51 @@ def compute_team_season_rb_stats(pbp: pd.DataFrame) -> pd.DataFrame:
     return out[SEASON_STATS_COLUMNS]
 
 
+def compute_carry_share(population: pd.DataFrame, season_stats: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. For each team with BOTH a Starter and a Backup in
+    `population` (current-roster-identified -- see current_roster.resolve_scored_population,
+    Part B of claude_code_spec_rb_index.md), finds each player's most recent season's
+    Carries in `season_stats` and computes:
+
+        Carry Share (Y-1) = Starter's carries / (Starter + Backup carries)
+
+    The committee-detection signal the spec calls for: near 0.5 means a genuine committee
+    backfield (Replacement Value means less there), near 1.0 means a clear bell-cow. A
+    player with zero Section 1 rows (a true rookie) contributes 0 carries here, which still
+    produces a meaningful share rather than an error (e.g. 1.0 if the incumbent has all the
+    recent carries and the new arrival has none yet).
+
+    Output: Team | Carry Share (Y-1) | Starter Carries (Y-1) | Backup Carries (Y-1)
+    """
+
+    def _most_recent_carries(player_id: str) -> int:
+        rows = season_stats[season_stats["Player ID"] == player_id]
+        if len(rows) == 0:
+            return 0
+        return int(rows.sort_values("Season", ascending=False).iloc[0]["Carries"])
+
+    out_rows = []
+    for team in population["Team"].unique():
+        team_pop = population[population["Team"] == team]
+        starter = team_pop[team_pop["Role"] == "Starter"]
+        backup = team_pop[team_pop["Role"] == "Backup"]
+        if len(starter) == 0 or len(backup) == 0:
+            continue
+        starter_carries = _most_recent_carries(starter.iloc[0]["Player ID"])
+        backup_carries = _most_recent_carries(backup.iloc[0]["Player ID"])
+        total = starter_carries + backup_carries
+        share = starter_carries / total if total > 0 else None
+        out_rows.append({
+            "Team": team, "Carry Share (Y-1)": share,
+            "Starter Carries (Y-1)": starter_carries, "Backup Carries (Y-1)": backup_carries,
+        })
+    return pd.DataFrame(
+        out_rows,
+        columns=["Team", "Carry Share (Y-1)", "Starter Carries (Y-1)", "Backup Carries (Y-1)"],
+    )
+
+
 def main(
     years: list[int] | None = None, output_path: str = "team_season_rb_stats.csv"
 ) -> pd.DataFrame:

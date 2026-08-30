@@ -4,6 +4,7 @@ import pytest
 from nflverse_pull.rb_stats import (
     MIN_QUALIFYING_CARRIES,
     SEASON_STATS_COLUMNS,
+    compute_carry_share,
     compute_team_season_rb_stats,
 )
 
@@ -84,3 +85,58 @@ def test_rb_stats_flags_rookie_season_as_first_qualifying_season():
 
     assert list(out["Season"]) == [2025]  # 2024 excluded, not zero-filled
     assert out.iloc[0]["Is Rookie Season"]
+
+
+def _population(rows):
+    return pd.DataFrame(rows, columns=["Team", "Role", "Player Name", "Player ID"])
+
+
+def _season_stats_for_carries(rows):
+    # Minimal season_stats stand-in: just the columns compute_carry_share actually reads.
+    return pd.DataFrame(rows, columns=["Player ID", "Season", "Carries"])
+
+
+def test_carry_share_flags_a_clear_bell_cow():
+    population = _population([
+        ["Buffalo Bills", "Starter", "R.Lead", "P1"],
+        ["Buffalo Bills", "Backup", "R.Change", "P2"],
+    ])
+    season_stats = _season_stats_for_carries([
+        ["P1", 2025, 210], ["P2", 2025, 90],  # 70/30 split
+    ])
+
+    out = compute_carry_share(population, season_stats).set_index("Team")
+    assert out.loc["Buffalo Bills", "Carry Share (Y-1)"] == pytest.approx(0.7)
+
+
+def test_carry_share_flags_a_genuine_committee():
+    population = _population([
+        ["Miami Dolphins", "Starter", "R.One", "P3"],
+        ["Miami Dolphins", "Backup", "R.Two", "P4"],
+    ])
+    season_stats = _season_stats_for_carries([
+        ["P3", 2025, 110], ["P4", 2025, 90],  # near 55/45
+    ])
+
+    out = compute_carry_share(population, season_stats).set_index("Team")
+    assert out.loc["Miami Dolphins", "Carry Share (Y-1)"] == pytest.approx(110 / 200)
+
+
+def test_carry_share_handles_a_true_zero_history_rookie_backup():
+    # The backup is a true rookie with no Section 1 rows at all -- must not error, and
+    # correctly gives the incumbent starter a 1.0 share (all of the recent carries).
+    population = _population([
+        ["Buffalo Bills", "Starter", "R.Incumbent", "P1"],
+        ["Buffalo Bills", "Backup", "R.Rookie", "P_NEW"],
+    ])
+    season_stats = _season_stats_for_carries([["P1", 2025, 150]])  # P_NEW has no rows
+
+    out = compute_carry_share(population, season_stats).set_index("Team")
+    assert out.loc["Buffalo Bills", "Carry Share (Y-1)"] == pytest.approx(1.0)
+    assert out.loc["Buffalo Bills", "Backup Carries (Y-1)"] == 0
+
+
+def test_carry_share_skips_team_missing_a_role():
+    population = _population([["Buffalo Bills", "Starter", "R.Solo", "P1"]])  # no backup
+    out = compute_carry_share(population, _season_stats_for_carries([]))
+    assert len(out) == 0

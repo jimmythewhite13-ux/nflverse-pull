@@ -4,6 +4,7 @@ import pytest
 from nflverse_pull.qb_stats import (
     MIN_QUALIFYING_DROPBACKS,
     SEASON_STATS_COLUMNS,
+    compute_player_season_qb_ngs_context,
     compute_qb_roles,
     compute_team_season_qb_stats,
 )
@@ -171,3 +172,44 @@ def test_qb_roles_resolves_traded_qb_to_season_of_record_team():
     assert list(jets["Player Name"]) == ["E.Traded", "F.Bench"]
     assert list(jets["Role"]) == ["Starter", "Backup"]
     assert "Miami Dolphins" not in set(roles["Team"])  # not double-counted on his old team
+
+
+def _ngs_row(player_id, season, team_abbr, week, time_to_throw, aggressiveness):
+    return {
+        "player_gsis_id": player_id, "season": season, "team_abbr": team_abbr,
+        "week": week, "avg_time_to_throw": time_to_throw, "aggressiveness": aggressiveness,
+    }
+
+
+def test_qb_ngs_context_uses_real_season_aggregate_rows_only():
+    # week=0 is the real season aggregate; weekly rows must be ignored, not averaged
+    # manually -- NGS already computes the season total itself.
+    rows = [
+        _ngs_row("P1", 2025, "BUF", 0, 2.65, 12.4),
+        _ngs_row("P1", 2025, "BUF", 1, 2.40, 10.0),
+        _ngs_row("P1", 2025, "BUF", 2, 2.90, 15.0),
+    ]
+    out = compute_player_season_qb_ngs_context(pd.DataFrame(rows)).set_index("Player ID")
+    assert len(out) == 1
+    assert out.loc["P1", "Avg Time to Throw"] == pytest.approx(2.65)
+    assert out.loc["P1", "Aggressiveness"] == pytest.approx(12.4)
+    assert out.loc["P1", "Team"] == "Buffalo Bills"
+
+
+def test_qb_ngs_context_remaps_ngs_lar_to_la():
+    rows = [_ngs_row("P1", 2025, "LAR", 0, 2.7, 14.0)]
+    out = compute_player_season_qb_ngs_context(pd.DataFrame(rows))
+    assert out.iloc[0]["Team"] == "Los Angeles Rams"
+
+
+def test_qb_ngs_context_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_ngs_row("P1", 2025, "ZZZ", 0, 2.7, 14.0)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_qb_ngs_context(df)
+
+
+def test_qb_ngs_context_skips_rows_with_no_real_player_id():
+    rows = [_ngs_row(None, 2025, "BUF", 0, 2.7, 14.0), _ngs_row("P1", 2025, "BUF", 0, 2.6, 13.0)]
+    out = compute_player_season_qb_ngs_context(pd.DataFrame(rows))
+    assert len(out) == 1
+    assert out.iloc[0]["Player ID"] == "P1"

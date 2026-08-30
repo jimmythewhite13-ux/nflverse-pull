@@ -13,6 +13,26 @@ even though the QB obviously has an identity on that play. `passer_id` / `passer
 populated across every dropback type (attempt, sack, scramble), so those are what this
 module groups and names by -- not the more "obvious" passer_player_id/passer_player_name,
 which would silently drop every scramble from a QB's own stat line.
+
+NGS passing context (Avg Time to Throw, Aggressiveness %): real, OFFICIAL NFL Next Gen Stats
+data (nfl_data_py.import_ngs_data("passing", years)), not derived from pbp -- NGS's own
+tracking-data measures of pocket-process speed and willingness to throw into tight coverage.
+Deliberately CONTEXT ONLY, never scored: unlike RB Index's RYOE/Att (a real skill-isolation
+signal with an unambiguous "higher is better" direction), neither of these has one -- a fast
+release can mean decisive processing or an offense that scripts quick, low-value throws; high
+Aggressiveness can mean elite arm talent or recklessness. NGS's own official Completion % Over
+Expectation (`completion_percentage_above_expectation`) was deliberately NOT added here even
+though it exists in the same real dataset: this tab's existing CPOE column (from pbp's own
+`cpoe`) already measures the same underlying skill from a different model, and adding NGS's
+version as a second scored metric would double-count accuracy in the weighted composite rather
+than add a genuinely new signal (verified live before deciding this: pbp's mean cpoe and NGS's
+own completion_percentage_above_expectation for the same real QB-season, e.g. Caleb Williams
+2025, are close but not identical -- -3.51 vs. -6.87 -- different models of the same skill, not
+different skills). Verified live before adding this: NGS passing applies its OWN, higher
+qualifying-volume threshold (2023-2025 minimum real attempts: 136-160) than this module's
+MIN_QUALIFYING_DROPBACKS=100, so some real, qualifying QB-seasons here won't have real NGS
+context -- handled as a genuinely missing data point (left blank), not zero-filled or assumed,
+same pattern as everywhere else in this project.
 """
 from __future__ import annotations
 
@@ -123,6 +143,48 @@ def compute_team_season_qb_stats(pbp: pd.DataFrame) -> pd.DataFrame:
         ["Team", "Season", "Dropbacks"], ascending=[True, True, False]
     ).reset_index(drop=True)
     return out[SEASON_STATS_COLUMNS]
+
+
+def fetch_ngs_passing(years: list[int]) -> pd.DataFrame:
+    """Network call -- real, official NFL Next Gen Stats passing data (weekly + season-
+    aggregate rows; compute_player_season_qb_ngs_context filters to the real season
+    aggregates)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_ngs_data("passing", years)
+
+
+# NGS quirk verified live before writing this (not assumed, same check already done for
+# rb_stats.py's RYOE pull): NGS uses "LAR" for the Rams consistently across 2023-2025 --
+# the Raiders' "LV" matches TEAM_NAMES correctly, so only LAR needs remapping here.
+_NGS_TEAM_REMAP = {"LAR": "LA"}
+
+
+def compute_player_season_qb_ngs_context(ngs_passing: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-player season Avg Time to Throw and Aggressiveness
+    %, from NFL Next Gen Stats' own season-aggregate rows (`week == 0` -- verified live this
+    is the real seasonal total, not something to average from weekly rows). CONTEXT ONLY --
+    see this module's own docstring for why neither metric is scored.
+
+    Columns: Player ID | Season | Team | Avg Time to Throw | Aggressiveness
+    """
+    season = ngs_passing[ngs_passing["week"] == 0].copy()
+    season = season[season["player_gsis_id"].notna()]
+    season["team_abbr"] = season["team_abbr"].replace(_NGS_TEAM_REMAP)
+
+    unmapped = sorted(set(season["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+
+    out = pd.DataFrame({
+        "Player ID": season["player_gsis_id"],
+        "Season": season["season"],
+        "Team": season["team_abbr"].map(TEAM_NAMES),
+        "Avg Time to Throw": season["avg_time_to_throw"],
+        "Aggressiveness": season["aggressiveness"],
+    })
+    return out.reset_index(drop=True)
 
 
 def compute_qb_roles(season_stats: pd.DataFrame) -> pd.DataFrame:

@@ -1,7 +1,8 @@
 """
-Pulls REAL, free, publicly available team-level offensive line metrics from Pro Football
-Reference (via nfl_data_py.import_seasonal_pfr) -- Pass_Protection and Run_Blocking, as
-requested. Feeds the workbook's "Offensive Line Index" tab.
+Pulls REAL, free, publicly available team-level offensive line metrics -- Pro Football
+Reference (via nfl_data_py.import_seasonal_pfr) for Pass_Protection and Run_Blocking, plus
+FTN Fantasy's real per-play charting (via nfl_data_py.import_ftn_data) for a fault-adjusted
+sack rate. Feeds the workbook's "Offensive Line Index" tab.
 
 Why PFR instead of individual per-lineman grades (LT/LG/C/RG/RT skill numbers): checked
 before writing this, per project convention -- there is no free, public, per-lineman
@@ -27,6 +28,16 @@ LT's own Pass_Protection number" here, unlike every other position in this proje
 current_roster.py for the separate, real INDIVIDUAL-level data this tab also uses (which
 starter, and their real NFL experience) -- that's identity/availability data, not a
 fabricated per-player skill grade.
+
+Sack-Free Rate (Fault-Adjusted): PFR's Pass_Protection (pressure rate) blames the O-line for
+every sack, even ones charted as the QB's own fault (held the ball too long, etc.) -- a real
+gap identified once FTN Fantasy's real per-play charting was found to carry
+`is_qb_fault_sack`. Checked live before building this: FTN's real charting matched 100% of
+2025's real sack plays (1,287/1,287, joined via game_id/play_id), with 445 (34.6%) charted
+as the QB's own fault -- a substantial, real signal worth correcting for, not noise.
+Sack-Free Rate (Fault-Adjusted) = 1 - (real sacks NOT charted as QB-fault / real pass plays
+faced), framed as a "higher is better" clean-pocket rate for consistency with every other
+metric in this project (same inversion convention Pass_Protection itself already uses).
 """
 from __future__ import annotations
 
@@ -47,6 +58,14 @@ def fetch_pfr_rush(years: list[int]) -> pd.DataFrame:
     import nfl_data_py as nfl
 
     return nfl.import_seasonal_pfr("rush", years)
+
+
+def fetch_ftn(years: list[int]) -> pd.DataFrame:
+    """Network call -- FTN Fantasy's real per-play charting (blitz/box counts, sack fault,
+    play-action, drops, etc.)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_ftn_data(years)
 
 
 # PFR quirk verified live before writing this (not assumed): the 2023 'pass' dataset alone
@@ -109,6 +128,53 @@ def compute_team_season_oline_stats(
 
     out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
     return out[["Team", "Season", "Pass_Protection", "Run_Blocking"]]
+
+
+def compute_team_season_sack_fault_stats(pbp: pd.DataFrame, ftn: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real, fault-adjusted sack rate per team-season, joining
+    nflverse pbp (real sack plays) against FTN Fantasy's real charting (is_qb_fault_sack) by
+    game_id/play_id. Team-level, attributed to `posteam` (the team whose O-line is being
+    evaluated) -- the same direction Pass_Protection already uses, and the OPPOSITE of
+    defense_stats.py's Sack Rate (which attributes to `defteam`, the team that caused it).
+
+    Columns: Team | Season | Sack-Free Rate (Fault-Adjusted)
+    """
+    reg = pbp[pbp["season_type"] == "REG"].copy()
+    reg = reg[reg["posteam"].notna()]
+    reg["play_id"] = reg["play_id"].astype("Int64")
+
+    ftn_join = ftn[["nflverse_game_id", "nflverse_play_id", "is_qb_fault_sack"]].copy()
+    ftn_join["nflverse_play_id"] = ftn_join["nflverse_play_id"].astype("Int64")
+
+    merged = reg.merge(
+        ftn_join, left_on=["game_id", "play_id"],
+        right_on=["nflverse_game_id", "nflverse_play_id"], how="left",
+    )
+
+    pass_faced = merged[merged["pass_attempt"] == 1]
+    pass_denom = pass_faced.groupby(["posteam", "season"]).size().rename("pass_plays_faced")
+
+    # A sack not charted as the QB's own fault (including a sack FTN didn't charge at all,
+    # i.e. is_qb_fault_sack is NaN -- treated as NOT proven QB-fault, so it still counts
+    # against the line by default, same conservative-default spirit as every other honest
+    # fallback in this project) is attributed to the O-line here.
+    sacks = merged[merged["sack"] == 1].copy()
+    sacks["ol_fault"] = sacks["is_qb_fault_sack"] != True  # noqa: E712
+    ol_fault_sacks = sacks.groupby(["posteam", "season"])["ol_fault"].sum().rename("ol_fault_sacks")
+
+    out = pass_denom.to_frame().join(ol_fault_sacks).reset_index()
+    out["ol_fault_sacks"] = out["ol_fault_sacks"].fillna(0)
+    out = out.rename(columns={"posteam": "team", "season": "Season"})
+    out["Sack-Free Rate (Fault-Adjusted)"] = 1 - out["ol_fault_sacks"] / out["pass_plays_faced"]
+
+    unmapped = sorted(set(out["team"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[["Team", "Season", "Sack-Free Rate (Fault-Adjusted)"]]
 
 
 def main(

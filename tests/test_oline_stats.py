@@ -1,7 +1,10 @@
 import pandas as pd
 import pytest
 
-from nflverse_pull.oline_stats import compute_team_season_oline_stats
+from nflverse_pull.oline_stats import (
+    compute_team_season_oline_stats,
+    compute_team_season_sack_fault_stats,
+)
 
 
 def _pass_row(team, season, attempts, pressured):
@@ -94,3 +97,57 @@ def test_oline_stats_handles_a_team_present_in_only_one_of_pass_or_rush():
     assert out.loc["Miami Dolphins", "Pass_Protection"] == pytest.approx(80.0)
     assert pd.isna(out.loc["New York Jets", "Pass_Protection"])
     assert out.loc["New York Jets", "Run_Blocking"] == pytest.approx(2.5)
+
+
+def _pbp_row(posteam, season, pass_attempt=0, sack=0, game_id="G1", play_id=1):
+    return {
+        "season_type": "REG", "posteam": posteam, "season": season,
+        "pass_attempt": pass_attempt, "sack": sack, "game_id": game_id, "play_id": play_id,
+    }
+
+
+def _ftn_row(game_id, play_id, is_qb_fault_sack):
+    return {
+        "nflverse_game_id": game_id, "nflverse_play_id": play_id,
+        "is_qb_fault_sack": is_qb_fault_sack,
+    }
+
+
+def test_sack_fault_stats_excludes_qb_fault_sacks_from_ol_blame():
+    """
+    BUF, 2025: 10 real pass plays faced (including sacks, matching the "pass_attempt is
+    TRUE on a sack too" quirk documented elsewhere in this project).
+      - 2 sacks charted as the O-line's fault (is_qb_fault_sack=False)
+      - 1 sack charted as the QB's own fault (is_qb_fault_sack=True) -- must NOT count
+        against the line
+    Sack-Free Rate (Fault-Adjusted) = 1 - (2 OL-fault sacks / 10 pass plays) = 0.8
+    (NOT 1 - 3/10 = 0.7, which is what an unadjusted sack rate would give.)
+    """
+    pbp_rows = [
+        _pbp_row("BUF", 2025, pass_attempt=1, sack=1, play_id=1),
+        _pbp_row("BUF", 2025, pass_attempt=1, sack=1, play_id=2),
+        _pbp_row("BUF", 2025, pass_attempt=1, sack=1, play_id=3),
+    ]
+    pbp_rows += [_pbp_row("BUF", 2025, pass_attempt=1, play_id=i) for i in range(4, 11)]
+    ftn_rows = [
+        _ftn_row("G1", 1, False),
+        _ftn_row("G1", 2, False),
+        _ftn_row("G1", 3, True),
+    ]
+    out = compute_team_season_sack_fault_stats(
+        pd.DataFrame(pbp_rows), pd.DataFrame(ftn_rows)
+    ).set_index("Team")
+    assert out.loc["Buffalo Bills", "Sack-Free Rate (Fault-Adjusted)"] == pytest.approx(0.8)
+
+
+def test_sack_fault_stats_treats_unmatched_sack_as_ol_fault_by_default():
+    # A real sack with no FTN charting match at all (is_qb_fault_sack ends up NaN after the
+    # left join) is NOT proven to be the QB's fault -- conservative default, counts against
+    # the line, same as an ordinary sack would without this adjustment.
+    pbp_rows = [_pbp_row("MIA", 2025, pass_attempt=1, sack=1, game_id="UNMATCHED", play_id=99)]
+    pbp_rows += [_pbp_row("MIA", 2025, pass_attempt=1, play_id=i) for i in range(1, 4)]
+    out = compute_team_season_sack_fault_stats(
+        pd.DataFrame(pbp_rows), pd.DataFrame(columns=["nflverse_game_id", "nflverse_play_id",
+                                                        "is_qb_fault_sack"])
+    ).set_index("Team")
+    assert out.loc["Miami Dolphins", "Sack-Free Rate (Fault-Adjusted)"] == pytest.approx(1 - 1 / 4)

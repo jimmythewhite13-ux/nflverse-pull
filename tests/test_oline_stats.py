@@ -49,6 +49,32 @@ def test_oline_stats_computes_attempt_weighted_team_pressure_and_ybc():
     assert row["Run_Blocking"] == pytest.approx(1000 / 350)
 
 
+def test_oline_stats_remaps_pfr_lar_lvr_and_excludes_multi_team_aggregate_rows():
+    # Verified live before writing this: the 2023 PFR 'pass' dataset alone uses "LAR"/"LVR"
+    # where every other year/dataset uses "LA"/"LV" -- and a traded player's "2TM" row
+    # duplicates (not supplements) his real per-team split rows.
+    pfr_pass = pd.DataFrame([
+        _pass_row("LAR", 2023, 400, 80),
+        _pass_row("LVR", 2023, 400, 100),
+        # A traded QB's aggregate row must be excluded, or MIA's real numbers below would
+        # be double-counted against this fabricated blend.
+        _pass_row("2TM", 2023, 50, 10),
+        _pass_row("MIA", 2023, 400, 90),
+    ])
+    pfr_rush = pd.DataFrame([
+        _rush_row("LA", 2023, 300, 750),
+        _rush_row("LV", 2023, 300, 900),
+        _rush_row("MIA", 2023, 300, 600),
+    ])
+
+    out = compute_team_season_oline_stats(pfr_pass, pfr_rush).set_index("Team")
+
+    assert out.loc["Los Angeles Rams", "Pass_Protection"] == pytest.approx(100 * (1 - 80 / 400))
+    assert out.loc["Las Vegas Raiders", "Pass_Protection"] == pytest.approx(100 * (1 - 100 / 400))
+    # MIA's real 90/400 rate, NOT diluted by the excluded 2TM aggregate row.
+    assert out.loc["Miami Dolphins", "Pass_Protection"] == pytest.approx(100 * (1 - 90 / 400))
+
+
 def test_oline_stats_raises_on_unmapped_team_abbreviation():
     pfr_pass = pd.DataFrame([_pass_row("ZZZ", 2025, 100, 20)])
     pfr_rush = pd.DataFrame([_rush_row("ZZZ", 2025, 100, 250)])

@@ -49,6 +49,18 @@ def fetch_pfr_rush(years: list[int]) -> pd.DataFrame:
     return nfl.import_seasonal_pfr("rush", years)
 
 
+# PFR quirk verified live before writing this (not assumed): the 2023 'pass' dataset alone
+# uses "LAR"/"LVR" where every other year/dataset (2024/2025 pass, all 3 years of rush) uses
+# "LA"/"LV" -- an inconsistency in PFR's own team-abbreviation history, not a bug in this
+# module. Remapped here so both eras join against TEAM_NAMES correctly.
+_PFR_TEAM_REMAP = {"LAR": "LA", "LVR": "LV"}
+
+# A player traded mid-season gets a "2TM"/"3TM" aggregate row IN ADDITION TO his real
+# per-team split rows (verified live: a 2024 2TM passer's MIA + NYG rows summed exactly to
+# his 2TM row's totals) -- excluding the aggregate avoids double-counting, not data loss.
+_PFR_MULTI_TEAM_CODES = {"2TM", "3TM"}
+
+
 def compute_team_season_oline_stats(
     pfr_pass: pd.DataFrame, pfr_rush: pd.DataFrame
 ) -> pd.DataFrame:
@@ -59,6 +71,8 @@ def compute_team_season_oline_stats(
     Columns: Team | Season | Pass_Protection | Run_Blocking
     """
     pass_df = pfr_pass.copy()
+    pass_df = pass_df[~pass_df["team"].isin(_PFR_MULTI_TEAM_CODES)]
+    pass_df["team"] = pass_df["team"].replace(_PFR_TEAM_REMAP)
     pass_df = pass_df[pass_df["pass_attempts"] > 0]
     pass_df["pressured"] = pass_df["times_pressured"].fillna(0)
     # Attempt-weighted team pressure rate: sum(times_pressured) / sum(pass_attempts) across
@@ -72,6 +86,8 @@ def compute_team_season_oline_stats(
     )
 
     rush_df = pfr_rush.copy()
+    rush_df = rush_df[~rush_df["tm"].isin(_PFR_MULTI_TEAM_CODES)]
+    rush_df["tm"] = rush_df["tm"].replace(_PFR_TEAM_REMAP)
     rush_df = rush_df[rush_df["att"] > 0]
     rush_df["ybc"] = rush_df["ybc"].fillna(0)
     # Attempt-weighted team Yards Before Contact per Attempt, same weighting logic as above.

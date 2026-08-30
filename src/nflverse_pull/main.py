@@ -8,11 +8,12 @@ Two stages:
      Advanced Efficiency Metrics Section 1 (fixed 96/32-row shape, values refreshed in
      place).
   2. QB Index / Replacement Value / Manual Override table / RB Value Index / WR-TE Value
-     Index / Kicking Index / Availability Index -- fully REBUILT from scratch each run (not
-     a Section-1-only value refresh), because their row counts are inherently dynamic: which
-     players currently qualify as a Starter/Backup, how many games have been played this
-     season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced
-     Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
+     Index / Kicking Index / Offensive Line Index / Availability Index -- fully REBUILT
+     from scratch each run (not a Section-1-only value refresh), because their row counts
+     are inherently dynamic: which players currently qualify as a Starter/Backup, how many
+     games have been played this season, etc. Skipped, non-fatally, on a workbook that
+     doesn't have 'Advanced Efficiency Metrics' yet (run scripts/build_efficiency_engine.py
+     once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -62,6 +63,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import add_manual_override_table
     import build_availability_index
     import build_kicking_index
+    import build_oline_index
     import build_qb_index
     import build_rb_index
     import build_replacement_value
@@ -73,20 +75,22 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # Order is load-bearing (see the module docstring): build_qb_index deletes/recreates the
     # whole 'QB Index' sheet, so Section 6 (Replacement Value) and Section 7 (Manual
     # Override) must be rebuilt immediately after it, every run. build_wr_te_index doesn't
-    # touch 'Team Ratings' at all, so its position doesn't matter. build_rb_index and
-    # build_kicking_index, however, EACH rewrite Team Ratings' Net Power Rating (column N)
-    # formula wholesale with whatever set of adjustment terms that script knows about --
-    # build_kicking_index's version is the most complete (includes the QB/RB/Kicking terms),
-    # so it must run AFTER build_rb_index, or the RB script's older, Kicking-unaware formula
-    # would win and silently drop the Kicking Adjustment column (written, but never summed
-    # into N). If a future phase adds another Team-Ratings-wired tab, update ITS Net Power
-    # Rating formula to include every prior term too, and keep it last in this list.
+    # touch 'Team Ratings' at all, so its position doesn't matter. build_rb_index,
+    # build_kicking_index, and build_oline_index, however, EACH rewrite Team Ratings' Net
+    # Power Rating (column N) formula wholesale with whatever set of adjustment terms that
+    # script knows about -- build_oline_index's version is the most complete (includes the
+    # QB/RB/Kicking/OL terms), so it must run LAST, after build_kicking_index, or an older
+    # script's formula would win and silently drop whichever column it doesn't know about
+    # (written, but never summed into N). If a future phase adds another Team-Ratings-wired
+    # tab, update ITS Net Power Rating formula to include every prior term too, and keep it
+    # last in this list.
     build_qb_index.build(workbook_path)
     build_replacement_value.build(workbook_path)
     add_manual_override_table.build(workbook_path)
     build_rb_index.build(workbook_path)
     build_wr_te_index.build(workbook_path)
     build_kicking_index.build(workbook_path)
+    build_oline_index.build(workbook_path)
     build_availability_index.build(workbook_path)
 
 

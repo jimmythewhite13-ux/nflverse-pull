@@ -80,7 +80,9 @@ from nflverse_pull.current_roster import (  # noqa: E402
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.receiving_stats import (  # noqa: E402
+    compute_player_season_ngs_receiving,
     compute_team_season_receiving_stats,
+    fetch_ngs_receiving,
 )
 from nflverse_pull.rookie_crosswalk import (  # noqa: E402
     assign_rookie_assumptions,
@@ -115,6 +117,10 @@ METRICS = [
     {"key": "success", "col": "Reception Success Rate", "label": "Reception\nSuccess Rate",
      "fmt": "0.00"},
     {"key": "ypt", "col": "YPT", "label": "YPT", "fmt": "0.00"},
+    {"key": "sep", "col": "Avg Separation", "label": "Avg Separation\n(NGS)", "fmt": "0.00",
+     "partial_coverage": True},
+    {"key": "yacoe", "col": "YAC Over Expectation", "label": "YAC Over\nExpectation (NGS)",
+     "fmt": "0.00", "partial_coverage": True},
 ]
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
@@ -175,6 +181,19 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          "signal than a true starter/backup swap -- see 'WR-TE Value Index' Section 6's "
          "own closing note for why this is a top-3-of-4 blend, not a Replacement Value "
          "swap."),
+        (84, "Avg Separation Weight (WR/TE Index, pts per SD, real NFL Next Gen Stats)", 0.25,
+         "Real route-running/get-open skill (yards of separation at the catch) that "
+         "this tab's outcome-based metrics (EPA/Target, Success Rate, YPT) don't "
+         "isolate on their own -- appended here rather than inserted next to C49-C51 "
+         "to avoid shifting every later tab's hardcoded row references (same "
+         "convention as RB's C82, OL's C81, this tab's own C83)."),
+        (85, "YAC Over Expectation Weight (WR/TE Index, pts per SD, real NFL Next Gen "
+             "Stats)", 0.25,
+         "Real after-catch playmaking isolated from the type of catch (actual YAC "
+         "minus a model's expected YAC) -- the RB Index RYOE/Att equivalent for "
+         "receivers. Weighted equal with Avg Separation: both are real, partial-"
+         "coverage NGS skill-isolation signals distinct from the outcome-based "
+         "metrics above."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -200,6 +219,18 @@ def _pull_data(overrides: pd.DataFrame) -> dict:
     print(f"Pulling {HISTORICAL_YEARS} seasonal rosters for real Is Rookie Season data...")
     seasonal_rosters = fetch_seasonal_rosters(HISTORICAL_YEARS)
     season_stats = attach_real_rookie_season(season_stats, seasonal_rosters)
+
+    print(f"Pulling {HISTORICAL_YEARS} Next Gen Stats receiving data for real Avg "
+          "Separation / YAC Over Expectation...")
+    ngs_receiving = fetch_ngs_receiving(HISTORICAL_YEARS)
+    ngs = compute_player_season_ngs_receiving(ngs_receiving)
+    # Left join -- a real, qualifying-here player without a real NGS row (below NGS's own,
+    # higher volume threshold) genuinely has no NGS value; left blank, not zero-filled.
+    season_stats = season_stats.merge(ngs, on=["Player ID", "Season", "Team"], how="left")
+    n_missing_ngs = season_stats["Avg Separation"].isna().sum()
+    print(f"{len(season_stats) - n_missing_ngs} of {len(season_stats)} WR/TE-seasons have "
+          f"real NGS Avg Separation / YAC Over Expectation values ({n_missing_ngs} below "
+          "NGS's own qualifying threshold).")
 
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster WR/TE population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
@@ -328,12 +359,12 @@ def build(workbook_path: str) -> dict:
     ws.column_dimensions["A"].width = 18.0
     ws.column_dimensions["C"].width = 20.0
 
-    ws.merge_cells("A1:J1")
+    ws.merge_cells("A1:L1")
     t = ws.cell(row=1, column=1, value=(
         "WR/TE Value Index -- Multi-Year Decay-Weighted Receiving Rating (Receiving "
-        "EPA/Target, Reception Success Rate, YPT). Scores WR1/WR2/WR3 and TE1 per team -- "
-        "NOT a Starter/Backup binary like QB/RB Index, and has NO Replacement Value / Team "
-        "Ratings wiring yet (see the closing note below for why)."
+        "EPA/Target, Reception Success Rate, YPT, real NGS Avg Separation / YAC Over "
+        "Expectation). Scores WR1/WR2/WR3 and TE1 per team -- NOT a Starter/Backup binary "
+        "like QB/RB Index."
     ))
     t.font = Font(name="Arial", size=12, bold=True)
 
@@ -341,14 +372,18 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(season_stats) - 1
     _section_title(
-        ws, 3, 9,
+        ws, 3, 11,
         "Section 1 \u2014 Raw 3-Year Data per Receiver-Season (from nflverse pbp; no "
-        "Position or historical Role column -- see this tab's closing note)",
+        "Position or historical Role column -- see this tab's closing note). Avg "
+        "Separation / YAC Over Expectation (J/K) are real NFL Next Gen Stats data with "
+        "their OWN, higher qualifying threshold than this tab's -- a blank cell means a "
+        "real, qualifying receiver-season with no real NGS value, not a zero.",
     )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "Targets", "Receiving EPA/Target",
-         "Reception Success Rate", "YPT", "Is Rookie Season"],
+         "Reception Success Rate", "YPT", "Is Rookie Season", "Avg Separation\n(NGS)",
+         "YAC Over\nExpectation (NGS)"],
     )
     for i, r in enumerate(season_stats.to_dict("records")):
         row = sec1_first_row + i
@@ -365,10 +400,20 @@ def build(workbook_path: str) -> dict:
             elif col in (7, 8):
                 cell.number_format = "0.00"
 
+        sep_v = float(r["Avg Separation"]) if pd.notna(r.get("Avg Separation")) else None
+        yac_raw = r.get("YAC Over Expectation")
+        yac_v = float(yac_raw) if pd.notna(yac_raw) else None
+        sep_cell = ws.cell(row=row, column=10, value=sep_v)
+        yac_cell = ws.cell(row=row, column=11, value=yac_v)
+        sep_cell.font = INPUT_FONT
+        yac_cell.font = INPUT_FONT
+        sep_cell.number_format = "0.00"
+        yac_cell.number_format = "0.00"
+
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
     rookie_range = f"$I${sec1_first_row}:$I${sec1_last_row}"
-    sec1_col_of = {"epa": "F", "success": "G", "ypt": "H"}
+    sec1_col_of = {"epa": "F", "success": "G", "ypt": "H", "sep": "J", "yacoe": "K"}
     metric_ranges = {
         m["key"]: (
             f"${sec1_col_of[m['key']]}${sec1_first_row}:${sec1_col_of[m['key']]}${sec1_last_row}"
@@ -455,7 +500,11 @@ def build(workbook_path: str) -> dict:
                 ws.cell(row=row, column=col, value=v).font = INPUT_FONT
             for j, m in enumerate(METRICS):
                 v = r.get(m["col"])
-                cell = ws.cell(row=row, column=6 + j, value=float(v) if v is not None else None)
+                # pd.notna(), not `v is not None` -- a partial-coverage metric's tier
+                # average can be a real NaN (e.g. a tier with zero real NGS-covered rookie
+                # comps in the pulled window); `v is not None` doesn't catch that (Python's
+                # `float('nan') is not None` is True) and would write an invalid literal.
+                cell = ws.cell(row=row, column=6 + j, value=float(v) if pd.notna(v) else None)
                 cell.font = INPUT_FONT
                 cell.number_format = m["fmt"]
             src = ws.cell(row=row, column=6 + len(METRICS), value=r.get("Source"))
@@ -531,15 +580,22 @@ def build(workbook_path: str) -> dict:
             flat_cell = flat_rookie_cell[m["key"]]
             twob_metric_range = sec2b_metric_range[m["key"]]
 
+            extra_existence_criteria = f",{mrange},\"<>\"" if m.get("partial_coverage") else ""
+
             def _ysub(offset: int, mrange=mrange, flat_cell=flat_cell,
-                       twob_metric_range=twob_metric_range) -> str:
-                rookie_sub = (
-                    f"IFERROR(INDEX({twob_metric_range},MATCH($B{row},{sec2b_id_range},0)),"
-                    f"{flat_cell})"
-                )
+                       twob_metric_range=twob_metric_range,
+                       extra_existence_criteria=extra_existence_criteria,
+                       partial_coverage=bool(m.get("partial_coverage"))) -> str:
+                index_match = f"INDEX({twob_metric_range},MATCH($B{row},{sec2b_id_range},0))"
+                if partial_coverage:
+                    rookie_sub = f"IF(ISBLANK({index_match}),{flat_cell},{index_match})"
+                    rookie_sub = f"IFERROR({rookie_sub},{flat_cell})"
+                else:
+                    rookie_sub = f"IFERROR({index_match},{flat_cell})"
                 return (
                     f"=IF(COUNTIFS({id_range},$B{row},{season_range},"
-                    f"'Model Assumptions'!$C$18-{offset})=0,{rookie_sub},"
+                    f"'Model Assumptions'!$C$18-{offset}{extra_existence_criteria})=0,"
+                    f"{rookie_sub},"
                     f"SUMIFS({mrange},{id_range},$B{row},{season_range},"
                     f"'Model Assumptions'!$C$18-{offset}))"
                 )
@@ -600,9 +656,10 @@ def build(workbook_path: str) -> dict:
     sec5_first_row = sec5_header_row + 1
     sec5_last_row = sec5_first_row + n_players - 1
 
+    sec5_last_col = 5 + len(METRICS) + 4  # player info + Z's + weighted sum + score + YH + key
     _section_title(
-        ws, sec5_title_row, 12,
-        "Section 5 \u2014 Z-Scores and WR/TE Index Score (all three metrics are \"higher is "
+        ws, sec5_title_row, sec5_last_col,
+        "Section 5 \u2014 Z-Scores and WR/TE Index Score (all five metrics are \"higher is "
         "better\" -- no sign-flip needed. Baseline/points-per-SD reuse QB Index's own Model "
         "Assumptions cells C37/C38, same design choice as RB Index.)",
     )
@@ -619,7 +676,10 @@ def build(workbook_path: str) -> dict:
     std_cell_ref = {
         m["key"]: f"${get_column_letter(2 + j)}${std_row}" for j, m in enumerate(METRICS)
     }
-    weight_cells = {"epa": "$C$49", "success": "$C$50", "ypt": "$C$51"}
+    weight_cells = {
+        "epa": "$C$49", "success": "$C$50", "ypt": "$C$51",
+        "sep": "$C$84", "yacoe": "$C$85",
+    }
 
     for i in range(n_players):
         sec3_row = sec3_first_row + i
@@ -676,8 +736,14 @@ def build(workbook_path: str) -> dict:
     # of the top 3, not target-share-weighted -- a real, free target-share proxy isn't
     # available without a separate pull this phase doesn't build (documented simplification,
     # same as every other "future extension" noted elsewhere in this project).
-    key_range = f"$L${sec5_first_row}:$L${sec5_last_row}"
-    score_range = f"$J${sec5_first_row}:$J${sec5_last_row}"
+    # Column letters computed from len(METRICS), not hardcoded -- Section 5's layout shifts
+    # whenever METRICS grows (verified needed when Avg Separation/YAC Over Expectation were
+    # added: with 3 metrics wz_col=I/score=J/key=L, with 5 metrics wz_col=K/score=L/key=N).
+    sec5_wz_col = 6 + len(METRICS)
+    sec5_score_col = get_column_letter(sec5_wz_col + 1)
+    sec5_key_col = get_column_letter(sec5_wz_col + 3)
+    key_range = f"${sec5_key_col}${sec5_first_row}:${sec5_key_col}${sec5_last_row}"
+    score_range = f"${sec5_score_col}${sec5_first_row}:${sec5_score_col}${sec5_last_row}"
 
     sec6_title_row = sec5_last_row + 2
     sec6_header_row = sec6_title_row + 1
@@ -731,11 +797,20 @@ def build(workbook_path: str) -> dict:
 
     # ---- Closing note --------------------------------------------------------------------
     note_row = sec6_last_row + 2
-    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=12)
+    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=sec5_last_col)
     note = ws.cell(row=note_row, column=1, value=(
         "Phase 2 of the multi-phase roadmap (claude_code_spec_rb_index.md) -- no separate "
         "written spec, designed directly. Scores 4 roles per team (WR1/WR2/WR3, TE1), not a "
         "Starter/Backup binary like QB/RB Index -- TE2 is a documented future extension. "
+        "UPDATED: Avg Separation / YAC Over Expectation (real NFL Next Gen Stats) are now "
+        "SCORED alongside the original 3 outcome-based metrics -- unlike QB Index's own NGS "
+        "context additions (Time to Throw / Aggressiveness, deliberately unscored), both of "
+        "these have an unambiguous \"higher is better\" direction and isolate a real skill "
+        "(route-running, after-catch playmaking) the outcome-based metrics don't on their "
+        "own -- same treatment as RB Index's RYOE/Att, including the same partial-coverage "
+        "handling (NGS applies its own higher qualifying threshold; a real, qualifying "
+        "receiver-season with no real NGS value shows blank and falls back to the Rookie "
+        "Baseline in Section 3, not a fabricated 0). "
         "Section 1 carries no historical Role label and Section 2's league average is NOT "
         "filtered to 'real starters only' the way QB/RB's is -- MIN_QUALIFYING_TARGETS "
         "(receiving_stats.py) already excludes below-threshold seasons, and building an "

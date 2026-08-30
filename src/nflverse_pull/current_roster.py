@@ -34,21 +34,30 @@ from nflverse_pull.pull import TEAM_NAMES
 
 # Kicker is "PK" (Place Kicker) in nflverse depth-chart data, NOT "K" -- verified live
 # against the real 2026 pull before writing this (a bare "K" pos_abb doesn't exist at all;
-# "PK" has all 32 teams' PK1 populated).
-POSITIONS = ["QB", "RB", "WR", "TE", "PK"]
+# "PK" has all 32 teams' PK1 populated). Offensive line positions are "LT"/"LG"/"C"/"RG"/
+# "RT" -- each already a distinct, real depth-chart position abbreviation (not a generic
+# "OL" grouping the way import_seasonal_rosters uses); verified live that all 32 teams have
+# a rank-1 starter at each of the 5 spots.
+POSITIONS = ["QB", "RB", "WR", "TE", "PK", "LT", "LG", "C", "RG", "RT"]
 
 # Each position's scored depth-chart slots, mapped to the Role label used throughout
 # Section 3/5/6 downstream. QB/RB keep the existing Starter/Backup binary. WR scores three
-# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE and PK (kicker) each score one (TE1,
-# K1 -- a team practically always has exactly one roster kicker, so there's no Backup
-# concept to score). A depth-order beyond what's listed here for a position (e.g. WR4+) is
-# not scored downstream.
+# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE, PK (kicker), and each of the 5 OL
+# spots score one apiece (TE1, K1, LT/LG/C/RG/RT -- a team has exactly one starter per OL
+# spot, so there's no Backup concept to score, same reasoning as PK). A depth-order beyond
+# what's listed here for a position (e.g. WR4+, or a backup lineman) is not scored
+# downstream.
 POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "QB": {1: "Starter", 2: "Backup"},
     "RB": {1: "Starter", 2: "Backup"},
     "WR": {1: "WR1", 2: "WR2", 3: "WR3"},
     "PK": {1: "K1"},
     "TE": {1: "TE1"},
+    "LT": {1: "LT"},
+    "LG": {1: "LG"},
+    "C": {1: "C"},
+    "RG": {1: "RG"},
+    "RT": {1: "RT"},
 }
 
 OUTPUT_COLUMNS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]
@@ -176,6 +185,41 @@ def resolve_scored_population(
     role_priority = {name: order for order, name in role_labels.items()}
     out["_priority"] = out["Role"].map(role_priority)
     out = out.sort_values(["Team", "_priority"]).drop(columns="_priority").reset_index(drop=True)
+    return out
+
+
+def fetch_seasonal_rosters(years: list[int]) -> pd.DataFrame:
+    """Network call -- nflverse's seasonal roster data, carrying real years_exp/entry_year."""
+    import nfl_data_py as nfl  # imported lazily so tests don't require it installed
+
+    return nfl.import_seasonal_rosters(years)
+
+
+def attach_experience(population: pd.DataFrame, rosters: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Joins a resolve_scored_population() output against real
+    roster data (years_exp) by Player ID -- REAL NFL experience, not a fabricated skill
+    grade. Built for the Offensive Line Index's individual-level component: there is no
+    honest free per-lineman performance grade (see oline_stats.py's module docstring), but
+    a real starter's real experience is a legitimate, well-established football-analytics
+    proxy for continuity/communication risk (a true rookie making his first NFL start at
+    left tackle is a genuinely different risk profile than a 10-year veteran, independent
+    of any grade).
+
+    A player not found in `rosters` (e.g. a very recent practice-squad promotion the
+    roster snapshot hasn't caught up to) gets None rather than a guessed value -- "Is
+    Rookie" is None (unknown), not False, when experience itself is unknown.
+
+    Output: same columns as `population`, plus Years of NFL Experience | Is Rookie
+    """
+    rosters = rosters.dropna(subset=["player_id"])
+    rosters = rosters[~rosters["player_id"].duplicated(keep="first")]
+    exp_lookup = rosters.set_index("player_id")["years_exp"]
+
+    out = population.copy()
+    years_exp = out["Player ID"].map(exp_lookup)
+    out["Years of NFL Experience"] = years_exp
+    out["Is Rookie"] = years_exp.apply(lambda v: bool(v == 0) if pd.notna(v) else None)
     return out
 
 

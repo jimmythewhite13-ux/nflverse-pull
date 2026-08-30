@@ -129,6 +129,43 @@ def test_resolve_population_labels_pk_role_as_k1():
     assert out.iloc[0]["Role"] == "K1"
 
 
+def test_resolve_population_labels_each_ol_spot_by_its_own_name():
+    for pos in ("LT", "LG", "C", "RG", "RT"):
+        current = _current_starters([
+            ["Kansas City Chiefs", pos, "Some Lineman", "P1", 1, "depth_charts"],
+        ])
+        out = resolve_scored_population(current, _overrides([]), pos)
+        assert len(out) == 1
+        assert out.iloc[0]["Role"] == pos
+
+
+def test_attach_experience_joins_real_years_exp_by_player_id():
+    from nflverse_pull.current_roster import attach_experience
+
+    population = pd.DataFrame([
+        {"Team": "Buffalo Bills", "Role": "LT", "Player Name": "D.Dawkins",
+         "Player ID": "P1", "Source": "depth_charts"},
+        {"Team": "Buffalo Bills", "Role": "C", "Player Name": "R.Rookie",
+         "Player ID": "P2", "Source": "depth_charts"},
+        # P3 has no roster row at all -- must get None, not a guessed value.
+        {"Team": "Buffalo Bills", "Role": "RT", "Player Name": "Mystery Player",
+         "Player ID": "P3", "Source": "depth_charts"},
+    ])
+    rosters = pd.DataFrame([
+        {"player_id": "P1", "years_exp": 9},
+        {"player_id": "P2", "years_exp": 0},
+    ])
+
+    out = attach_experience(population, rosters).set_index("Player ID")
+
+    assert out.loc["P1", "Years of NFL Experience"] == 9
+    assert out.loc["P1", "Is Rookie"] is False
+    assert out.loc["P2", "Years of NFL Experience"] == 0
+    assert out.loc["P2", "Is Rookie"] is True
+    assert pd.isna(out.loc["P3", "Years of NFL Experience"])
+    assert out.loc["P3", "Is Rookie"] is None
+
+
 def _historical(rows):
     return pd.DataFrame(rows, columns=["Team", "Role", "Player Name", "Player ID"])
 

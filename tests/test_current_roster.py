@@ -79,6 +79,22 @@ def test_current_starters_covers_pk_as_k1():
     assert out.iloc[0]["Player Name"] == "H.Butker"
 
 
+def test_current_starters_covers_all_five_ol_spots():
+    rows = [
+        _row("2026-08-01T00:00:00Z", "KC", "P.Johnson", "LT1", "LT", 1),
+        _row("2026-08-01T00:00:00Z", "KC", "T.Smith", "LG1", "LG", 1),
+        _row("2026-08-01T00:00:00Z", "KC", "C.Humphrey", "C1", "C", 1),
+        _row("2026-08-01T00:00:00Z", "KC", "T.Smith2", "RG1", "RG", 1),
+        _row("2026-08-01T00:00:00Z", "KC", "J.Allen", "RT1", "RT", 1),
+        # A backup lineman (rank 2) at each spot must be excluded -- only the starter is
+        # scored, same reasoning as PK.
+        _row("2026-08-01T00:00:00Z", "KC", "Backup Guy", "LT2", "LT", 2),
+    ]
+    out = compute_current_starters(pd.DataFrame(rows))
+    assert len(out) == 5
+    assert set(out["Position"]) == {"LT", "LG", "C", "RG", "RT"}
+
+
 def test_current_starters_raises_on_unmapped_team_abbreviation():
     rows = [_row("2026-08-01T00:00:00Z", "ZZZ", "X.Player", "P1", "QB", 1)]
     with pytest.raises(ValueError, match="No full-name mapping"):

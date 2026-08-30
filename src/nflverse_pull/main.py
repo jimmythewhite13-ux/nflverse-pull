@@ -77,24 +77,45 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     #
     # Order is load-bearing (see the module docstring): build_qb_index deletes/recreates the
     # whole 'QB Index' sheet, so Section 6 (Replacement Value) and Section 7 (Manual
-    # Override) must be rebuilt immediately after it, every run. build_wr_te_index doesn't
-    # touch 'Team Ratings' at all, so its position doesn't matter. build_rb_index,
+    # Override) must be rebuilt immediately after it, every run. build_rb_index,
     # build_kicking_index, build_oline_index, build_defense_index, build_secondary_index,
-    # and build_special_teams_index, however, EACH rewrite Team Ratings' Net Power Rating
-    # (column N) formula wholesale with whatever set of adjustment terms that script knows
-    # about -- build_special_teams_index's version is the most complete (includes the QB/
-    # RB/Kicking/OL/Front-7/Secondary/Special-Teams terms), so it must run LAST, after
-    # build_secondary_index, or an older script's formula would win and silently drop
-    # whichever column it doesn't know about (written, but never summed into N). If a
-    # future phase adds another Team-Ratings-wired tab, update ITS Net Power Rating formula
-    # to include every prior term too, and keep it last here.
+    # and build_special_teams_index EACH rewrite Team Ratings' Net Power Rating (column N)
+    # formula wholesale with whatever set of adjustment terms that script knows about --
+    # build_special_teams_index's version is the most complete (includes the QB/RB/Kicking/
+    # OL/Front-7/Secondary/Special-Teams/WR-TE-Corps-Quality terms), so it must run LAST,
+    # after build_secondary_index, or an older script's formula would win and silently drop
+    # whichever column it doesn't know about (written, but never summed into N). build_wr_
+    # te_index (claude_code_spec_consolidated_fixes.md Part 3) now DOES touch 'Team Ratings'
+    # -- it writes its own new column X (WR/TE Corps Quality Adjustment) -- but deliberately
+    # does NOT touch column N itself, since it runs before every N-rewriting script above and
+    # N gets rewritten wholesale by each of them anyway; only build_special_teams_index's own
+    # N formula was updated to sum column X. If a future phase adds another Team-Ratings-
+    # wired tab, update ITS Net Power Rating formula to include every prior term too (or, if
+    # it runs before the N-rewriting scripts like build_wr_te_index does, just add its new
+    # column and update build_special_teams_index's own formula instead), and keep whichever
+    # script owns the complete N formula last here.
+    #
+    # claude_code_spec_consolidated_fixes.md Part 2 generalized the Manual Roster Override
+    # table from QB-Index-only to every tab that resolves a current-roster population --
+    # each add_manual_override_table.build(...) call below rebuilds THAT tab's own Section 7
+    # (with that tab's real role labels) immediately after the tab it belongs to, same
+    # reasoning as QB's original placement: the tab's own build script deletes/recreates the
+    # whole sheet, wiping any override table along with it, so it must be rebuilt every run.
     build_qb_index.build(workbook_path)
     build_replacement_value.build(workbook_path)
-    add_manual_override_table.build(workbook_path)
+    add_manual_override_table.build(workbook_path, "QB Index", ["Starter", "Backup"])
     build_rb_index.build(workbook_path)
+    add_manual_override_table.build(workbook_path, "RB Value Index", ["Starter", "Backup"])
     build_wr_te_index.build(workbook_path)
+    add_manual_override_table.build(
+        workbook_path, "WR-TE Value Index", ["WR1", "WR2", "WR3", "TE1"]
+    )
     build_kicking_index.build(workbook_path)
+    add_manual_override_table.build(workbook_path, "Kicking Index", ["K1"])
     build_oline_index.build(workbook_path)
+    add_manual_override_table.build(
+        workbook_path, "Offensive Line Index", ["LT", "LG", "C", "RG", "RT"]
+    )
     build_defense_index.build(workbook_path)
     build_secondary_index.build(workbook_path)
     build_special_teams_index.build(workbook_path)

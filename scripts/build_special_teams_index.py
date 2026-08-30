@@ -577,25 +577,31 @@ def build(workbook_path: str) -> dict:
         adj.number_format = "0.00;(0.00)"
 
         # Net Power Rating (N) now also includes the Special Teams Adjustment, additive
-        # alongside QB (P), RB (R), Kicking (S), OL (T), Front 7 (U), and Secondary (V) --
-        # none disturb each other. This is now the MOST COMPLETE version of the N formula
-        # -- see main.py's own ordering comment.
+        # alongside QB (P), RB (R), Kicking (S), OL (T), Front 7 (U), Secondary (V), and
+        # WR/TE Corps Quality (X, claude_code_spec_consolidated_fixes.md Part 3 -- build_
+        # wr_te_index.py writes column X but deliberately doesn't touch N itself, since it
+        # runs before this script in main.py's pipeline and N gets rewritten wholesale by
+        # every later script anyway) -- none disturb each other. This is now the MOST
+        # COMPLETE version of the N formula -- see main.py's own ordering comment.
         net = tr.cell(row=row, column=14, value=(
             f"=J{row}-K{row}+L{row}+M{row}+P{row}+R{row}+S{row}+T{row}+U{row}+V{row}+W{row}"
+            f"+X{row}"
         ))
         net.font = FORMULA_FONT
         net.number_format = "0.0;(0.0)"
 
     note_row_tr = 3 + len(TEAM_ORDER) + 6
-    tr.merge_cells(start_row=note_row_tr, start_column=1, end_row=note_row_tr, end_column=23)
+    tr.merge_cells(start_row=note_row_tr, start_column=1, end_row=note_row_tr, end_column=24)
     tr_note = tr.cell(row=note_row_tr, column=1, value=(
         "Special Teams Adjustment (W) is unconditional, same reasoning as every other "
         "position-group tab's direct adjustment -- there's no 'backup special teams "
         "unit' to switch to. It pulls directly from 'Special Teams Index' Section 7 "
         "(that team's real, Z-scored Special Teams Score minus the league-average "
         "baseline, converted to game points) and applies to Net Power Rating (N) for "
-        "every team, every time, alongside whatever QB/RB/Kicking/OL/Front-7/Secondary "
-        "adjustments are also active."
+        "every team, every time, alongside whatever QB/RB/Kicking/OL/Front-7/Secondary/"
+        "WR-TE-Corps-Quality adjustments are also active. Net Power Rating (N) is rebuilt "
+        "here as the pipeline's final, most-complete formula -- it now also sums column X "
+        "(WR/TE Corps Quality Adjustment, written by build_wr_te_index.py's own Section 6)."
     ))
     tr_note.font = NOTE_FONT
     tr_note.alignment = Alignment(wrap_text=True, vertical="top")

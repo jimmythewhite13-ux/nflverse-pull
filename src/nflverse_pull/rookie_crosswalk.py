@@ -161,6 +161,7 @@ def assign_rookie_assumptions(
     metric_cols: list[str],
     flat_rookie_baseline: dict[str, float],
     all_rookie_names: list[str],
+    market_source: str = "market data",
 ) -> pd.DataFrame:
     """
     Pure function, no network. Assigns each rookie in `all_rookie_names` his tier's
@@ -169,6 +170,14 @@ def assign_rookie_assumptions(
     rookie MISSING from `rookie_class_ranking` entirely (no market data found for him at
     all -- an extremely deep UDFA) falls back to the flat Rookie Baseline. Either way,
     Source records exactly which happened -- never left ambiguous.
+
+    `market_source` (claude_code_spec_consolidated_fixes.md Part 4): names WHICH real market
+    actually produced `rookie_class_ranking` -- "FFC ADP" (Fantasy Football Calculator
+    Dynasty Rookie ADP, the primary source) or "FantasyCalc" (api.fantasycalc.com dynasty
+    trade value, the fallback used when FFC returns no players for this position/class) --
+    so Section 2B's Source column records which one was used, not just that one was.
+    Callers pass whichever string matches what they actually fetched; the default exists
+    only so this stays backward-compatible for a caller that hasn't been updated to pass it.
     """
     tier_lookup = tier_averages.set_index("Historical Tier")
     rank_lookup = (
@@ -183,7 +192,7 @@ def assign_rookie_assumptions(
             sample_size = int(tier_lookup.loc[tier, "Sample Size"]) if has_tier else 0
             if sample_size > 0:
                 row = {"Player Name": name, "Assumption Tier": tier, "Sample Size": sample_size,
-                       "Source": "market-informed tier average"}
+                       "Source": f"market-informed tier average ({market_source})"}
                 for col in metric_cols:
                     row[col] = tier_lookup.loc[tier, col]
                 rows.append(row)

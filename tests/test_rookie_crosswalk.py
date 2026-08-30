@@ -95,11 +95,28 @@ def test_assign_rookie_assumptions_uses_tier_average_when_available():
     flat_baseline = {"EPA/Play": -0.10}
 
     out = assign_rookie_assumptions(
-        ranking, tiers, ["EPA/Play"], flat_baseline, all_rookie_names=["R.Star"]
+        ranking, tiers, ["EPA/Play"], flat_baseline, all_rookie_names=["R.Star"],
+        market_source="FFC ADP",
     ).set_index("Player Name")
 
     assert out.loc["R.Star", "EPA/Play"] == pytest.approx(0.12)
-    assert out.loc["R.Star", "Source"] == "market-informed tier average"
+    assert out.loc["R.Star", "Source"] == "market-informed tier average (FFC ADP)"
+
+
+def test_assign_rookie_assumptions_source_names_whichever_market_was_used():
+    # claude_code_spec_consolidated_fixes.md Part 4: Source must record WHICH real market
+    # produced this player's assumption, not just that a market was used -- so a caller
+    # that fell back to FantasyCalc must see that fact, not the FFC-ADP default.
+    ranking = pd.DataFrame([{"Player Name": "R.Star", "Assumption Tier": TIER_TOP}])
+    tiers = pd.DataFrame([{"Historical Tier": TIER_TOP, "Sample Size": 5, "EPA/Play": 0.12}])
+    flat_baseline = {"EPA/Play": -0.10}
+
+    out = assign_rookie_assumptions(
+        ranking, tiers, ["EPA/Play"], flat_baseline, all_rookie_names=["R.Star"],
+        market_source="FantasyCalc",
+    ).set_index("Player Name")
+
+    assert out.loc["R.Star", "Source"] == "market-informed tier average (FantasyCalc)"
 
 
 def test_assign_rookie_assumptions_falls_back_to_flat_baseline_when_missing_from_market():

@@ -9,11 +9,12 @@ Two stages:
      place).
   2. QB Index / Replacement Value / Manual Override table / RB Value Index / WR-TE Value
      Index / Kicking Index / Offensive Line Index / Front Seven Index / Secondary Index /
-     Special Teams Index / Availability Index -- fully REBUILT from scratch each run (not
-     a Section-1-only value refresh), because their row counts are inherently dynamic:
-     which players currently qualify as a Starter/Backup, how many games have been played
-     this season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced
-     Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
+     Special Teams Index / Availability Index / Pass Defense Matchup / Run Defense Matchup
+     / the Defensive Matchup Engine's Week 1 Matchups wiring -- fully REBUILT from scratch
+     each run (not a Section-1-only value refresh), because their row counts are inherently
+     dynamic: which players currently qualify as a Starter/Backup, how many games have been
+     played this season, etc. Skipped, non-fatally, on a workbook that doesn't have
+     'Advanced Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -63,11 +64,14 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import add_manual_override_table
     import build_availability_index
     import build_defense_index
+    import build_defensive_matchup_wiring
     import build_kicking_index
     import build_oline_index
+    import build_pass_defense_matchup
     import build_qb_index
     import build_rb_index
     import build_replacement_value
+    import build_run_defense_matchup
     import build_secondary_index
     import build_special_teams_index
     import build_wr_te_index
@@ -120,6 +124,19 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     build_secondary_index.build(workbook_path)
     build_special_teams_index.build(workbook_path)
     build_availability_index.build(workbook_path)
+
+    # claude_code_spec_defensive_matchup_engine.md Part B/C. Pass/Run Defense Matchup are
+    # independent of the pipeline above (pure pbp-based, no current-roster population, no
+    # Team Ratings wiring) -- position doesn't matter relative to the N-rewriting scripts
+    # above. build_defensive_matchup_wiring MUST run last of these three: it requires QB
+    # Index, RB Value Index, AND both Defense Matchup tabs to already exist (reads each
+    # one's real Section 5 Score/Team|Role-key columns to wire the phase-specific matchup
+    # differential into Week 1 Matchups' Model Home/Away Score formula, additively --
+    # see that script's own module docstring for why this is treated with more caution
+    # than a typical adjustment column).
+    build_pass_defense_matchup.build(workbook_path)
+    build_run_defense_matchup.build(workbook_path)
+    build_defensive_matchup_wiring.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

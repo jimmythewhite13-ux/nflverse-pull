@@ -119,6 +119,16 @@ def test_resolve_population_labels_te_role_as_te1():
     assert out.iloc[0]["Role"] == "TE1"
 
 
+def test_resolve_population_labels_pk_role_as_k1():
+    current = _current_starters([
+        ["Kansas City Chiefs", "PK", "H.Butker", "P1", 1, "depth_charts"],
+    ])
+    out = resolve_scored_population(current, _overrides([]), "PK")
+
+    assert len(out) == 1
+    assert out.iloc[0]["Role"] == "K1"
+
+
 def _historical(rows):
     return pd.DataFrame(rows, columns=["Team", "Role", "Player Name", "Player ID"])
 

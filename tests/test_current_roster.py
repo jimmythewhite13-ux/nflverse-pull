@@ -67,6 +67,18 @@ def test_current_starters_wr_scores_three_slots_te_scores_one():
     assert set(out[out["Position"] == "TE"]["Depth Order"]) == {1}
 
 
+def test_current_starters_covers_pk_as_k1():
+    rows = [
+        _row("2026-08-01T00:00:00Z", "KC", "H.Butker", "PK1", "PK", 1),
+        # A backup/camp-body kicker (rank 2) must be excluded -- only K1 is scored.
+        _row("2026-08-01T00:00:00Z", "KC", "Camp Leg", "PK2", "PK", 2),
+    ]
+    out = compute_current_starters(pd.DataFrame(rows))
+    assert len(out) == 1
+    assert out.iloc[0]["Position"] == "PK"
+    assert out.iloc[0]["Player Name"] == "H.Butker"
+
+
 def test_current_starters_raises_on_unmapped_team_abbreviation():
     rows = [_row("2026-08-01T00:00:00Z", "ZZZ", "X.Player", "P1", "QB", 1)]
     with pytest.raises(ValueError, match="No full-name mapping"):

@@ -32,16 +32,22 @@ import pandas as pd
 
 from nflverse_pull.pull import TEAM_NAMES
 
-POSITIONS = ["QB", "RB", "WR", "TE"]
+# Kicker is "PK" (Place Kicker) in nflverse depth-chart data, NOT "K" -- verified live
+# against the real 2026 pull before writing this (a bare "K" pos_abb doesn't exist at all;
+# "PK" has all 32 teams' PK1 populated).
+POSITIONS = ["QB", "RB", "WR", "TE", "PK"]
 
 # Each position's scored depth-chart slots, mapped to the Role label used throughout
 # Section 3/5/6 downstream. QB/RB keep the existing Starter/Backup binary. WR scores three
-# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE scores one (TE1). A depth-order beyond
-# what's listed here for a position (e.g. WR4+) is not scored downstream.
+# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE and PK (kicker) each score one (TE1,
+# K1 -- a team practically always has exactly one roster kicker, so there's no Backup
+# concept to score). A depth-order beyond what's listed here for a position (e.g. WR4+) is
+# not scored downstream.
 POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "QB": {1: "Starter", 2: "Backup"},
     "RB": {1: "Starter", 2: "Backup"},
     "WR": {1: "WR1", 2: "WR2", 3: "WR3"},
+    "PK": {1: "K1"},
     "TE": {1: "TE1"},
 }
 

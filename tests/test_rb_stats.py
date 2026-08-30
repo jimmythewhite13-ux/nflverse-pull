@@ -185,6 +185,14 @@ def test_ryoe_uses_real_season_aggregate_rows_only():
     assert out.loc["P1", "Season"] == 2025
 
 
+def test_ryoe_remaps_ngs_lar_to_la():
+    # Verified live before writing this: NGS uses "LAR" for the Rams consistently across
+    # 2023-2025 (a different quirk from PFR's own inconsistent-across-years LAR/LVR).
+    rows = [_ngs_row("P1", 2025, "LAR", 0, 0.5)]
+    out = compute_player_season_ryoe(pd.DataFrame(rows))
+    assert out.iloc[0]["Team"] == "Los Angeles Rams"
+
+
 def test_ryoe_raises_on_unmapped_team_abbreviation():
     df = pd.DataFrame([_ngs_row("P1", 2025, "ZZZ", 0, 0.5)])
     with pytest.raises(ValueError, match="No full-name mapping"):

@@ -173,6 +173,13 @@ def fetch_ngs_rushing(years: list[int]) -> pd.DataFrame:
     return nfl.import_ngs_data("rushing", years)
 
 
+# NGS quirk verified live before writing this (not assumed): NGS uses "LAR" for the Rams
+# consistently across 2023-2025 (unlike this project's own TEAM_NAMES, and unlike PFR's own
+# inconsistent-across-years LAR/LVR quirk documented in oline_stats.py) -- the Raiders'
+# "LV" matches TEAM_NAMES correctly in NGS, so only LAR needs remapping here.
+_NGS_TEAM_REMAP = {"LAR": "LA"}
+
+
 def compute_player_season_ryoe(ngs_rushing: pd.DataFrame) -> pd.DataFrame:
     """
     Pure function, no network. Real per-player season Rush Yards Over Expected per Attempt,
@@ -183,6 +190,7 @@ def compute_player_season_ryoe(ngs_rushing: pd.DataFrame) -> pd.DataFrame:
     """
     season = ngs_rushing[ngs_rushing["week"] == 0].copy()
     season = season[season["player_gsis_id"].notna()]
+    season["team_abbr"] = season["team_abbr"].replace(_NGS_TEAM_REMAP)
 
     unmapped = sorted(set(season["team_abbr"]) - set(TEAM_NAMES))
     if unmapped:

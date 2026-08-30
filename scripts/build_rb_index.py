@@ -762,9 +762,14 @@ def build(workbook_path: str) -> dict:
     for row in range(3, 3 + len(TEAM_ORDER)):
         status = tr.cell(row=row, column=17, value="RB1 In")
         status.font = INPUT_FONT
+        # IFERROR wraps the negation too, not just INDEX/MATCH -- see build_replacement_
+        # value.py's identical fix for the QB column: INDEX can succeed and still return
+        # "" (a team whose Starter/Backup never reached the qualifying threshold), and
+        # unary-minus on a blank string throws #VALUE! that a narrower
+        # IFERROR(INDEX(...),0) would not catch.
         adj = tr.cell(row=row, column=18, value=(
             f'=IF(Q{row}="RB2 In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(A{row},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(A{row},{rv_team_range},0)),0),0)'
         ))
         adj.font = LINK_FONT
         adj.number_format = "0.00;(0.00)"

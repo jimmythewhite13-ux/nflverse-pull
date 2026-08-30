@@ -4,15 +4,31 @@ mirroring "Advanced Efficiency Metrics" (5-section decay-weighted/regressed patt
 the new "QB Index Weighting & Conversion" assumptions on "Model Assumptions".
 
 Section 1: raw 3-year data per QB-season (from qb_stats.py), Role-tagged
-Section 2: league average per metric per season (Starters+Backups only) + a Rookie Baseline
-           row (average of every qualifying rookie season, across all pulled years)
-Section 3: per-QB (this season's Starters + Backups only) Y-1/Y-2/Y-3 -> decay-weighted
-           average -> last-year-emphasis blend -> regressed toward league mean, per metric
-           -- missing Y-2/Y-3 slots are substituted with the Rookie Baseline, not zero-
-           filled or omitted, with a live "Years of Real History" (0-3) count per QB
+Section 2: league average per metric per season (Starters+Backups only) + a flat Rookie
+           Baseline row (average of every qualifying rookie season, across all pulled
+           years) -- the fallback used when a player isn't in Section 2B below
+Section 2B: Individual Rookie Assumptions (ADP/trade-value-informed, current draft class
+           only) -- retrofitted in per claude_code_spec_current_roster_fix.md Part 4 /
+           the kickoff prompt's Step 4 ("apply Step 2's ADP-informed rookie assumption
+           method to QB Index's existing Rookie Baseline the same way it's used in RB
+           Index"). Mirrors RB Value Index's Section 2B exactly -- see build_rb_index.py.
+Section 3: per-QB Y-1/Y-2/Y-3 -> decay-weighted average -> last-year-emphasis blend ->
+           regressed toward league mean, per metric -- missing years are substituted with
+           Section 2B's individual assumption first, falling back to the flat Section 2
+           Rookie Baseline, with a live "Years of Real History" (0-3) count per QB.
+           RETROFITTED per current_roster_fix.md Part 4: population is now the CURRENT-
+           roster-identified Starters/Backups (current_roster.py's live depth-chart pull,
+           Parts 1-2) plus a fallback to the OLD historical-attempts-ranking population for
+           any (Team, Role) the current pull and manual override together left empty
+           (current_roster.merge_with_historical_fallback) -- not the historical proxy
+           alone, as this tab used before this retrofit.
 Section 4: league average/std-dev of Section 3's Projected 3-Yr Baseline, per metric
 Section 5: Z-score each metric (no sign-flip -- all 3 QB metrics are "higher is better"),
            weighted composite, and the final points-scale QB Index Score (50 + Z*10)
+Section 6: Replacement Value Index (built by build_replacement_value.py -- run after this)
+Section 7: Manual Roster Override input table (built by add_manual_override_table.py -- run
+           after this; ALSO read back by THIS script, before the sheet is deleted and
+           rebuilt, so any values a user has already filled in survive a re-run)
 
 Usage:
     uv run python scripts/build_qb_index.py "C:\\path\\to\\NFL_Prediction_Model.xlsx"
@@ -23,21 +39,40 @@ import sys
 from pathlib import Path
 
 import openpyxl
+import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from add_manual_override_table import SECTION_MARKER as OVERRIDE_SECTION_MARKER  # noqa: E402
+
+from nflverse_pull.current_roster import (  # noqa: E402
+    compute_current_starters,
+    fetch_depth_charts,
+    merge_with_historical_fallback,
+    resolve_scored_population,
+)
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.qb_stats import compute_qb_roles, compute_team_season_qb_stats  # noqa: E402
+from nflverse_pull.rookie_crosswalk import (  # noqa: E402
+    assign_rookie_assumptions,
+    compute_historical_tier_averages,
+    fetch_draft_info,
+    fetch_fantasycalc_values,
+    fetch_ffc_dynasty_rookie_adp,
+    rank_rookie_class,
+)
 
 YEARS = [2023, 2024, 2025]
+CURRENT_ROSTER_YEAR = 2026
 SHEET_NAME = "QB Index"
 
 METRICS = [
-    {"key": "epa", "label": "EPA/Play", "sec1_col": "E", "fmt": "0.000"},
-    {"key": "cpoe", "label": "CPOE", "sec1_col": "F", "fmt": "0.00"},
-    {"key": "anya", "label": "ANY/A", "sec1_col": "G", "fmt": "0.00"},
+    {"key": "epa", "col": "EPA/Play", "label": "EPA/Play", "sec1_col": "E", "fmt": "0.000"},
+    {"key": "cpoe", "col": "CPOE", "label": "CPOE", "sec1_col": "F", "fmt": "0.00"},
+    {"key": "anya", "col": "ANY/A", "label": "ANY/A", "sec1_col": "G", "fmt": "0.00"},
 ]
 
 # --- Styles (same conventions as build_efficiency_engine.py / the rest of the workbook) --
@@ -110,6 +145,101 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n.alignment = Alignment(wrap_text=True, vertical="top")
 
 
+def _read_existing_overrides(wb: openpyxl.Workbook) -> pd.DataFrame:
+    """
+    Reads back Section 7's Manual Roster Override table (built by
+    add_manual_override_table.py) from the QB Index sheet BEFORE this script deletes and
+    rebuilds it -- so any values a user has already filled in survive a re-run rather than
+    being silently wiped along with the rest of the sheet.
+    """
+    columns = ["Team", "Manual Starter Override", "Manual Backup Override"]
+    if SHEET_NAME not in wb.sheetnames:
+        return pd.DataFrame(columns=columns)
+    ws = wb[SHEET_NAME]
+
+    title_row = None
+    for r in range(1, ws.max_row + 1):
+        v = ws.cell(row=r, column=1).value
+        if isinstance(v, str) and v.startswith(OVERRIDE_SECTION_MARKER):
+            title_row = r
+            break
+    if title_row is None:
+        return pd.DataFrame(columns=columns)
+
+    header_row = title_row + 1
+    first_data_row = header_row + 1
+    rows = []
+    r = first_data_row
+    while ws.cell(row=r, column=1).value is not None:
+        rows.append({
+            "Team": ws.cell(row=r, column=1).value,
+            "Manual Starter Override": ws.cell(row=r, column=2).value,
+            "Manual Backup Override": ws.cell(row=r, column=3).value,
+        })
+        r += 1
+    return pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
+
+
+def _build_rookie_assumptions(stats: pd.DataFrame, population: pd.DataFrame) -> dict:
+    """
+    Same pattern as build_rb_index.py's _build_rookie_assumptions -- see that module's
+    docstring for the full rationale. QB-specific: metric_cols are EPA/Play/CPOE/ANY-A, and
+    the market-data position filter is "QB" instead of "RB".
+    """
+    metric_cols = [m["col"] for m in METRICS]
+    known_ids = set(stats["Player ID"])
+    zero_history = population[~population["Player ID"].isin(known_ids)]
+    zero_history_names = list(zero_history["Player Name"])
+
+    if not zero_history_names:
+        print("No current-roster QB Starter/Backup has zero qualifying pbp history -- "
+              "Section 2B will be empty.")
+        return {"table": pd.DataFrame(), "zero_history_names": []}
+
+    print(f"{len(zero_history_names)} current QB Starter/Backup(s) with zero qualifying "
+          f"history: {zero_history_names} -- building ADP/trade-value-informed assumptions.")
+
+    rookie_stats = stats[stats["Is Rookie Season"]]
+    draft_info = fetch_draft_info()
+    tier_averages = compute_historical_tier_averages(
+        rookie_stats, draft_info, metric_cols, id_col="Player ID"
+    )
+    flat_baseline = {col: rookie_stats[col].mean() for col in metric_cols}
+
+    market = fetch_ffc_dynasty_rookie_adp()
+    if len(market):
+        if "position" in market:
+            qb_market = market[market["position"].str.upper() == "QB"]
+        else:
+            qb_market = market
+        ranking = rank_rookie_class(qb_market, rank_col="adp", ascending=True, name_col="name")
+        print(f"Using FFC Dynasty Rookie ADP: {len(ranking)} QBs ranked.")
+    else:
+        print("FFC Dynasty Rookie ADP returned no players (see rookie_crosswalk.py's own "
+              "module docstring); falling back to api.fantasycalc.com dynasty trade values.")
+        fc = fetch_fantasycalc_values()
+        is_qb = fc["player.position"] == "QB"
+        is_this_class = fc["player.maybeDraftInfo.year"] == CURRENT_ROSTER_YEAR
+        qb_rookies = fc[is_qb & is_this_class]
+        ranking = rank_rookie_class(
+            qb_rookies, rank_col="value", ascending=False, name_col="player.name"
+        )
+        print(f"Using fantasycalc.com dynasty trade values: {len(ranking)} rookie QBs ranked.")
+
+    assumptions = assign_rookie_assumptions(
+        ranking, tier_averages, metric_cols, flat_baseline,
+        all_rookie_names=zero_history_names,
+    )
+    id_lookup = dict(zip(zero_history["Player Name"], zero_history["Player ID"], strict=True))
+    team_lookup = dict(zip(zero_history["Player Name"], zero_history["Team"], strict=True))
+    role_lookup2 = dict(zip(zero_history["Player Name"], zero_history["Role"], strict=True))
+    assumptions = assumptions.copy()
+    assumptions["Player ID"] = assumptions["Player Name"].map(id_lookup)
+    assumptions["Team"] = assumptions["Player Name"].map(team_lookup)
+    assumptions["Role"] = assumptions["Player Name"].map(role_lookup2)
+    return {"table": assumptions, "zero_history_names": zero_history_names}
+
+
 def build(workbook_path: str) -> dict:
     print(f"Pulling {YEARS} play-by-play data...")
     pbp = fetch_pbp(YEARS)
@@ -127,16 +257,35 @@ def build(workbook_path: str) -> dict:
     stats = stats.sort_values(["Team", "Season", "Dropbacks"], ascending=[True, True, False])
     stats = stats.reset_index(drop=True)
 
+    # Retrofit per claude_code_spec_current_roster_fix.md Part 4: the OLD population (kept
+    # here, renamed, as the fallback for a team the current-roster pull/override didn't
+    # cover) was every historical Starter/Backup in the most recent pulled season.
     current_season = max(YEARS)
-    current_qbs = (
+    historical_proxy = (
         roles[(roles["Season"] == current_season) & (roles["Role"].isin(["Starter", "Backup"]))]
-        .sort_values(["Team", "Role"])
+        [["Team", "Role", "Player Name", "Player ID"]]
         .reset_index(drop=True)
     )
-    n_qb = len(current_qbs)
-    print(f"{len(stats)} QB-seasons in Section 1; {n_qb} current Starters/Backups scored.")
 
     wb = openpyxl.load_workbook(workbook_path)
+    overrides = _read_existing_overrides(wb)
+    print(f"Read back {len(overrides)} existing manual-override row(s) from Section 7 "
+          "before rebuilding the sheet.")
+
+    print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster QB population...")
+    depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
+    current_starters = compute_current_starters(depth_charts)
+    current_population = resolve_scored_population(current_starters, overrides, "QB")
+    population = merge_with_historical_fallback(current_population, historical_proxy)
+    n_qb = len(population)
+    n_fallback = (population["Source"] == "historical-proxy fallback "
+                  "(no current-roster or override data)").sum()
+    print(f"{len(stats)} QB-seasons in Section 1; {n_qb} current-roster Starters/Backups "
+          f"scored ({n_fallback} fell back to the historical proxy).")
+
+    rookie = _build_rookie_assumptions(stats, population)
+    rookie_table = rookie["table"]
+
     add_model_assumptions_weights(wb)
 
     if SHEET_NAME in wb.sheetnames:
@@ -233,28 +382,92 @@ def build(workbook_path: str) -> dict:
         cell.font = FORMULA_FONT
         cell.number_format = "0"
 
-    rookie_baseline_cell = {
+    flat_rookie_cell = {
         m["key"]: f"${get_column_letter(2 + j)}${rookie_baseline_row}"
         for j, m in enumerate(METRICS)
     }
     season_avg_col = {m["key"]: get_column_letter(2 + j) for j, m in enumerate(METRICS)}
 
+    # ==== Section 2B: Individual Rookie Assumptions (ADP/trade-value-informed) =============
+    # Retrofitted in per current_roster_fix.md Part 4 / the kickoff prompt's Step 4 -- mirrors
+    # RB Value Index's Section 2B exactly (see build_rb_index.py's own comments).
+    sec2b_title_row = rookie_count_row + 2
+    sec2b_header_row = sec2b_title_row + 1
+    sec2b_first_row = sec2b_header_row + 1
+    n_2b = len(rookie_table)
+    sec2b_last_row = sec2b_first_row + max(n_2b, 1) - 1
+
+    _section_title(
+        ws, sec2b_title_row, 8,
+        "Section 2B \u2014 Individual Rookie Assumptions (ADP/trade-value-informed, "
+        "current draft class only -- see rookie_crosswalk.py / "
+        "claude_code_spec_rookie_adp_crosswalk.md). Only lists current-roster QB "
+        "Starters/Backups with ZERO qualifying pbp history; Section 3 looks this table up "
+        "by Player ID FIRST for any missing year, falling back to the flat Section 2 "
+        "Rookie Baseline for everyone else.",
+    )
+    _header_row(
+        ws, sec2b_header_row,
+        ["Player Name", "Player ID", "Team", "Role", *[m["label"] for m in METRICS],
+         "Source"],
+        height=20,
+    )
+    if n_2b:
+        for i, r in enumerate(rookie_table.to_dict("records")):
+            row = sec2b_first_row + i
+            values = [r["Player Name"], r["Player ID"], r["Team"], r["Role"]]
+            for col, v in enumerate(values, start=1):
+                ws.cell(row=row, column=col, value=v).font = INPUT_FONT
+            for j, m in enumerate(METRICS):
+                v = r.get(m["col"])
+                cell = ws.cell(row=row, column=5 + j, value=float(v) if v is not None else None)
+                cell.font = INPUT_FONT
+                cell.number_format = m["fmt"]
+            src = ws.cell(row=row, column=5 + len(METRICS), value=r.get("Source"))
+            src.font = INPUT_FONT
+    else:
+        ws.merge_cells(
+            start_row=sec2b_first_row, start_column=1, end_row=sec2b_first_row, end_column=8
+        )
+        empty_note = ws.cell(
+            row=sec2b_first_row, column=1,
+            value="(none currently -- no identified current-roster QB Starter/Backup has "
+                  "zero qualifying pbp history; every missing year falls back to the flat "
+                  "Section 2 Rookie Baseline)",
+        )
+        empty_note.font = NOTE_FONT
+
+    sec2b_id_range = f"$B${sec2b_first_row}:$B${sec2b_last_row}"
+    sec2b_metric_range = {
+        m["key"]: (
+            f"${get_column_letter(5 + j)}${sec2b_first_row}:"
+            f"${get_column_letter(5 + j)}${sec2b_last_row}"
+        )
+        for j, m in enumerate(METRICS)
+    }
+
     # ==== Section 3: Per-QB decay-weighted, regressed baseline, per metric ================
-    sec3_title_row = rookie_count_row + 2
+    # Population is now the current-roster-identified Starters + Backups (Part 1-2), falling
+    # back to the historical proxy only where the current pull/override left a gap (Part 4).
+    sec3_title_row = sec2b_last_row + 2
     sec3_header_row = sec3_title_row + 1
     sec3_first_row = sec3_header_row + 1
     sec3_last_row = sec3_first_row + n_qb - 1
-    sec3_last_col = 5 + len(METRICS) * 7  # Player/ID/Team/Role/YearsHistory + 7 cols x 3
+    sec3_last_col = 6 + len(METRICS) * 7  # Player/ID/Team/Role/YearsHistory/Source + 7x3
 
     _section_title(
         ws, sec3_title_row, sec3_last_col,
-        "Section 3 \u2014 Per-QB 3-Yr Decay-Weighted, Regressed Baseline (this season's "
-        "Starters + Backups only; missing Y-2/Y-3 seasons substitute the Rookie Baseline "
-        "above, not zero -- same formula chain as Advanced Efficiency Metrics Section 3)",
+        "Section 3 \u2014 Per-QB 3-Yr Decay-Weighted, Regressed Baseline. Population is the "
+        "CURRENT-roster-identified Starters + Backups (current_roster.py's live 2026 "
+        "depth-chart pull plus any manual override, Section 7), falling back to the OLD "
+        "historical-attempts-ranking population only for a (Team, Role) neither of those "
+        "covers -- see the Source column below and claude_code_spec_current_roster_fix.md "
+        "Part 4. Missing Y-2/Y-3 (or all 3, for a true rookie) substitute Section 2B's "
+        "individual assumption first, falling back to the flat Section 2 Rookie Baseline.",
     )
-    headers = ["Player Name", "Player ID", "Team", "Role", "Years of\nReal History"]
+    headers = ["Player Name", "Player ID", "Team", "Role", "Years of\nReal History", "Source"]
     metric_block_start_col: dict[str, int] = {}
-    col_cursor = 6
+    col_cursor = 7
     for m in METRICS:
         metric_block_start_col[m["key"]] = col_cursor
         headers += [
@@ -265,7 +478,7 @@ def build(workbook_path: str) -> dict:
         col_cursor += 7
     _header_row(ws, sec3_header_row, headers)
 
-    for i, qb in enumerate(current_qbs.to_dict("records")):
+    for i, qb in enumerate(population.to_dict("records")):
         row = sec3_first_row + i
         ws.cell(row=row, column=1, value=qb["Player Name"]).font = FORMULA_FONT
         ws.cell(row=row, column=2, value=qb["Player ID"]).font = FORMULA_FONT
@@ -279,17 +492,24 @@ def build(workbook_path: str) -> dict:
         yh = ws.cell(row=row, column=5, value=f"={years_hist_terms}")
         yh.font = FORMULA_FONT
         yh.number_format = "0"
+        ws.cell(row=row, column=6, value=qb.get("Source")).font = FORMULA_FONT
 
         for m in METRICS:
             base = metric_block_start_col[m["key"]]
             y1, y2, y3, wavg, th, lb, pb = (get_column_letter(base + k) for k in range(7))
             mrange = metric_ranges[m["key"]]
-            rbcell = rookie_baseline_cell[m["key"]]
+            flat_cell = flat_rookie_cell[m["key"]]
+            twob_metric_range = sec2b_metric_range[m["key"]]
 
-            def _ysub(offset: int) -> str:
+            def _ysub(offset: int, mrange=mrange, flat_cell=flat_cell,
+                       twob_metric_range=twob_metric_range) -> str:
+                rookie_sub = (
+                    f"IFERROR(INDEX({twob_metric_range},MATCH($B{row},{sec2b_id_range},0)),"
+                    f"{flat_cell})"
+                )
                 return (
                     f"=IF(COUNTIFS({id_range},$B{row},{season_range},"
-                    f"'Model Assumptions'!$C$18-{offset})=0,{rbcell},"
+                    f"'Model Assumptions'!$C$18-{offset})=0,{rookie_sub},"
                     f"SUMIFS({mrange},{id_range},$B{row},{season_range},"
                     f"'Model Assumptions'!$C$18-{offset}))"
                 )
@@ -416,30 +636,42 @@ def build(workbook_path: str) -> dict:
         "observed qualifying season within the pulled years, not real draft data) -- a "
         "veteran whose first pulled-window season happens to be the earliest year pulled "
         "will show as a false rookie; this is a documented simplification, not a bug. "
-        "Section 2 computes each metric's league average among Starters+Backups per season, "
-        "plus a Rookie Baseline (average of every qualifying rookie season, any role, across "
-        "all pulled years) used to fill in a QB's missing Y-2/Y-3 history below rather than "
-        "zero-filling or omitting it -- both the Section 2 averages and the Rookie Baseline "
-        "are formulas over Section 1, so they recompute automatically as more data is "
-        "pulled. Section 3 scores only this season's Starters and Backups (from Model "
-        "Assumptions Current Season - 1); its Years of Real History column (0-3) shows at a "
-        "glance how much of a QB's rating leans on real career data versus the Rookie "
-        "Baseline. Section 4/5 Z-score Section 3's output and convert to the QB Index Score "
-        "(points-scale, 50 = league average, +/-10 per std. dev., both tunable on Model "
-        "Assumptions) using the new EPA/CPOE/ANY-A weights there. One known limitation: a "
+        "Section 2 computes each metric's league average among Starters+Backups per season "
+        "(Role here is the OLD historical-attempts-ranking label, used ONLY for this filter, "
+        "same as RB Value Index's Section 1), plus a flat Rookie Baseline (average of every "
+        "qualifying rookie season, any role, across all pulled years) -- the fallback used "
+        "when a player isn't in Section 2B. RETROFITTED per "
+        "claude_code_spec_current_roster_fix.md Part 4: Section 3/5/6's population is now "
+        "the CURRENT-roster-identified Starters/Backups (current_roster.py's live 2026 "
+        "depth-chart pull plus Section 7's manual override), falling back to the historical "
+        "proxy only for a (Team, Role) neither of those covers -- see each Section 3 row's "
+        "Source column. A true zero-history current rookie gets Section 2B's ADP/trade-"
+        "value-informed assumption for all three Y-1/Y-2/Y-3 slots instead of the flat "
+        "Rookie Baseline, same mechanism as RB Value Index. Its Years of Real History column "
+        "(0-3) shows at a glance how much of a QB's rating leans on real career data versus "
+        "an assumption. Section 4/5 Z-score Section 3's output and convert to the QB Index "
+        "Score (points-scale, 50 = league average, +/-10 per std. dev., both tunable on "
+        "Model Assumptions) using the EPA/CPOE/ANY-A weights there. One known limitation: a "
         "QB traded mid-season keeps two Section 1 rows (one per team, per Part A's own "
         "design) -- his Y-1/Y-2/Y-3 SUMIFS would sum both teams' per-play averages together "
         "for that one season rather than blend them correctly; rare in practice, but worth "
-        "knowing if a current Starter/Backup was traded within the pulled window."
+        "knowing if a current Starter/Backup was traded within the pulled window. The 2026 "
+        "depth-chart snapshot this tab's current-roster population is built from was pulled "
+        "BEFORE final 53-man roster cuts -- same caveat as the rookie ADP/trade-value "
+        "crosswalk and RB Value Index, per the user's explicit decision to proceed anyway "
+        "with this noted rather than wait."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")
 
     wb.save(workbook_path)
-    print(f"Built '{SHEET_NAME}': Section 1 {len(stats)} rows, Section 3/5 {n_qb} QBs.")
+    print(
+        f"Built '{SHEET_NAME}': Section 1 {len(stats)} rows, Section 2B {n_2b} rows, "
+        f"Section 3/5 {n_qb} QBs ({n_fallback} via historical-proxy fallback)."
+    )
     print(f"Saved to {workbook_path}")
     return {
-        "sec1_rows": len(stats), "n_qb": n_qb,
+        "sec1_rows": len(stats), "n_qb": n_qb, "n_2b": n_2b, "n_fallback": int(n_fallback),
         "sec3_range": (sec3_first_row, sec3_last_row),
         "sec5_range": (sec5_first_row, sec5_last_row),
     }

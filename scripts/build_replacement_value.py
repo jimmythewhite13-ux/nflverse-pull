@@ -198,9 +198,14 @@ def build(workbook_path: str) -> None:
     for row in range(3, 3 + len(TEAM_ORDER)):
         status = tr.cell(row=row, column=15, value="Starter In")
         status.font = INPUT_FONT
+        # IFERROR wraps the NEGATION too, not just INDEX/MATCH -- INDEX can succeed and
+        # still return "" (a team whose Starter/Backup never reached the qualifying
+        # threshold, per Section 6's own IF(...,"",...) formula), and unary-minus on a
+        # blank string throws #VALUE! that a narrower IFERROR(INDEX(...),0) would not
+        # catch, since that error only occurs OUTSIDE its envelope.
         adj = tr.cell(row=row, column=16, value=(
             f'=IF(O{row}="Backup In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(A{row},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(A{row},{rv_team_range},0)),0),0)'
         ))
         adj.font = LINK_FONT
         adj.number_format = "0.00;(0.00)"
@@ -249,13 +254,14 @@ def build(workbook_path: str) -> None:
         home_status.font = INPUT_FONT
         away_status.font = INPUT_FONT
 
+        # Same IFERROR-wraps-the-negation fix as the Team Ratings adjustment above.
         home_adj = wm.cell(row=r, column=45, value=(
             f'=IF(AQ{r}="Backup In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(D{r},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(D{r},{rv_team_range},0)),0),0)'
         ))
         away_adj = wm.cell(row=r, column=46, value=(
             f'=IF(AR{r}="Backup In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(C{r},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(C{r},{rv_team_range},0)),0),0)'
         ))
         home_adj.font = LINK_FONT
         away_adj.font = LINK_FONT

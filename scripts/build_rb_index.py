@@ -65,10 +65,15 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from add_manual_override_table import read_existing_overrides  # noqa: E402
 
 from nflverse_pull.current_roster import (  # noqa: E402
+    attach_real_rookie_season,
     compute_current_starters,
     fetch_depth_charts,
+    fetch_seasonal_rosters,
     resolve_scored_population,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
@@ -207,7 +212,7 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n.alignment = Alignment(wrap_text=True, vertical="top")
 
 
-def _pull_data() -> dict:
+def _pull_data(overrides: pd.DataFrame) -> dict:
     print(f"Pulling {HISTORICAL_YEARS} play-by-play data for RB stats...")
     pbp = fetch_pbp(HISTORICAL_YEARS)
     season_stats = compute_team_season_rb_stats(pbp)
@@ -225,6 +230,15 @@ def _pull_data() -> dict:
         ["Team", "Season", "Carries"], ascending=[True, True, False]
     ).reset_index(drop=True)
 
+    # claude_code_spec_consolidated_fixes.md Part 1: rb_stats' own Is Rookie Season is a
+    # "first season observed in the pulled window" proxy -- overwrite it with real
+    # per-season entry_year data (confirmed live this was contaminating the Rookie Baseline
+    # with real veterans: Henry, Barkley, Kamara, McCaffrey all had a pulled-window season
+    # wrongly flagged True).
+    print(f"Pulling {HISTORICAL_YEARS} seasonal rosters for real Is Rookie Season data...")
+    seasonal_rosters = fetch_seasonal_rosters(HISTORICAL_YEARS)
+    season_stats = attach_real_rookie_season(season_stats, seasonal_rosters)
+
     print(f"Pulling {HISTORICAL_YEARS} Next Gen Stats rushing data for real RYOE/Att...")
     ngs_rushing = fetch_ngs_rushing(HISTORICAL_YEARS)
     ryoe = compute_player_season_ryoe(ngs_rushing)
@@ -240,10 +254,7 @@ def _pull_data() -> dict:
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster RB population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
     current_starters = compute_current_starters(depth_charts)
-    empty_overrides = pd.DataFrame(
-        columns=["Team", "Manual Starter Override", "Manual Backup Override"]
-    )
-    population = resolve_scored_population(current_starters, empty_overrides, "RB")
+    population = resolve_scored_population(current_starters, overrides, "RB")
     print(f"{len(population)} current-roster RB Starters/Backups identified.")
 
     carry_share = compute_carry_share(population, season_stats)
@@ -288,6 +299,7 @@ def _build_rookie_assumptions(season_stats: pd.DataFrame, population: pd.DataFra
         else:
             rb_market = market
         ranking = rank_rookie_class(rb_market, rank_col="adp", ascending=True, name_col="name")
+        market_source = "FFC ADP"
         print(f"Using FFC Dynasty Rookie ADP: {len(ranking)} RBs ranked.")
     else:
         print("FFC Dynasty Rookie ADP returned no players (confirmed empty via direct curl "
@@ -300,11 +312,12 @@ def _build_rookie_assumptions(season_stats: pd.DataFrame, population: pd.DataFra
         ranking = rank_rookie_class(
             rb_rookies, rank_col="value", ascending=False, name_col="player.name"
         )
+        market_source = "FantasyCalc"
         print(f"Using fantasycalc.com dynasty trade values: {len(ranking)} rookie RBs ranked.")
 
     assumptions = assign_rookie_assumptions(
         ranking, tier_averages, metric_cols, flat_baseline,
-        all_rookie_names=zero_history_names,
+        all_rookie_names=zero_history_names, market_source=market_source,
     )
     id_lookup = dict(zip(zero_history["Player Name"], zero_history["Player ID"], strict=True))
     team_lookup = dict(zip(zero_history["Player Name"], zero_history["Team"], strict=True))
@@ -317,7 +330,12 @@ def _build_rookie_assumptions(season_stats: pd.DataFrame, population: pd.DataFra
 
 
 def build(workbook_path: str) -> dict:
-    data = _pull_data()
+    wb = openpyxl.load_workbook(workbook_path)
+    overrides = read_existing_overrides(wb, SHEET_NAME, ["Starter", "Backup"])
+    print(f"Read back {len(overrides)} existing manual-override row(s) from Section 7 "
+          "before rebuilding the sheet.")
+
+    data = _pull_data(overrides)
     season_stats = data["season_stats"]
     population = data["population"]
     carry_share = data["carry_share"]
@@ -326,7 +344,6 @@ def build(workbook_path: str) -> dict:
     rookie = _build_rookie_assumptions(season_stats, population)
     rookie_table = rookie["table"]
 
-    wb = openpyxl.load_workbook(workbook_path)
     add_model_assumptions_weights(wb)
 
     if SHEET_NAME in wb.sheetnames:

@@ -1,8 +1,13 @@
 """
-Pulls current-season QB/RB depth-chart data to identify each team's actual current
-Starter/Backup -- replacing the historical-attempts-ranking proxy that QB Index (and, from
-the start, RB Index) otherwise uses, which silently breaks for a trade, a retirement, or a
-true rookie with no play-by-play history at all. See claude_code_spec_current_roster_fix.md.
+Pulls current-season QB/RB/WR/TE depth-chart data to identify each team's actual current
+Starter/Backup (or, for WR/TE, current WR1/WR2/WR3/TE1) -- replacing the historical-
+attempts-ranking proxy that QB Index (and, from the start, RB Index) otherwise uses, which
+silently breaks for a trade, a retirement, or a true rookie with no play-by-play history at
+all. See claude_code_spec_current_roster_fix.md. WR/TE support was added for the WR/TE Value
+Index (Phase 2 of the multi-phase roadmap in claude_code_spec_rb_index.md) -- that spec's
+own note that WR/TE "isn't a clean binary" is why WR gets THREE scored slots (a 3-WR
+personnel group) instead of a Starter/Backup pair, and TE gets one (TE1 only -- a second
+scored TE slot is a documented future extension, not built here).
 
 Source and confidence: nflverse's depth_charts feed (nfl_data_py.import_depth_charts) is
 used as the primary source -- verified live against the installed package (not assumed):
@@ -27,8 +32,18 @@ import pandas as pd
 
 from nflverse_pull.pull import TEAM_NAMES
 
-POSITIONS = ["QB", "RB"]
-DEPTH_ORDERS = [1, 2]  # 1 = Starter, 2 = primary Backup; 3+ not scored downstream
+POSITIONS = ["QB", "RB", "WR", "TE"]
+
+# Each position's scored depth-chart slots, mapped to the Role label used throughout
+# Section 3/5/6 downstream. QB/RB keep the existing Starter/Backup binary. WR scores three
+# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE scores one (TE1). A depth-order beyond
+# what's listed here for a position (e.g. WR4+) is not scored downstream.
+POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
+    "QB": {1: "Starter", 2: "Backup"},
+    "RB": {1: "Starter", 2: "Backup"},
+    "WR": {1: "WR1", 2: "WR2", 3: "WR3"},
+    "TE": {1: "TE1"},
+}
 
 OUTPUT_COLUMNS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]
 
@@ -52,9 +67,11 @@ def compute_current_starters(depth_charts: pd.DataFrame) -> pd.DataFrame:
 
     Output: Team | Position | Player Name | Player ID | Depth Order | Source
     """
-    qb_rb = depth_charts[
-        depth_charts["pos_abb"].isin(POSITIONS) & depth_charts["pos_rank"].isin(DEPTH_ORDERS)
-    ].copy()
+    qb_rb = depth_charts[depth_charts["pos_abb"].isin(POSITIONS)].copy()
+    # Each position has its OWN scored depth-order ceiling (QB/RB stop at 2, WR at 3, TE at
+    # 1) -- can't filter with one global depth-order list once positions differ.
+    max_depth_order = {pos: max(labels) for pos, labels in POSITION_ROLE_LABELS.items()}
+    qb_rb = qb_rb[qb_rb["pos_rank"] <= qb_rb["pos_abb"].map(max_depth_order)]
 
     idx = qb_rb.groupby(["team", "pos_abb", "pos_rank"])["dt"].idxmax()
     latest = qb_rb.loc[idx].copy()
@@ -104,10 +121,16 @@ def resolve_scored_population(
     row (e.g. flag it for the user to supply an ID by hand) but it won't feed a
     decay-weighted formula chain without one.
     """
+    role_labels = POSITION_ROLE_LABELS.get(position)
+    if role_labels is None:
+        raise ValueError(f"No Role labels defined for position {position!r}")
+
     pos_data = current_starters[current_starters["Position"] == position]
     by_team_role: dict[tuple[str, str], dict] = {}
     for row in pos_data.to_dict("records"):
-        role = "Starter" if row["Depth Order"] == 1 else "Backup"
+        role = role_labels.get(row["Depth Order"])
+        if role is None:
+            continue  # a depth-order beyond what's scored for this position (e.g. WR4+)
         by_team_role[(row["Team"], role)] = {
             "Player Name": row["Player Name"], "Player ID": row["Player ID"],
             "Source": row["Source"],
@@ -116,6 +139,10 @@ def resolve_scored_population(
     # Build a name -> Player ID lookup from the pulled data, for resolving an override.
     name_to_id = {r["Player Name"]: r["Player ID"] for r in pos_data.to_dict("records")}
 
+    # Only QB/RB have a Manual Override table (their Role labels are "Starter"/"Backup"),
+    # so `overrides` is an empty DataFrame by convention for WR/TE -- this loop is then a
+    # correct no-op rather than needing a WR/TE-specific override schema (a documented Phase
+    # 2 scope limit, same as RB Index shipping without an override table).
     override_cols = [("Starter", "Manual Starter Override"), ("Backup", "Manual Backup Override")]
     for orow in overrides.to_dict("records"):
         team = orow["Team"]
@@ -135,7 +162,15 @@ def resolve_scored_population(
         {"Team": team, "Role": role, **info} for (team, role), info in by_team_role.items()
     ]
     out = pd.DataFrame(out_rows, columns=["Team", "Role", "Player Name", "Player ID", "Source"])
-    return out.sort_values(["Team", "Role"], ascending=[True, False]).reset_index(drop=True)
+    # Sort by each role's own depth-order priority (Starter=1/Backup=2 for QB/RB,
+    # WR1=1/WR2=2/WR3=3 for WR, ...) rather than alphabetically -- an alphabetical sort would
+    # put "Backup" before "Starter" (needing an explicit descending flag, as this used to
+    # rely on) and "WR3" before "WR1" (which no explicit flag fixes), so this generalizes
+    # correctly to any number of roles instead of only the QB/RB binary.
+    role_priority = {name: order for order, name in role_labels.items()}
+    out["_priority"] = out["Role"].map(role_priority)
+    out = out.sort_values(["Team", "_priority"]).drop(columns="_priority").reset_index(drop=True)
+    return out
 
 
 def merge_with_historical_fallback(

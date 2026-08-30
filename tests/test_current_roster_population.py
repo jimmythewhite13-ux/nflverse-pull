@@ -91,6 +91,34 @@ def test_resolve_population_includes_a_true_zero_history_rookie():
     assert rookie["Role"] == "Starter"
 
 
+def test_resolve_population_labels_wr_roles_as_wr1_wr2_wr3():
+    current = _current_starters([
+        ["Buffalo Bills", "WR", "K.Coleman", "P1", 1, "depth_charts"],
+        ["Buffalo Bills", "WR", "K.Shakir", "P2", 2, "depth_charts"],
+        ["Buffalo Bills", "WR", "C.Samuel", "P3", 3, "depth_charts"],
+    ])
+    overrides = _overrides([])
+
+    out = resolve_scored_population(current, overrides, "WR").set_index("Role")
+
+    assert set(out.index) == {"WR1", "WR2", "WR3"}
+    assert out.loc["WR1", "Player Name"] == "K.Coleman"
+    assert out.loc["WR2", "Player Name"] == "K.Shakir"
+    assert out.loc["WR3", "Player Name"] == "C.Samuel"
+    # Sorted by role priority (WR1, WR2, WR3), not alphabetically.
+    assert list(out.reset_index()["Role"]) == ["WR1", "WR2", "WR3"]
+
+
+def test_resolve_population_labels_te_role_as_te1():
+    current = _current_starters([
+        ["Kansas City Chiefs", "TE", "T.Kelce", "P1", 1, "depth_charts"],
+    ])
+    out = resolve_scored_population(current, _overrides([]), "TE")
+
+    assert len(out) == 1
+    assert out.iloc[0]["Role"] == "TE1"
+
+
 def _historical(rows):
     return pd.DataFrame(rows, columns=["Team", "Role", "Player Name", "Player ID"])
 

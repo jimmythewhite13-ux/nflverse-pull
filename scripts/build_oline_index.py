@@ -66,6 +66,9 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from add_manual_override_table import read_existing_overrides  # noqa: E402
 
 from nflverse_pull.current_roster import (  # noqa: E402
     attach_experience,
@@ -206,7 +209,7 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n.alignment = Alignment(wrap_text=True, vertical="top")
 
 
-def _pull_data() -> dict:
+def _pull_data(overrides: pd.DataFrame) -> dict:
     print(f"Pulling {HISTORICAL_YEARS} Pro Football Reference data for team OL stats...")
     pfr_pass = fetch_pfr_pass(HISTORICAL_YEARS)
     pfr_rush = fetch_pfr_rush(HISTORICAL_YEARS)
@@ -222,11 +225,8 @@ def _pull_data() -> dict:
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for the 5 current-roster OL starters...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
     current_starters = compute_current_starters(depth_charts)
-    empty_overrides = pd.DataFrame(
-        columns=["Team", "Manual Starter Override", "Manual Backup Override"]
-    )
     starters = pd.concat(
-        [resolve_scored_population(current_starters, empty_overrides, pos) for pos in OL_POSITIONS],
+        [resolve_scored_population(current_starters, overrides, pos) for pos in OL_POSITIONS],
         ignore_index=True,
     )
     print(f"{len(starters)} current-roster OL starters identified across "
@@ -244,11 +244,15 @@ def _pull_data() -> dict:
 
 
 def build(workbook_path: str) -> dict:
-    data = _pull_data()
+    wb = openpyxl.load_workbook(workbook_path)
+    overrides = read_existing_overrides(wb, SHEET_NAME, OL_POSITIONS)
+    print(f"Read back {len(overrides)} existing manual-override row(s) from Section 7 "
+          "before rebuilding the sheet.")
+
+    data = _pull_data(overrides)
     season_stats = data["season_stats"]
     starters = data["starters"]
 
-    wb = openpyxl.load_workbook(workbook_path)
     add_model_assumptions_weights(wb)
 
     if SHEET_NAME in wb.sheetnames:

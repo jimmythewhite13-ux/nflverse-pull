@@ -38,15 +38,32 @@ from nflverse_pull.pull import TEAM_NAMES
 # "RT" -- each already a distinct, real depth-chart position abbreviation (not a generic
 # "OL" grouping the way import_seasonal_rosters uses); verified live that all 32 teams have
 # a rank-1 starter at each of the 5 spots.
-POSITIONS = ["QB", "RB", "WR", "TE", "PK", "LT", "LG", "C", "RG", "RT"]
+#
+# Front-seven defensive positions ("LDE"/"RDE"/"LDT"/"RDT"/"NT"/"MLB"/"WLB"/"SLB"/"LILB"/
+# "RILB") are each real, distinct depth-chart position abbreviations too, but split by real
+# SCHEME rather than a clean fixed count the way OL is -- verified live against the real
+# 2026 pull (properly deduplicated to each slot's latest snapshot, per compute_
+# current_starters' own logic; an earlier un-deduplicated check inflated these into the
+# hundreds and was wrong): LDE/RDE are populated for all 32 teams (2 EDGE slots, always).
+# The interior line varies 1-3 rank-1 starters per team (20 teams: 1, 11 teams: 2, 1 team:
+# 3) depending on whether that team's scheme labels a true nose tackle (NT), two 4-3
+# tackles (LDT/RDT), or some mix. Linebacker varies 3-4 rank-1 starters per team (11 teams:
+# 3 -- a 4-3's MLB/WLB/SLB; 21 teams: 4 -- a 3-4's WLB/SLB/LILB/RILB). build_defense_
+# index.py maps these onto fixed EDGE1/EDGE2, IDL1/IDL2, and LB1/LB2/LB3 slots (a real,
+# documented priority order per scheme, not fabrication -- the rare extra real starter a
+# 3-4 team's 4th linebacker represents is a documented scope limit, same as WR4+ elsewhere).
+POSITIONS = [
+    "QB", "RB", "WR", "TE", "PK", "LT", "LG", "C", "RG", "RT",
+    "LDE", "RDE", "LDT", "RDT", "NT", "MLB", "WLB", "SLB", "LILB", "RILB",
+]
 
 # Each position's scored depth-chart slots, mapped to the Role label used throughout
 # Section 3/5/6 downstream. QB/RB keep the existing Starter/Backup binary. WR scores three
-# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE, PK (kicker), and each of the 5 OL
-# spots score one apiece (TE1, K1, LT/LG/C/RG/RT -- a team has exactly one starter per OL
-# spot, so there's no Backup concept to score, same reasoning as PK). A depth-order beyond
-# what's listed here for a position (e.g. WR4+, or a backup lineman) is not scored
-# downstream.
+# slots (WR1/WR2/WR3 -- a 3-WR personnel group). TE, PK (kicker), the 5 OL spots, and each
+# of the 10 front-seven abbreviations score one apiece (a team has at most one rank-1
+# starter per real depth-chart label, so there's no Backup concept to score, same reasoning
+# as PK). A depth-order beyond what's listed here for a position (e.g. WR4+, or a backup
+# lineman/front-seven player) is not scored downstream.
 POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "QB": {1: "Starter", 2: "Backup"},
     "RB": {1: "Starter", 2: "Backup"},
@@ -58,6 +75,16 @@ POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "C": {1: "C"},
     "RG": {1: "RG"},
     "RT": {1: "RT"},
+    "LDE": {1: "LDE"},
+    "RDE": {1: "RDE"},
+    "LDT": {1: "LDT"},
+    "RDT": {1: "RDT"},
+    "NT": {1: "NT"},
+    "MLB": {1: "MLB"},
+    "WLB": {1: "WLB"},
+    "SLB": {1: "SLB"},
+    "LILB": {1: "LILB"},
+    "RILB": {1: "RILB"},
 }
 
 OUTPUT_COLUMNS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]

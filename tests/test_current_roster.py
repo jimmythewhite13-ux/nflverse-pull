@@ -95,6 +95,17 @@ def test_current_starters_covers_all_five_ol_spots():
     assert set(out["Position"]) == {"LT", "LG", "C", "RG", "RT"}
 
 
+def test_current_starters_covers_all_ten_front_seven_positions():
+    front7 = ["LDE", "RDE", "LDT", "RDT", "NT", "MLB", "WLB", "SLB", "LILB", "RILB"]
+    rows = [
+        _row("2026-08-01T00:00:00Z", "KC", f"Player {pos}", f"{pos}1", pos, 1)
+        for pos in front7
+    ]
+    out = compute_current_starters(pd.DataFrame(rows))
+    assert len(out) == 10
+    assert set(out["Position"]) == set(front7)
+
+
 def test_current_starters_raises_on_unmapped_team_abbreviation():
     rows = [_row("2026-08-01T00:00:00Z", "ZZZ", "X.Player", "P1", "QB", 1)]
     with pytest.raises(ValueError, match="No full-name mapping"):

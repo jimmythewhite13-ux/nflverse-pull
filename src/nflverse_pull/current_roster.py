@@ -56,10 +56,15 @@ from nflverse_pull.pull import TEAM_NAMES
 # depth-chart abbreviations too -- and much cleaner than the front seven: verified live that
 # all 32 teams have exactly one rank-1 starter at each of the 5 spots, always (no scheme-
 # variation juggling needed the way interior line/linebacker required).
+# Special teams positions ("P"/"KR"/"PR") are each real, distinct depth-chart abbreviations
+# too -- verified live that all 32 teams have exactly one rank-1 starter at each of the 3
+# spots, always. "P" (punter) never collides with "PK" (kicker) -- they're already distinct
+# real abbreviations in nflverse's own depth-chart data.
 POSITIONS = [
     "QB", "RB", "WR", "TE", "PK", "LT", "LG", "C", "RG", "RT",
     "LDE", "RDE", "LDT", "RDT", "NT", "MLB", "WLB", "SLB", "LILB", "RILB",
     "LCB", "RCB", "NB", "FS", "SS",
+    "P", "KR", "PR",
 ]
 
 # Each position's scored depth-chart slots, mapped to the Role label used throughout
@@ -95,6 +100,9 @@ POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "NB": {1: "NB"},
     "FS": {1: "FS"},
     "SS": {1: "SS"},
+    "P": {1: "P1"},
+    "KR": {1: "KR1"},
+    "PR": {1: "PR1"},
 }
 
 OUTPUT_COLUMNS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]

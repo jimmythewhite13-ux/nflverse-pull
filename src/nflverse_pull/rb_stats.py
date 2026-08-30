@@ -14,6 +14,18 @@ Also verified: `rushing_yards` is null on 33 of 14895 real 2025 run plays (fumbl
 edge cases) while `yards_gained` is never null and agrees with rushing_yards everywhere it
 IS populated -- used yards_gained for YPC to avoid silently dropping those plays, and for
 consistency with efficiency.py's team-level NY/A, which uses the same column.
+
+Rush Yards Over Expected per Attempt (RYOE/Att): real, OFFICIAL NFL Next Gen Stats data
+(nfl_data_py.import_ngs_data("rushing", years)), not derived from pbp -- NGS's own tracking-
+data model of expected yards per carry based on defender positioning at handoff, isolating
+the RUNNER's own skill from blocking/scheme more precisely than EPA or YPC can. Verified
+live before adding this: `week == 0` rows are real season aggregates (not something to sum
+from weekly rows), `player_gsis_id` matches this project's existing Player ID format
+exactly, and NGS applies its OWN (higher) qualifying-volume threshold than this module's
+MIN_QUALIFYING_CARRIES=50 -- real 2025 check found 51 NGS-tracked RBs (min 92 carries) vs.
+78 RBs this module considers qualifying, meaning some real, qualifying-here players won't
+have a real RYOE value. Handled as a genuinely missing data point (left blank downstream),
+not zero-filled or assumed.
 """
 from __future__ import annotations
 
@@ -151,6 +163,38 @@ def compute_carry_share(population: pd.DataFrame, season_stats: pd.DataFrame) ->
         out_rows,
         columns=["Team", "Carry Share (Y-1)", "Starter Carries (Y-1)", "Backup Carries (Y-1)"],
     )
+
+
+def fetch_ngs_rushing(years: list[int]) -> pd.DataFrame:
+    """Network call -- real, official NFL Next Gen Stats rushing data (weekly + season-
+    aggregate rows; compute_player_season_ryoe filters to the real season aggregates)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_ngs_data("rushing", years)
+
+
+def compute_player_season_ryoe(ngs_rushing: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-player season Rush Yards Over Expected per Attempt,
+    from NFL Next Gen Stats' own season-aggregate rows (`week == 0` -- verified live this is
+    the real seasonal total, not something to sum from weekly rows).
+
+    Columns: Player ID | Season | Team | RYOE/Att
+    """
+    season = ngs_rushing[ngs_rushing["week"] == 0].copy()
+    season = season[season["player_gsis_id"].notna()]
+
+    unmapped = sorted(set(season["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+
+    out = pd.DataFrame({
+        "Player ID": season["player_gsis_id"],
+        "Season": season["season"],
+        "Team": season["team_abbr"].map(TEAM_NAMES),
+        "RYOE/Att": season["rush_yards_over_expected_per_att"],
+    })
+    return out.reset_index(drop=True)
 
 
 def main(

@@ -5,6 +5,7 @@ from nflverse_pull.rb_stats import (
     MIN_QUALIFYING_CARRIES,
     SEASON_STATS_COLUMNS,
     compute_carry_share,
+    compute_player_season_ryoe,
     compute_team_season_rb_stats,
 )
 
@@ -160,3 +161,39 @@ def test_historical_rb_roles_ranks_by_carries_within_team_season():
     assert out.loc["P1", "Role"] == "Starter"
     assert out.loc["P2", "Role"] == "Backup"
     assert out.loc["P3", "Role"] == "Other"
+
+
+def _ngs_row(player_id, season, team_abbr, week, ryoe_per_att):
+    return {
+        "player_gsis_id": player_id, "season": season, "team_abbr": team_abbr,
+        "week": week, "rush_yards_over_expected_per_att": ryoe_per_att,
+    }
+
+
+def test_ryoe_uses_real_season_aggregate_rows_only():
+    # week=0 is the real season aggregate; weekly rows (week=1, 2...) must be ignored, not
+    # summed or averaged manually -- NGS already computes the season total itself.
+    rows = [
+        _ngs_row("P1", 2025, "BUF", 0, 0.45),
+        _ngs_row("P1", 2025, "BUF", 1, 0.10),
+        _ngs_row("P1", 2025, "BUF", 2, 0.80),
+    ]
+    out = compute_player_season_ryoe(pd.DataFrame(rows)).set_index("Player ID")
+    assert len(out) == 1
+    assert out.loc["P1", "RYOE/Att"] == pytest.approx(0.45)
+    assert out.loc["P1", "Team"] == "Buffalo Bills"
+    assert out.loc["P1", "Season"] == 2025
+
+
+def test_ryoe_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_ngs_row("P1", 2025, "ZZZ", 0, 0.5)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_ryoe(df)
+
+
+def test_ryoe_skips_rows_with_no_real_player_id():
+    # A row with no player_gsis_id (a data gap) must not produce a phantom None-keyed row.
+    rows = [_ngs_row(None, 2025, "BUF", 0, 0.5), _ngs_row("P1", 2025, "BUF", 0, 0.3)]
+    out = compute_player_season_ryoe(pd.DataFrame(rows))
+    assert len(out) == 1
+    assert out.iloc[0]["Player ID"] == "P1"

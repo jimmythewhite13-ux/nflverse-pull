@@ -7,12 +7,12 @@ Two stages:
   1. update_workbook.py -- writes fresh PPG and efficiency data into YoY Baseline Engine /
      Advanced Efficiency Metrics Section 1 (fixed 96/32-row shape, values refreshed in
      place).
-  2. QB Index / Replacement Value / Manual Override table / RB Value Index / Availability
-     Index -- fully REBUILT from scratch each run (not a Section-1-only value refresh),
-     because their row counts are inherently dynamic: which players currently qualify as a
-     Starter/Backup, how many games have been played this season, etc. Skipped, non-fatally,
-     on a workbook that doesn't have 'Advanced Efficiency Metrics' yet (run
-     scripts/build_efficiency_engine.py once first).
+  2. QB Index / Replacement Value / Manual Override table / RB Value Index / WR-TE Value
+     Index / Availability Index -- fully REBUILT from scratch each run (not a
+     Section-1-only value refresh), because their row counts are inherently dynamic: which
+     players currently qualify as a Starter/Backup, how many games have been played this
+     season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced
+     Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -64,20 +64,23 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_qb_index
     import build_rb_index
     import build_replacement_value
+    import build_wr_te_index
 
     # NOTE: these scripts each pull their own fixed [2023, 2024, 2025] internally -- the
     # `years` argument to this module's run()/main() does not (yet) override them.
     #
     # Order is load-bearing (see the module docstring): build_qb_index deletes/recreates the
     # whole 'QB Index' sheet, so Section 6 (Replacement Value) and Section 7 (Manual
-    # Override) must be rebuilt immediately after it, every run. build_rb_index rebuilds its
-    # own sheet wholesale too, but nothing downstream depends on rebuilding after it the way
-    # QB Index's Section 6/7 do, so its position relative to Availability Index doesn't
-    # matter -- kept here, after the QB Index chain, for readability.
+    # Override) must be rebuilt immediately after it, every run. build_rb_index and
+    # build_wr_te_index each rebuild their own sheet wholesale too, but nothing downstream
+    # depends on rebuilding immediately after either of them the way QB Index's Section 6/7
+    # do, so their position relative to Availability Index doesn't matter -- kept here, after
+    # the QB Index chain, for readability.
     build_qb_index.build(workbook_path)
     build_replacement_value.build(workbook_path)
     add_manual_override_table.build(workbook_path)
     build_rb_index.build(workbook_path)
+    build_wr_te_index.build(workbook_path)
     build_availability_index.build(workbook_path)
 
 

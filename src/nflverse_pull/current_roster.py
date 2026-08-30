@@ -52,9 +52,14 @@ from nflverse_pull.pull import TEAM_NAMES
 # index.py maps these onto fixed EDGE1/EDGE2, IDL1/IDL2, and LB1/LB2/LB3 slots (a real,
 # documented priority order per scheme, not fabrication -- the rare extra real starter a
 # 3-4 team's 4th linebacker represents is a documented scope limit, same as WR4+ elsewhere).
+# Secondary defensive positions ("LCB"/"RCB"/"NB"/"FS"/"SS") are each real, distinct
+# depth-chart abbreviations too -- and much cleaner than the front seven: verified live that
+# all 32 teams have exactly one rank-1 starter at each of the 5 spots, always (no scheme-
+# variation juggling needed the way interior line/linebacker required).
 POSITIONS = [
     "QB", "RB", "WR", "TE", "PK", "LT", "LG", "C", "RG", "RT",
     "LDE", "RDE", "LDT", "RDT", "NT", "MLB", "WLB", "SLB", "LILB", "RILB",
+    "LCB", "RCB", "NB", "FS", "SS",
 ]
 
 # Each position's scored depth-chart slots, mapped to the Role label used throughout
@@ -85,6 +90,11 @@ POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "SLB": {1: "SLB"},
     "LILB": {1: "LILB"},
     "RILB": {1: "RILB"},
+    "LCB": {1: "LCB"},
+    "RCB": {1: "RCB"},
+    "NB": {1: "NB"},
+    "FS": {1: "FS"},
+    "SS": {1: "SS"},
 }
 
 OUTPUT_COLUMNS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]

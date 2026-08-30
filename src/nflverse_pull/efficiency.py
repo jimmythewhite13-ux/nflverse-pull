@@ -177,6 +177,104 @@ def compute_team_season_efficiency(pbp: pd.DataFrame) -> pd.DataFrame:
     return out[SEASON_OUTPUT_COLUMNS]
 
 
+# claude_code_spec_defensive_matchup_engine.md Part A. Named, tunable thresholds -- judgment
+# calls like every other one in this project (QB's 100-dropback minimum, RB's 50-carry
+# minimum), not magic numbers buried in a formula.
+EXPLOSIVE_PASS_YARDS = 15
+EXPLOSIVE_RUN_YARDS = 10
+
+MATCHUP_SEASON_OUTPUT_COLUMNS = [
+    "Team", "Season",
+    "Completion % Allowed (Def)",
+    "Explosive Pass Rate (Off)", "Explosive Pass Rate Allowed (Def)",
+    "Explosive Run Rate (Off)", "Explosive Run Rate Allowed (Def)",
+    "Stuff Rate (Off)", "Stuff Rate Allowed (Def)",
+]
+
+
+def compute_team_season_matchup_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Team-season Completion % Allowed, Explosive Pass/Run Rate
+    (both sides of the ball), and Stuff Rate (both sides) -- feeds the Pass/Run Defense
+    Matchup tabs (claude_code_spec_defensive_matchup_engine.md Part A). Same fetch-once/
+    pure-transform pattern as compute_team_season_efficiency() above; extends efficiency.py
+    rather than a parallel pipeline, per the spec's own instruction.
+
+    Completion % Allowed uses real pass attempts EXCLUDING sacks (pass_attempt==1 AND
+    sack==0 -- nflverse's pass_attempt flag is TRUE on a sack too, the same quirk documented
+    in receiving_stats.py; a sack was never a real thrown-and-caught/incomplete opportunity).
+    Explosive Pass/Run Rate and Stuff Rate use the same "meaningful snap" play_type filter
+    (pass/run) compute_team_season_efficiency() already uses -- an incomplete pass still
+    counts as a real attempt in the denominator (0 yards, not explosive), same convention as
+    every rate stat in this project. Deliberately DIFFERENT from Completion %'s sack
+    exclusion: play_type=="pass" INCLUDES sacks (verified live, same quirk documented
+    throughout this project), which is correct here -- a sack is a real negative dropback
+    outcome that should dilute Explosive Pass Rate the same way a 0-yard incompletion does
+    (matches EPA/Success Rate's own snap-count convention above), whereas "was this pass
+    COMPLETED" is a question a sack was never a candidate to answer at all.
+
+    Columns: Team | Season | Completion % Allowed (Def) | Explosive Pass Rate (Off) |
+    Explosive Pass Rate Allowed (Def) | Explosive Run Rate (Off) |
+    Explosive Run Rate Allowed (Def) | Stuff Rate (Off) | Stuff Rate Allowed (Def)
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    axis_names = ["team_abbr", "season"]
+
+    attempts = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0)]
+    comp_pct_def = (
+        attempts.groupby(["defteam", "season"])["complete_pass"].mean()
+        .rename_axis(axis_names).rename("Completion % Allowed (Def)")
+    )
+
+    pass_plays = reg[reg["play_type"] == "pass"].copy()
+    pass_plays["explosive"] = pass_plays["yards_gained"] >= EXPLOSIVE_PASS_YARDS
+    exp_pass_off = (
+        pass_plays.groupby(["posteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Pass Rate (Off)")
+    )
+    exp_pass_def = (
+        pass_plays.groupby(["defteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Pass Rate Allowed (Def)")
+    )
+
+    run_plays = reg[reg["play_type"] == "run"].copy()
+    run_plays["explosive"] = run_plays["yards_gained"] >= EXPLOSIVE_RUN_YARDS
+    run_plays["stuffed"] = run_plays["yards_gained"] <= 0
+    exp_run_off = (
+        run_plays.groupby(["posteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Run Rate (Off)")
+    )
+    exp_run_def = (
+        run_plays.groupby(["defteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Run Rate Allowed (Def)")
+    )
+    stuff_off = (
+        run_plays.groupby(["posteam", "season"])["stuffed"].mean()
+        .rename_axis(axis_names).rename("Stuff Rate (Off)")
+    )
+    stuff_def = (
+        run_plays.groupby(["defteam", "season"])["stuffed"].mean()
+        .rename_axis(axis_names).rename("Stuff Rate Allowed (Def)")
+    )
+
+    out = (
+        comp_pct_def.to_frame()
+        .join(exp_pass_off, how="outer").join(exp_pass_def, how="outer")
+        .join(exp_run_off, how="outer").join(exp_run_def, how="outer")
+        .join(stuff_off, how="outer").join(stuff_def, how="outer")
+        .reset_index()
+    )
+    out = out.rename(columns={"team_abbr": "team_abbr", "season": "Season"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[MATCHUP_SEASON_OUTPUT_COLUMNS]
+
+
 def compute_league_stats(raw: pd.DataFrame) -> pd.DataFrame:
     """Pure function. Section 2 equivalent: league average and population std-dev per metric."""
     return pd.DataFrame(

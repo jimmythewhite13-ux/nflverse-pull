@@ -12,13 +12,15 @@ Where this departs from QB/RB Index, and why:
   FOUR roles per team: WR1, WR2, WR3 (current_roster.py's new WR support), and TE1 (TE2 is
   a documented future extension, not built here). ~128 scored player-rows across 32 teams,
   not ~64.
-- NO Section 6 Replacement Value / Team Ratings wiring in this phase. QB/RB's Replacement
-  Value is a clean "Starter score minus Backup score" swap; there's no equally clean
-  equivalent for a 3-WR group (WR1 minus WR3 isn't "who plays if the starter is hurt," it's
-  just "gap between the best and third-best receiver," a different and less actionable
-  number). Building a real Replacement Value concept for a non-binary position group is left
-  for a future extension once there's a concrete definition worth building, rather than
-  forcing QB/RB's swap logic onto a shape it wasn't designed for.
+- UPDATED (claude_code_spec_consolidated_fixes.md Part 3): Section 6 wires this tab into
+  Team Ratings -- but still NOT a Replacement Value swap. QB/RB's Replacement Value is a
+  clean "Starter score minus Backup score" swap; there's no equally clean equivalent for a
+  4-role group (WR1 minus WR3 isn't "who plays if the starter is hurt," it's just "gap
+  between the best and third-best receiver," a different and less actionable number).
+  Instead, Section 6 blends the team's top 3 of its 4 scored roles (WR1/WR2/WR3/TE1) via
+  LARGE() -- a real quality measure, not a swap -- same unconditional-adjustment pattern
+  Kicking/OL/Special Teams already established for a position group with no clean "backup
+  unit" concept.
 - Section 1 has NO historical Role/label column, and Section 2's league average is NOT
   filtered to "Starters + Backups only" the way QB/RB's is. QB/RB's Role filter existed to
   keep a rare "3rd-string emergency starter" season out of the league-average baseline;
@@ -48,6 +50,8 @@ Section 3: per-player 3-Yr decay-weighted, regressed baseline -- population is t
 Section 4: league average/std-dev of Section 3's projected baselines
 Section 5: Z-scores, weighted composite, points-scale score (reuses QB Index's own
            Model Assumptions C37/C38 scale constants, same design choice as RB Index)
+Section 6: WR/TE Corps Quality (pts) -- top-3-of-4-role blended score, direct Team Ratings
+           adjustment (unconditional, no Replacement Value swap -- see Part 3 note above)
 
 Usage:
     uv run python scripts/build_wr_te_index.py "C:\\path\\to\\NFL_Prediction_Model.xlsx"
@@ -63,10 +67,15 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from add_manual_override_table import read_existing_overrides  # noqa: E402
 
 from nflverse_pull.current_roster import (  # noqa: E402
+    attach_real_rookie_season,
     compute_current_starters,
     fetch_depth_charts,
+    fetch_seasonal_rosters,
     resolve_scored_population,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
@@ -87,6 +96,18 @@ CURRENT_ROSTER_YEAR = 2026
 SHEET_NAME = "WR-TE Value Index"  # Excel sheet titles can't contain "/"
 QB_INDEX_SHEET = "QB Index"
 RB_INDEX_SHEET = "RB Value Index"
+TEAM_RATINGS_SHEET = "Team Ratings"
+
+TEAM_ORDER = [
+    "Buffalo Bills", "Miami Dolphins", "New England Patriots", "New York Jets",
+    "Baltimore Ravens", "Cincinnati Bengals", "Cleveland Browns", "Pittsburgh Steelers",
+    "Houston Texans", "Indianapolis Colts", "Jacksonville Jaguars", "Tennessee Titans",
+    "Denver Broncos", "Kansas City Chiefs", "Las Vegas Raiders", "Los Angeles Chargers",
+    "Dallas Cowboys", "New York Giants", "Philadelphia Eagles", "Washington Commanders",
+    "Chicago Bears", "Detroit Lions", "Green Bay Packers", "Minnesota Vikings",
+    "Atlanta Falcons", "Carolina Panthers", "New Orleans Saints", "Tampa Bay Buccaneers",
+    "Arizona Cardinals", "Los Angeles Rams", "San Francisco 49ers", "Seattle Seahawks",
+]
 
 METRICS = [
     {"key": "epa", "col": "Receiving EPA/Target", "label": "Receiving\nEPA/Target",
@@ -103,6 +124,7 @@ HEADER_FILL = PatternFill("solid", fgColor="FF1F4E78")
 HEADER_ALIGN = Alignment(wrap_text=True, horizontal="center", vertical="center")
 INPUT_FONT = Font(name="Arial", size=10, color="FF0000FF")
 FORMULA_FONT = Font(name="Arial", size=10, color="FF000000")
+LINK_FONT = Font(name="Arial", size=10, color="FF008000")
 NOTE_FONT = Font(name="Arial", size=9, color="FF808080")
 ASSUMPTION_FILL = PatternFill("solid", fgColor="FFFFFF00")
 
@@ -144,6 +166,15 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         (51, "YPT Weight (WR/TE Index, pts per SD)", 0.3,
          "Traditional, well-understood counting stat -- a sanity check alongside the "
          "EPA-based metrics, not the primary signal."),
+        (83, "WR/TE Corps Quality Points-to-Game-Points Conversion", 0.05,
+         "claude_code_spec_consolidated_fixes.md Part 3 -- appended here rather than "
+         "inserted next to C49-C51 to avoid shifting every later tab's hardcoded row "
+         "references (same convention as RB's C82, OL's C81). A starting guess, like "
+         "every other coefficient in this model. Smaller than QB's/RB's own conversion "
+         "constants since this measures corps DEPTH QUALITY, a real but less direct "
+         "signal than a true starter/backup swap -- see 'WR-TE Value Index' Section 6's "
+         "own closing note for why this is a top-3-of-4 blend, not a Replacement Value "
+         "swap."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -156,21 +187,27 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n.alignment = Alignment(wrap_text=True, vertical="top")
 
 
-def _pull_data() -> dict:
+def _pull_data(overrides: pd.DataFrame) -> dict:
     print(f"Pulling {HISTORICAL_YEARS} play-by-play data for receiving stats...")
     pbp = fetch_pbp(HISTORICAL_YEARS)
     season_stats = compute_team_season_receiving_stats(pbp)
 
+    # claude_code_spec_consolidated_fixes.md Part 1: receiving_stats' own Is Rookie Season
+    # is a "first season observed in the pulled window" proxy -- overwrite it with real
+    # per-season entry_year data (confirmed live this was contaminating the Rookie Baseline
+    # with real veterans: Ertz, Beckham, Diggs, Andrews all had a pulled-window season
+    # wrongly flagged True).
+    print(f"Pulling {HISTORICAL_YEARS} seasonal rosters for real Is Rookie Season data...")
+    seasonal_rosters = fetch_seasonal_rosters(HISTORICAL_YEARS)
+    season_stats = attach_real_rookie_season(season_stats, seasonal_rosters)
+
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster WR/TE population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
     current_starters = compute_current_starters(depth_charts)
-    empty_overrides = pd.DataFrame(
-        columns=["Team", "Manual Starter Override", "Manual Backup Override"]
-    )
 
     populations = []
     for pos in ("WR", "TE"):
-        pop = resolve_scored_population(current_starters, empty_overrides, pos)
+        pop = resolve_scored_population(current_starters, overrides, pos)
         pop = pop.copy()
         pop["Position"] = pos
         populations.append(pop)
@@ -204,6 +241,7 @@ def _rookie_assumptions_for_position(
 
     if len(pos_market):
         ranking = rank_rookie_class(pos_market, rank_col="adp", ascending=True, name_col="name")
+        market_source = "FFC ADP"
         print(f"  {position}: using FFC Dynasty Rookie ADP, {len(ranking)} ranked.")
     else:
         fc = fetch_fantasycalc_values()
@@ -213,11 +251,13 @@ def _rookie_assumptions_for_position(
         ranking = rank_rookie_class(
             pos_rookies, rank_col="value", ascending=False, name_col="player.name"
         )
+        market_source = "FantasyCalc"
         print(f"  {position}: FFC empty, using fantasycalc.com dynasty trade values, "
               f"{len(ranking)} ranked.")
 
     assumptions = assign_rookie_assumptions(
         ranking, tier_averages, metric_cols, flat_baseline, all_rookie_names=names,
+        market_source=market_source,
     )
     id_lookup = dict(zip(zero_history["Player Name"], zero_history["Player ID"], strict=True))
     team_lookup = dict(zip(zero_history["Player Name"], zero_history["Team"], strict=True))
@@ -266,7 +306,12 @@ def _build_rookie_assumptions(season_stats: pd.DataFrame, population: pd.DataFra
 
 
 def build(workbook_path: str) -> dict:
-    data = _pull_data()
+    wb = openpyxl.load_workbook(workbook_path)
+    overrides = read_existing_overrides(wb, SHEET_NAME, ["WR1", "WR2", "WR3", "TE1"])
+    print(f"Read back {len(overrides)} existing manual-override row(s) from Section 7 "
+          "before rebuilding the sheet.")
+
+    data = _pull_data(overrides)
     season_stats = data["season_stats"]
     population = data["population"]
     n_players = len(population)
@@ -274,7 +319,6 @@ def build(workbook_path: str) -> dict:
     rookie = _build_rookie_assumptions(season_stats, population)
     rookie_table = rookie["table"]
 
-    wb = openpyxl.load_workbook(workbook_path)
     add_model_assumptions_weights(wb)
 
     if SHEET_NAME in wb.sheetnames:
@@ -557,7 +601,7 @@ def build(workbook_path: str) -> dict:
     sec5_last_row = sec5_first_row + n_players - 1
 
     _section_title(
-        ws, sec5_title_row, 11,
+        ws, sec5_title_row, 12,
         "Section 5 \u2014 Z-Scores and WR/TE Index Score (all three metrics are \"higher is "
         "better\" -- no sign-flip needed. Baseline/points-per-SD reuse QB Index's own Model "
         "Assumptions cells C37/C38, same design choice as RB Index.)",
@@ -566,7 +610,7 @@ def build(workbook_path: str) -> dict:
         ws, sec5_header_row,
         ["Player Name", "Player ID", "Team", "Position", "Role",
          *[f"{m['label']}\nZ" for m in METRICS], "Weighted\nZ-Score Sum",
-         "WR/TE Index\nScore (Points)", "Years of\nReal History"],
+         "WR/TE Index\nScore (Points)", "Years of\nReal History", "Team|Role\n(helper)"],
     )
 
     avg_cell_ref = {
@@ -613,9 +657,81 @@ def build(workbook_path: str) -> dict:
         yh_link.font = FORMULA_FONT
         yh_link.number_format = "0"
 
+        # Team|Role helper key (claude_code_spec_consolidated_fixes.md Part 3) -- Section 6
+        # needs to look up "this team's WR2 score" directly, but WR and TE rows are NOT
+        # interleaved by team (population is all-WR-by-team, then all-TE-by-team -- see
+        # _pull_data()), so a single-criteria MATCH against Team alone can't find a
+        # specific role. A concatenated key avoids a two-criteria array formula (CSE/
+        # SUMPRODUCT), consistent with this project's no-array-formula convention.
+        key = ws.cell(row=row, column=wz_col + 3, value=f"=C{row}&\"|\"&E{row}")
+        key.font = FORMULA_FONT
+
+    # ==== Section 6: WR/TE Corps Quality (pts) -- claude_code_spec_consolidated_fixes.md ===
+    # Part 3. NOT a Replacement Value swap (no clean "backup corps" concept for a 4-role
+    # group) -- a direct quality measure instead, same pattern as Kicking/OL/Special Teams'
+    # own unconditional Team Ratings adjustments. Per the spec's own guidance: blends the
+    # team's TOP 3 of its 4 scored roles (WR1/WR2/WR3/TE1) via LARGE(), so a TE1 who
+    # outscores that team's WR3 correctly displaces WR3 in the blend rather than being
+    # ignored -- a fixed "always WR1+WR2+WR3" average could never do that. Simple average
+    # of the top 3, not target-share-weighted -- a real, free target-share proxy isn't
+    # available without a separate pull this phase doesn't build (documented simplification,
+    # same as every other "future extension" noted elsewhere in this project).
+    key_range = f"$L${sec5_first_row}:$L${sec5_last_row}"
+    score_range = f"$J${sec5_first_row}:$J${sec5_last_row}"
+
+    sec6_title_row = sec5_last_row + 2
+    sec6_header_row = sec6_title_row + 1
+    sec6_first_row = sec6_header_row + 1
+    sec6_last_row = sec6_first_row + len(TEAM_ORDER) - 1
+
+    _section_title(
+        ws, sec6_title_row, 9,
+        "Section 6 — WR/TE Corps Quality (pts) -- a DIRECT quality measure (average of "
+        "the team's top 3 of its 4 scored roles' WR/TE Index Scores, via LARGE(), minus the "
+        "league-average baseline of 50, converted to game points), NOT a Replacement Value "
+        "swap like QB/RB Index -- there's no clean 'backup corps' concept for a 4-role "
+        "group. Unconditional, applied to every team every time (see closing note).",
+    )
+    _header_row(ws, sec6_header_row, [
+        "Team", "WR1 Score", "WR2 Score", "WR3 Score", "TE1 Score",
+        "Top-3 Corps\nScore (avg)", "Corps Adjustment\n(Index Points)",
+        "Corps Adjustment\n(Game Points)",
+    ])
+
+    for i, team in enumerate(TEAM_ORDER):
+        row = sec6_first_row + i
+        t = ws.cell(row=row, column=1, value=team)
+        t.font = INPUT_FONT
+
+        role_cols = {"WR1": 2, "WR2": 3, "WR3": 4, "TE1": 5}
+        for role, col in role_cols.items():
+            c = ws.cell(row=row, column=col, value=(
+                f'=IFERROR(INDEX({score_range},MATCH("{team}|{role}",{key_range},0)),"")'
+            ))
+            c.font = FORMULA_FONT
+            c.number_format = "0.0;(0.0)"
+
+        role_range = f"B{row}:E{row}"
+        top3 = ws.cell(row=row, column=6, value=(
+            f'=IFERROR((LARGE({role_range},1)+LARGE({role_range},2)+LARGE({role_range},3))/3,"")'
+        ))
+        top3.font = FORMULA_FONT
+        top3.number_format = "0.0;(0.0)"
+
+        adj_index = ws.cell(row=row, column=7, value=(
+            f'=IF(F{row}="","",F{row}-\'Model Assumptions\'!$C$37)'
+        ))
+        adj_game = ws.cell(row=row, column=8, value=(
+            f'=IF(G{row}="","",G{row}*\'Model Assumptions\'!$C$83)'
+        ))
+        adj_index.font = FORMULA_FONT
+        adj_game.font = FORMULA_FONT
+        adj_index.number_format = "0.0;(0.0)"
+        adj_game.number_format = "0.00;(0.00)"
+
     # ---- Closing note --------------------------------------------------------------------
-    note_row = sec5_last_row + 2
-    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=11)
+    note_row = sec6_last_row + 2
+    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=12)
     note = ws.cell(row=note_row, column=1, value=(
         "Phase 2 of the multi-phase roadmap (claude_code_spec_rb_index.md) -- no separate "
         "written spec, designed directly. Scores 4 roles per team (WR1/WR2/WR3, TE1), not a "
@@ -631,28 +747,64 @@ def build(workbook_path: str) -> dict:
         "WR-only vs TE-only historical split isn't available without a separate historical "
         "position pull. The CURRENT draft class's market ranking IS split by real position "
         "(WR ranked among WR, TE among TE), since that comes from this year's live "
-        "current-roster population. THERE IS NO SECTION 6 REPLACEMENT VALUE AND NO TEAM "
-        "RATINGS WIRING for this tab -- QB/RB's Replacement Value is a clean Starter-minus-"
-        "Backup swap; there's no equally clean equivalent for a 3-WR group (WR1 minus WR3 "
-        "measures depth-chart spread, not 'who plays if the starter is hurt'), so this was "
-        "deliberately left for a future extension rather than forcing an ill-fitting metric. "
-        "The 2026 depth-chart snapshot this tab's population is built from was pulled "
-        "BEFORE final 53-man roster cuts -- same caveat as every other current-roster-driven "
-        "tab in this workbook."
+        "current-roster population. SECTION 6 (claude_code_spec_consolidated_fixes.md Part "
+        "3) is a DIRECT quality adjustment wired into Team Ratings, NOT a Replacement Value "
+        "swap -- QB/RB's Replacement Value is a clean Starter-minus-Backup swap; there's no "
+        "equally clean equivalent for a 4-role group, so this instead blends the team's top "
+        "3 of 4 role scores (see Section 6's own title text for why LARGE(), not a fixed "
+        "WR1+WR2+WR3 average). A team missing a role shows blank in that role's column but "
+        "does not break the top-3 blend (LARGE ignores blank/text cells). The 2026 "
+        "depth-chart snapshot this tab's population is built from was pulled BEFORE final "
+        "53-man roster cuts -- same caveat as every other current-roster-driven tab in this "
+        "workbook."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")
 
+    # ==== Wire into Team Ratings (new, unconditional additive column) ======================
+    tr = wb[TEAM_RATINGS_SHEET]
+    tr.cell(row=2, column=24, value="WR/TE Corps\nQuality Adj (pts)").font = HEADER_FONT
+    tr.cell(row=2, column=24).fill = HEADER_FILL
+    tr.cell(row=2, column=24).alignment = HEADER_ALIGN
+
+    adj_game_range = f"'{SHEET_NAME}'!$H${sec6_first_row}:$H${sec6_last_row}"
+    adj_team_range = f"'{SHEET_NAME}'!$A${sec6_first_row}:$A${sec6_last_row}"
+
+    for row in range(3, 3 + len(TEAM_ORDER)):
+        adj = tr.cell(row=row, column=24, value=(
+            f"=IFERROR(INDEX({adj_game_range},MATCH(A{row},{adj_team_range},0)),0)"
+        ))
+        adj.font = LINK_FONT
+        adj.number_format = "0.00;(0.00)"
+
+    note_row_tr = 3 + len(TEAM_ORDER) + 8
+    tr.merge_cells(start_row=note_row_tr, start_column=1, end_row=note_row_tr, end_column=24)
+    tr_note = tr.cell(row=note_row_tr, column=1, value=(
+        "WR/TE Corps Quality Adjustment (X) is unconditional, same reasoning as Kicking "
+        "(S) / OL (T) / Front-7 (U) / Secondary (V) / Special Teams (W) -- there's no "
+        "'backup WR/TE corps' to switch to. It pulls directly from 'WR-TE Value Index' "
+        "Section 6 (that team's top-3-of-4-role blended score minus the league-average "
+        "baseline, converted to game points) and applies to Net Power Rating (N) for "
+        "every team, every time. NOT included in Net Power Rating's formula by THIS "
+        "script (build_wr_te_index.py runs before Kicking/OL/Defense/Secondary/Special "
+        "Teams in main.py's pipeline, none of which know about column X) -- Special "
+        "Teams' build script owns the final, most-complete N formula and was updated to "
+        "include X. See main.py's own pipeline-ordering comment."
+    ))
+    tr_note.font = NOTE_FONT
+    tr_note.alignment = Alignment(wrap_text=True, vertical="top")
+
     wb.save(workbook_path)
     print(
         f"Built '{SHEET_NAME}': Section 1 {len(season_stats)} rows, Section 2B {n_2b} rows, "
-        f"Section 3/5 {n_players} WR/TE roles."
+        f"Section 3/5 {n_players} WR/TE roles. Wired into '{TEAM_RATINGS_SHEET}' (col X)."
     )
     print(f"Saved to {workbook_path}")
     return {
         "sec1_rows": len(season_stats), "n_players": n_players, "n_2b": n_2b,
         "sec3_range": (sec3_first_row, sec3_last_row),
         "sec5_range": (sec5_first_row, sec5_last_row),
+        "sec6_range": (sec6_first_row, sec6_last_row),
     }
 
 

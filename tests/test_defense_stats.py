@@ -5,6 +5,7 @@ from nflverse_pull.defense_stats import (
     compute_player_season_front7_stats,
     compute_player_season_secondary_stats,
     compute_team_season_front7_stats,
+    compute_team_season_scheme_context,
     compute_team_season_secondary_stats,
 )
 
@@ -139,3 +140,54 @@ def test_player_secondary_stats_credits_int_and_shared_pbu_correctly():
     assert out.loc["P2", "PBU"] == 3.0  # full credit on all 3, including the shared play
     assert out.loc["P3", "PBU"] == 1.0  # full credit too -- PBU isn't split like a half-sack
     assert out.loc["P1", "Team"] == "San Francisco 49ers"
+
+
+def _scheme_pbp_row(defteam, season, pass_attempt, game_id, play_id):
+    return {
+        "season_type": "REG", "defteam": defteam, "season": season,
+        "pass_attempt": pass_attempt, "game_id": game_id, "play_id": play_id,
+    }
+
+
+def _ftn_scheme_row(game_id, play_id, n_blitzers, n_defense_box):
+    return {
+        "nflverse_game_id": game_id, "nflverse_play_id": play_id,
+        "n_blitzers": n_blitzers, "n_defense_box": n_defense_box,
+    }
+
+
+def test_scheme_context_computes_blitz_rate_and_avg_box_count():
+    """
+    SF defense, 2025: 4 pass plays faced (2 blitzed, 2 not) + 1 run play (box count only).
+    Blitz Rate = 2/4 = 0.5 (share of PASS plays with n_blitzers > 0).
+    Avg Box Count = mean across ALL 5 plays = (6+7+6+6+7)/5 = 6.4.
+    """
+    pbp_rows = [
+        _scheme_pbp_row("SF", 2025, 1, "G1", 1),
+        _scheme_pbp_row("SF", 2025, 1, "G1", 2),
+        _scheme_pbp_row("SF", 2025, 1, "G1", 3),
+        _scheme_pbp_row("SF", 2025, 1, "G1", 4),
+        _scheme_pbp_row("SF", 2025, 0, "G1", 5),  # run play -- not in Blitz Rate's denominator
+    ]
+    ftn_rows = [
+        _ftn_scheme_row("G1", 1, 1, 6),
+        _ftn_scheme_row("G1", 2, 2, 7),
+        _ftn_scheme_row("G1", 3, 0, 6),
+        _ftn_scheme_row("G1", 4, 0, 6),
+        _ftn_scheme_row("G1", 5, 0, 7),
+    ]
+    out = compute_team_season_scheme_context(
+        pd.DataFrame(pbp_rows), pd.DataFrame(ftn_rows)
+    ).set_index("Team")
+    row = out.loc["San Francisco 49ers"]
+    assert row["Blitz Rate"] == pytest.approx(0.5)
+    assert row["Avg Box Count"] == pytest.approx((6 + 7 + 6 + 6 + 7) / 5)
+
+
+def test_scheme_context_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_scheme_pbp_row("ZZZ", 2025, 1, "G1", 1)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_scheme_context(
+            df, pd.DataFrame(columns=["nflverse_game_id", "nflverse_play_id",
+                                       "n_blitzers", "n_defense_box"])
+        )

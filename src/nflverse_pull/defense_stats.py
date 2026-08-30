@@ -27,6 +27,15 @@ pass plays faced (`pass_attempt == 1` while on defense -- verified this already 
 sack plays, same "pass_attempt is TRUE on a sack too" quirk documented in
 receiving_stats.py). TFL Rate uses ALL real defensive plays faced (TFL can happen on a run
 OR a pass play, unlike the other four which are pass-play-only).
+
+Scheme context (Blitz Rate, Avg Box Count): real, per-play charting from FTN Fantasy
+(nfl_data_py.import_ftn_data), joined against pbp by game_id/play_id -- verified live 100%
+real coverage on a real team's pass plays faced. Blitz Rate = share of real pass plays
+faced with at least one charted blitzer (n_blitzers > 0); Avg Box Count = mean n_defense_box
+across all real defensive plays. Deliberately informational/contextual, NOT part of the
+weighted Z-score composite on Front Seven & D-Line Index -- a higher or lower blitz rate
+isn't inherently "better," it's a scheme choice, unlike Sack/TFL/QB-Hit Rate which are
+unambiguously "higher is better."
 """
 from __future__ import annotations
 
@@ -246,6 +255,54 @@ def compute_player_season_secondary_stats(pbp: pd.DataFrame) -> pd.DataFrame:
     if len(combined) == 0:
         return pd.DataFrame(columns=["Player ID", "Season", "Team", *value_cols])
     return _finalize_player_frame(combined, value_cols)
+
+
+def fetch_ftn(years: list[int]) -> pd.DataFrame:
+    """Network call -- FTN Fantasy's real per-play charting (blitz/box counts, sack fault,
+    play-action, drops, etc.)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_ftn_data(years)
+
+
+def compute_team_season_scheme_context(pbp: pd.DataFrame, ftn: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real, per-play scheme-tendency context for Front Seven & D-
+    Line Index -- Blitz Rate and Avg Box Count, joined from FTN Fantasy's real charting by
+    game_id/play_id. Deliberately informational (see module docstring): neither is a
+    "higher is better" quality signal, so neither feeds the tab's weighted Z-score
+    composite.
+
+    Columns: Team | Season | Blitz Rate | Avg Box Count
+    """
+    reg = pbp[pbp["season_type"] == "REG"].copy()
+    reg = reg[reg["defteam"].notna()]
+    reg["play_id"] = reg["play_id"].astype("Int64")
+
+    ftn_join = ftn[["nflverse_game_id", "nflverse_play_id", "n_blitzers", "n_defense_box"]].copy()
+    ftn_join["nflverse_play_id"] = ftn_join["nflverse_play_id"].astype("Int64")
+
+    merged = reg.merge(
+        ftn_join, left_on=["game_id", "play_id"],
+        right_on=["nflverse_game_id", "nflverse_play_id"], how="left",
+    )
+
+    box_avg = merged.groupby(["defteam", "season"])["n_defense_box"].mean().rename("Avg Box Count")
+
+    pass_faced = merged[merged["pass_attempt"] == 1].copy()
+    pass_faced["blitzed"] = pass_faced["n_blitzers"] > 0
+    blitz_rate = pass_faced.groupby(["defteam", "season"])["blitzed"].mean().rename("Blitz Rate")
+
+    out = blitz_rate.to_frame().join(box_avg).reset_index()
+    out = out.rename(columns={"defteam": "team", "season": "Season"})
+
+    unmapped = sorted(set(out["team"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[["Team", "Season", "Blitz Rate", "Avg Box Count"]]
 
 
 def main(

@@ -1,8 +1,16 @@
 """
 Pulls REAL, free, publicly available team-level offensive line metrics -- Pro Football
 Reference (via nfl_data_py.import_seasonal_pfr) for Pass_Protection and Run_Blocking, plus
-FTN Fantasy's real per-play charting (via nfl_data_py.import_ftn_data) for a fault-adjusted
+FTN Data's real per-play charting (via nfl_data_py.import_ftn_data) for a fault-adjusted
 sack rate. Feeds the workbook's "Offensive Line Index" tab.
+
+Provenance note on the FTN data (claude_code_spec_ftn_fix.md): confirmed by reading
+nfl_data_py's own source and a live unauthenticated pull that `import_ftn_data` fetches a
+public parquet file from nflverse's own GitHub Releases -- no API key, login, or
+subscription check anywhere in the code path. This is FTN Data's own real charting,
+released under a CC-BY-SA 4.0 Creative Commons license specifically for open publication
+via nflverse (per that function's own docstring) -- NOT FTN Fantasy's paid subscription
+product, which this project has no access to and does not use anywhere.
 
 Why PFR instead of individual per-lineman grades (LT/LG/C/RG/RT skill numbers): checked
 before writing this, per project convention -- there is no free, public, per-lineman
@@ -31,7 +39,7 @@ fabricated per-player skill grade.
 
 Sack-Free Rate (Fault-Adjusted): PFR's Pass_Protection (pressure rate) blames the O-line for
 every sack, even ones charted as the QB's own fault (held the ball too long, etc.) -- a real
-gap identified once FTN Fantasy's real per-play charting was found to carry
+gap identified once FTN Data's real, free per-play charting (via nflverse) was found to carry
 `is_qb_fault_sack`. Checked live before building this: FTN's real charting matched 100% of
 2025's real sack plays (1,287/1,287, joined via game_id/play_id), with 445 (34.6%) charted
 as the QB's own fault -- a substantial, real signal worth correcting for, not noise.
@@ -61,8 +69,10 @@ def fetch_pfr_rush(years: list[int]) -> pd.DataFrame:
 
 
 def fetch_ftn(years: list[int]) -> pd.DataFrame:
-    """Network call -- FTN Fantasy's real per-play charting (blitz/box counts, sack fault,
-    play-action, drops, etc.)."""
+    """Network call -- FTN Data's real per-play charting (blitz/box counts, sack fault,
+    play-action, drops, etc.), released free under CC-BY-SA 4.0 via nflverse's GitHub
+    Releases -- no API key or subscription required (verified live; see this module's own
+    docstring)."""
     import nfl_data_py as nfl
 
     return nfl.import_ftn_data(years)
@@ -133,7 +143,7 @@ def compute_team_season_oline_stats(
 def compute_team_season_sack_fault_stats(pbp: pd.DataFrame, ftn: pd.DataFrame) -> pd.DataFrame:
     """
     Pure function, no network. Real, fault-adjusted sack rate per team-season, joining
-    nflverse pbp (real sack plays) against FTN Fantasy's real charting (is_qb_fault_sack) by
+    nflverse pbp (real sack plays) against FTN Data's real charting (is_qb_fault_sack) by
     game_id/play_id. Team-level, attributed to `posteam` (the team whose O-line is being
     evaluated) -- the same direction Pass_Protection already uses, and the OPPOSITE of
     defense_stats.py's Sack Rate (which attributes to `defteam`, the team that caused it).

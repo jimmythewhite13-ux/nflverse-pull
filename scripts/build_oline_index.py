@@ -22,11 +22,15 @@ this pipeline doesn't have) -- both are real, legitimate ideas worth a future ex
 just out of scope for this build.
 
 UPDATED: added a third real metric, Sack-Free Rate (Fault-Adjusted), per explicit user
-instruction to incorporate FTN Fantasy's real per-play charting (already accessible via
+instruction to incorporate FTN Data's real per-play charting (already accessible via
 nfl_data_py.import_ftn_data). PFR's Pass_Protection blames the O-line for every sack, even
 ones charted as the QB's own fault -- FTN's real is_qb_fault_sack column (verified live:
 100% coverage on 2025's real sack plays, 34.6% charted as QB-fault) lets this tab correct
-for that. See oline_stats.py's updated docstring for the full reasoning.
+for that. See oline_stats.py's updated docstring for the full reasoning. Provenance note
+(claude_code_spec_ftn_fix.md): this FTN charting data is confirmed real and genuinely free
+(FTN Data's own CC-BY-SA-licensed public release via nflverse's GitHub Releases, no API key
+or subscription required) -- NOT FTN Fantasy's paid subscription product, which this
+project has no access to and does not use anywhere.
 
 Section 1: raw 3-year TEAM-level data (Pass_Protection, Run_Blocking from Pro Football
            Reference; Sack-Free Rate (Fault-Adjusted) from real nflverse pbp + FTN
@@ -189,7 +193,7 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          "DIRECT quality adjustment, not a Replacement Value swap -- there's no "
          "'backup offensive line' to swap in, same reasoning as Kicking Index's C56."),
         (81, "Sack-Free Rate (Fault-Adjusted) Weight (OL Index, pts per SD)", 0.25,
-         "Added after the fact once FTN Fantasy's real per-play charting "
+         "Added after the fact once FTN Data's real, free per-play charting "
          "(is_qb_fault_sack) was found -- appended here rather than inserted next "
          "to C58/C59 to avoid shifting every row reference every later tab's build "
          "script already hardcodes (Front Seven/Secondary/Special Teams start at "
@@ -271,7 +275,7 @@ def build(workbook_path: str) -> dict:
     t = ws.cell(row=1, column=1, value=(
         "Offensive Line Index -- Multi-Year Decay-Weighted TEAM-Level Blocking Rating "
         "(Pass Protection and Run Blocking from Pro Football Reference; Sack-Free Rate "
-        "Fault-Adjusted from real nflverse pbp + FTN Fantasy charting). NO individual "
+        "Fault-Adjusted from real nflverse pbp + FTN Data's real, free charting). NO individual "
         "lineman is graded anywhere on this tab -- see the closing note for why, and how "
         "the individual-level section instead uses real NFL experience."
     ))
@@ -284,8 +288,8 @@ def build(workbook_path: str) -> dict:
         ws, 3, 2 + len(METRICS),
         "Section 1 \u2014 Raw 3-Year TEAM-Level Data (Pass Protection/Run Blocking: Pro "
         "Football Reference; Sack-Free Rate (Fault-Adjusted): real nflverse pbp + FTN "
-        "Fantasy charting -- genuinely team-level, not per-player; see this tab's opening "
-        "note)",
+        "Data's real, free charting -- genuinely team-level, not per-player; see this "
+        "tab's opening note)",
     )
     _header_row(ws, 4, ["Team", "Season", *[m["label"] for m in METRICS]])
     for i, r in enumerate(season_stats.to_dict("records")):
@@ -625,7 +629,7 @@ def build(workbook_path: str) -> dict:
         "TEAM-level data: Pass Protection (= 100 - the team's attempt-weighted pressure "
         "rate allowed) and Run Blocking (= the team's attempt-weighted Yards Before "
         "Contact per Attempt) from Pro Football Reference; Sack-Free Rate (Fault-Adjusted) "
-        "from real nflverse play-by-play joined against FTN Fantasy's real per-play "
+        "from real nflverse play-by-play joined against FTN Data's real, free per-play "
         "charting (is_qb_fault_sack) -- excludes sacks charted as the QB's own fault "
         "(held the ball too long, etc.) from the O-line's blame, verified live to have "
         "100% real coverage on 2025's actual sack plays. There is no honest free per-"

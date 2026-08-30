@@ -171,15 +171,21 @@ def resolve_scored_population(
     in the first place, which the old historical-attempts-only population never could be,
     since it only ever considered players who already had a qualifying historical season.
 
-    `overrides` columns: Team | Manual Starter Override | Manual Backup Override (either
-    override column may be blank/NaN per row -- blank means "use the pulled data for that
-    role"). A filled-in override name takes precedence over the pulled current-roster
-    starter/backup for that team+role. The override is matched against `current_starters`
-    first (covers a name already on SOME team's depth chart, just not this slot) and, if not
-    found there, is returned with a null Player ID and Source="override (unresolved -- no
-    Player ID found)" rather than silently dropped or guessed at; a caller can still use the
-    row (e.g. flag it for the user to supply an ID by hand) but it won't feed a
-    decay-weighted formula chain without one.
+    `overrides` columns: Team | Manual {Role} Override... -- one override column per real
+    Role label this position uses (e.g. "Manual Starter Override"/"Manual Backup Override"
+    for QB/RB, "Manual WR1 Override"/"Manual WR2 Override"/"Manual WR3 Override" for WR,
+    "Manual LT Override"/.../"Manual RT Override" for OL -- see claude_code_spec_
+    consolidated_fixes.md Part 2, which generalized this from the original QB/RB-only
+    Starter/Backup pair). Any column may be blank/NaN per row -- blank means "use the pulled
+    data for that role". A filled-in override name takes precedence over the pulled
+    current-roster player for that team+role. The override is matched against
+    `current_starters` first (covers a name already on SOME team's depth chart, just not
+    this slot) and, if not found there, is returned with a null Player ID and
+    Source="override (unresolved -- no Player ID found)" rather than silently dropped or
+    guessed at; a caller can still use the row (e.g. flag it for the user to supply an ID by
+    hand) but it won't feed a decay-weighted formula chain without one. A missing override
+    column entirely (e.g. an old-format overrides table with fewer roles than this position
+    now has) is treated the same as an all-blank column -- no error, no override applied.
     """
     role_labels = POSITION_ROLE_LABELS.get(position)
     if role_labels is None:
@@ -199,11 +205,13 @@ def resolve_scored_population(
     # Build a name -> Player ID lookup from the pulled data, for resolving an override.
     name_to_id = {r["Player Name"]: r["Player ID"] for r in pos_data.to_dict("records")}
 
-    # Only QB/RB have a Manual Override table (their Role labels are "Starter"/"Backup"),
-    # so `overrides` is an empty DataFrame by convention for WR/TE -- this loop is then a
-    # correct no-op rather than needing a WR/TE-specific override schema (a documented Phase
-    # 2 scope limit, same as RB Index shipping without an override table).
-    override_cols = [("Starter", "Manual Starter Override"), ("Backup", "Manual Backup Override")]
+    # Generalized to every real Role label this position uses (claude_code_fixes.md Part 2)
+    # -- column name is always "Manual {role} Override", so this works unchanged for
+    # QB/RB's Starter/Backup pair, WR's WR1/WR2/WR3, TE's TE1, Kicking's K1, and OL's
+    # LT/LG/C/RG/RT. A position whose override table hasn't been built yet on its tab simply
+    # passes an empty `overrides` DataFrame -- to_dict("records") is then an empty list and
+    # this loop is a correct no-op, same behavior as before generalizing.
+    override_cols = [(role, f"Manual {role} Override") for role in role_labels.values()]
     for orow in overrides.to_dict("records"):
         team = orow["Team"]
         for role, col in override_cols:
@@ -265,6 +273,52 @@ def attach_experience(population: pd.DataFrame, rosters: pd.DataFrame) -> pd.Dat
     years_exp = out["Player ID"].map(exp_lookup)
     out["Years of NFL Experience"] = years_exp
     out["Is Rookie"] = years_exp.apply(lambda v: bool(v == 0) if pd.notna(v) else None)
+    return out
+
+
+def attach_real_rookie_season(season_stats: pd.DataFrame, rosters: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Fixes claude_code_spec_consolidated_fixes.md Part 1: every
+    stats module's own `Is Rookie Season` (qb_stats.py, rb_stats.py, receiving_stats.py,
+    kicking_stats.py) is a PROXY -- "the first season this player_id appears with a
+    qualifying sample in the years we happened to pull" -- which silently mislabels any
+    veteran whose real career started before the pull window as a rookie in his first
+    pulled season (confirmed live: Mahomes/Allen/Jackson/Hurts/Lawrence in QB Index,
+    Henry/Barkley/Kamara/McCaffrey in RB Value Index, Ertz/Beckham/Diggs/Andrews in WR-TE
+    Value Index, Butker/McPherson in Kicking Index -- all real veterans, all contaminating
+    each tab's flat Rookie Baseline).
+
+    Real fix: join `season_stats` to nflverse's seasonal rosters (the same real years_exp/
+    entry_year source attach_experience() already uses for Offensive Line Index) by
+    (Player ID, Season) -- NOT by Player ID alone like attach_experience(), since
+    years_exp/entry_year are season-specific and a player's rookie season is a one-time
+    real historical fact, not a function of which years we happened to pull. A player's
+    real rookie season is definitionally the season real draft/entry data says he entered
+    the league (verified live: Mahomes' 2023/2024/2025 rows all carry entry_year=2017;
+    Caleb Williams' 2024 row carries entry_year=2024, his 2025 row still entry_year=2024 --
+    correctly a sophomore, not a rookie again).
+
+    A (Player ID, Season) with no roster match gets Is Rookie Season = False, not True --
+    we cannot positively confirm rookie status without a real match, and defaulting to
+    False is the safer failure mode for a Rookie Baseline pool (excludes an unverified
+    player-season rather than risk a false positive contaminating the baseline again).
+
+    Output: same columns as `season_stats`, with Is Rookie Season overwritten using real
+    per-season entry_year data.
+    """
+    rosters = rosters.dropna(subset=["player_id", "season"])
+    rosters = rosters[~rosters[["player_id", "season"]].duplicated(keep="first")]
+    entry_lookup = rosters.set_index(["player_id", "season"])["entry_year"]
+
+    out = season_stats.copy()
+    keys = list(zip(out["Player ID"], out["Season"], strict=True))
+    entry_years = pd.Series(
+        [entry_lookup.get(k) for k in keys], index=out.index, dtype="object"
+    )
+    out["Is Rookie Season"] = [
+        bool(s == e) if pd.notna(e) else False
+        for s, e in zip(out["Season"], entry_years, strict=True)
+    ]
     return out
 
 

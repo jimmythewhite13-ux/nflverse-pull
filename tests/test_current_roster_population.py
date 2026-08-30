@@ -139,6 +139,61 @@ def test_resolve_population_labels_each_ol_spot_by_its_own_name():
         assert out.iloc[0]["Role"] == pos
 
 
+def test_resolve_population_override_generalizes_to_wr_roles():
+    # claude_code_spec_consolidated_fixes.md Part 2: override columns aren't limited to
+    # Starter/Backup -- "Manual WR2 Override" must take precedence on the WR2 slot.
+    current = _current_starters([
+        ["Buffalo Bills", "WR", "K.Coleman", "P1", 1, "depth_charts"],
+        ["Buffalo Bills", "WR", "K.Shakir", "P2", 2, "depth_charts"],
+        ["Buffalo Bills", "WR", "C.Samuel", "P3", 3, "depth_charts"],
+        ["Miami Dolphins", "WR", "J.Waddle", "P4", 1, "depth_charts"],
+    ])
+    overrides = pd.DataFrame([
+        {"Team": "Buffalo Bills", "Manual WR2 Override": "J.Waddle"},
+    ])
+
+    out = resolve_scored_population(current, overrides, "WR")
+    buf = out[out["Team"] == "Buffalo Bills"].set_index("Role")
+
+    assert buf.loc["WR2", "Player Name"] == "J.Waddle"
+    assert buf.loc["WR2", "Player ID"] == "P4"
+    assert buf.loc["WR2", "Source"] == "override"
+    # WR1/WR3 untouched -- override was only supplied for WR2.
+    assert buf.loc["WR1", "Player Name"] == "K.Coleman"
+    assert buf.loc["WR3", "Player Name"] == "C.Samuel"
+
+
+def test_resolve_population_override_generalizes_to_ol_roles():
+    current = _current_starters([
+        ["Kansas City Chiefs", "LT", "Some.Lineman", "P1", 1, "depth_charts"],
+    ])
+    overrides = pd.DataFrame([
+        {"Team": "Kansas City Chiefs", "Manual LT Override": "Replacement.Lineman"},
+    ])
+
+    out = resolve_scored_population(current, overrides, "LT")
+
+    row = out[(out["Team"] == "Kansas City Chiefs") & (out["Role"] == "LT")].iloc[0]
+    assert row["Player Name"] == "Replacement.Lineman"
+    assert pd.isna(row["Player ID"])  # not on any pulled depth chart -- unresolved
+    assert "unresolved" in row["Source"]
+
+
+def test_resolve_population_missing_override_column_is_a_no_op():
+    # An overrides table built for a position with fewer roles (or no override table at
+    # all, i.e. an empty DataFrame) must not error just because this position's role
+    # columns aren't present.
+    current = _current_starters([
+        ["Buffalo Bills", "TE", "T.Kelce", "P1", 1, "depth_charts"],
+    ])
+    overrides = pd.DataFrame([{"Team": "Buffalo Bills"}])
+
+    out = resolve_scored_population(current, overrides, "TE")
+
+    assert len(out) == 1
+    assert out.iloc[0]["Player Name"] == "T.Kelce"
+
+
 def test_attach_experience_joins_real_years_exp_by_player_id():
     from nflverse_pull.current_roster import attach_experience
 
@@ -164,6 +219,38 @@ def test_attach_experience_joins_real_years_exp_by_player_id():
     assert out.loc["P2", "Is Rookie"] is True
     assert pd.isna(out.loc["P3", "Years of NFL Experience"])
     assert out.loc["P3", "Is Rookie"] is None
+
+
+def test_attach_real_rookie_season_uses_real_entry_year_not_pull_window():
+    from nflverse_pull.current_roster import attach_real_rookie_season
+
+    # A real veteran (entry_year=2017) whose first PULLED season happens to be 2023 -- the
+    # OLD proxy (first season observed in the window) would wrongly call this a rookie
+    # season; the real entry_year fix must not.
+    season_stats = pd.DataFrame([
+        {"Player ID": "MAHOMES", "Season": 2023, "Is Rookie Season": True},  # old proxy's bug
+        {"Player ID": "MAHOMES", "Season": 2024, "Is Rookie Season": False},
+        # A real rookie (entry_year=2024): correctly True only in his real entry season.
+        {"Player ID": "ROOKIE", "Season": 2024, "Is Rookie Season": True},
+        {"Player ID": "ROOKIE", "Season": 2025, "Is Rookie Season": True},  # old proxy's bug
+        # No roster match at all -- must default to False, not carry over the old value.
+        {"Player ID": "MYSTERY", "Season": 2024, "Is Rookie Season": True},
+    ])
+    rosters = pd.DataFrame([
+        {"player_id": "MAHOMES", "season": 2023, "entry_year": 2017},
+        {"player_id": "MAHOMES", "season": 2024, "entry_year": 2017},
+        {"player_id": "ROOKIE", "season": 2024, "entry_year": 2024},
+        {"player_id": "ROOKIE", "season": 2025, "entry_year": 2024},
+    ])
+
+    out = attach_real_rookie_season(season_stats, rosters)
+
+    result = dict(zip(zip(out["Player ID"], out["Season"]), out["Is Rookie Season"]))
+    assert result[("MAHOMES", 2023)] is False
+    assert result[("MAHOMES", 2024)] is False
+    assert result[("ROOKIE", 2024)] is True
+    assert result[("ROOKIE", 2025)] is False
+    assert result[("MYSTERY", 2024)] is False
 
 
 def _historical(rows):

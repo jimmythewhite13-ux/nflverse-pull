@@ -3,21 +3,26 @@ import pytest
 
 from nflverse_pull.defense_stats import (
     compute_player_season_front7_stats,
+    compute_player_season_secondary_stats,
     compute_team_season_front7_stats,
+    compute_team_season_secondary_stats,
 )
 
 
-def _play(defteam, season, pass_attempt=0, sack=0, qb_hit=0, tfl=0,
+def _play(defteam, season, pass_attempt=0, sack=0, qb_hit=0, tfl=0, interception=0,
           sack_player=None, half1=None, half2=None,
-          qb_hit1=None, qb_hit2=None, tfl1=None, tfl2=None):
+          qb_hit1=None, qb_hit2=None, tfl1=None, tfl2=None,
+          int_player=None, pbu1=None, pbu2=None):
     return {
         "season_type": "REG", "defteam": defteam, "season": season,
         "pass_attempt": pass_attempt, "sack": sack, "qb_hit": qb_hit,
-        "tackled_for_loss": tfl,
+        "tackled_for_loss": tfl, "interception": interception,
         "sack_player_id": sack_player,
         "half_sack_1_player_id": half1, "half_sack_2_player_id": half2,
         "qb_hit_1_player_id": qb_hit1, "qb_hit_2_player_id": qb_hit2,
         "tackle_for_loss_1_player_id": tfl1, "tackle_for_loss_2_player_id": tfl2,
+        "interception_player_id": int_player,
+        "pass_defense_1_player_id": pbu1, "pass_defense_2_player_id": pbu2,
     }
 
 
@@ -89,3 +94,48 @@ def test_player_front7_stats_credits_both_players_on_a_shared_qb_hit_or_tfl():
     assert out.loc["P2", "QB Hits"] == 1.0
     assert out.loc["P3", "TFL"] == 1.0
     assert out.loc["P4", "TFL"] == 1.0
+
+
+def _fake_secondary_pbp():
+    """
+    SF defense, 2025, faces 10 pass plays:
+      - 2 are interceptions (both credited to P1)
+      - 3 are pass breakups (2 credited solely to P2, 1 shared between P2 and P3)
+
+    INT Rate = 2 / 10 = 0.2
+    PBU Rate = 3 plays / 10 = 0.3 (the play itself, not per-credit)
+    Individual: P1 = 2 INT; P2 = 3 PBU (full credit on each, including the shared one);
+    P3 = 1 PBU (also full credit on the shared play, not split like a half-sack).
+    """
+    rows = [
+        _play("SF", 2025, pass_attempt=1, interception=1, int_player="P1"),
+        _play("SF", 2025, pass_attempt=1, interception=1, int_player="P1"),
+        _play("SF", 2025, pass_attempt=1, pbu1="P2"),
+        _play("SF", 2025, pass_attempt=1, pbu1="P2"),
+        _play("SF", 2025, pass_attempt=1, pbu1="P2", pbu2="P3"),
+    ]
+    rows += [_play("SF", 2025, pass_attempt=1) for _ in range(5)]
+    return pd.DataFrame(rows)
+
+
+def test_team_secondary_stats_computes_expected_rates():
+    out = compute_team_season_secondary_stats(_fake_secondary_pbp())
+    assert len(out) == 1
+    row = out.iloc[0]
+    assert row["Team"] == "San Francisco 49ers"
+    assert row["INT Rate"] == pytest.approx(0.2)
+    assert row["PBU Rate"] == pytest.approx(0.3)
+
+
+def test_team_secondary_stats_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_play("ZZZ", 2025, pass_attempt=1)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_secondary_stats(df)
+
+
+def test_player_secondary_stats_credits_int_and_shared_pbu_correctly():
+    out = compute_player_season_secondary_stats(_fake_secondary_pbp()).set_index("Player ID")
+    assert out.loc["P1", "INT"] == 2.0
+    assert out.loc["P2", "PBU"] == 3.0  # full credit on all 3, including the shared play
+    assert out.loc["P3", "PBU"] == 1.0  # full credit too -- PBU isn't split like a half-sack
+    assert out.loc["P1", "Team"] == "San Francisco 49ers"

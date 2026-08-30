@@ -167,6 +167,11 @@ def compute_player_season_qb_ngs_context(ngs_passing: pd.DataFrame) -> pd.DataFr
     is the real seasonal total, not something to average from weekly rows). CONTEXT ONLY --
     see this module's own docstring for why neither metric is scored.
 
+    NGS's own `aggressiveness` field is a raw percentage NUMBER (e.g. 12.4 meaning 12.4%,
+    verified live), not a 0-1 fraction like every rate/percentage elsewhere in this project
+    (Reception Success Rate, FG%, Blitz Rate, ...) -- divided by 100 here so it's on the same
+    0-1 scale and Excel's "0.00%" number format displays it correctly downstream.
+
     Columns: Player ID | Season | Team | Avg Time to Throw | Aggressiveness
     """
     season = ngs_passing[ngs_passing["week"] == 0].copy()
@@ -182,7 +187,7 @@ def compute_player_season_qb_ngs_context(ngs_passing: pd.DataFrame) -> pd.DataFr
         "Season": season["season"],
         "Team": season["team_abbr"].map(TEAM_NAMES),
         "Avg Time to Throw": season["avg_time_to_throw"],
-        "Aggressiveness": season["aggressiveness"],
+        "Aggressiveness": season["aggressiveness"] / 100.0,
     })
     return out.reset_index(drop=True)
 

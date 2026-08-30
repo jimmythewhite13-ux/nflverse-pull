@@ -192,7 +192,10 @@ def test_qb_ngs_context_uses_real_season_aggregate_rows_only():
     out = compute_player_season_qb_ngs_context(pd.DataFrame(rows)).set_index("Player ID")
     assert len(out) == 1
     assert out.loc["P1", "Avg Time to Throw"] == pytest.approx(2.65)
-    assert out.loc["P1", "Aggressiveness"] == pytest.approx(12.4)
+    # NGS's raw "aggressiveness" of 12.4 means 12.4% -- normalized to a 0-1 fraction (0.124)
+    # to match every other rate/percentage in this project (Excel's "0.00%" format expects
+    # a fraction, not a raw percentage number).
+    assert out.loc["P1", "Aggressiveness"] == pytest.approx(0.124)
     assert out.loc["P1", "Team"] == "Buffalo Bills"
 
 

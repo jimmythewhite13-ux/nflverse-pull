@@ -46,11 +46,13 @@ from openpyxl.utils import get_column_letter
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from add_manual_override_table import SECTION_MARKER as OVERRIDE_SECTION_MARKER  # noqa: E402
+from add_manual_override_table import read_existing_overrides  # noqa: E402
 
 from nflverse_pull.current_roster import (  # noqa: E402
+    attach_real_rookie_season,
     compute_current_starters,
     fetch_depth_charts,
+    fetch_seasonal_rosters,
     merge_with_historical_fallback,
     resolve_scored_population,
 )
@@ -150,34 +152,11 @@ def _read_existing_overrides(wb: openpyxl.Workbook) -> pd.DataFrame:
     Reads back Section 7's Manual Roster Override table (built by
     add_manual_override_table.py) from the QB Index sheet BEFORE this script deletes and
     rebuilds it -- so any values a user has already filled in survive a re-run rather than
-    being silently wiped along with the rest of the sheet.
+    being silently wiped along with the rest of the sheet. Thin QB-specific wrapper around
+    the shared read_existing_overrides() (claude_code_spec_consolidated_fixes.md Part 2 --
+    every tab's build script now uses the same shared reader).
     """
-    columns = ["Team", "Manual Starter Override", "Manual Backup Override"]
-    if SHEET_NAME not in wb.sheetnames:
-        return pd.DataFrame(columns=columns)
-    ws = wb[SHEET_NAME]
-
-    title_row = None
-    for r in range(1, ws.max_row + 1):
-        v = ws.cell(row=r, column=1).value
-        if isinstance(v, str) and v.startswith(OVERRIDE_SECTION_MARKER):
-            title_row = r
-            break
-    if title_row is None:
-        return pd.DataFrame(columns=columns)
-
-    header_row = title_row + 1
-    first_data_row = header_row + 1
-    rows = []
-    r = first_data_row
-    while ws.cell(row=r, column=1).value is not None:
-        rows.append({
-            "Team": ws.cell(row=r, column=1).value,
-            "Manual Starter Override": ws.cell(row=r, column=2).value,
-            "Manual Backup Override": ws.cell(row=r, column=3).value,
-        })
-        r += 1
-    return pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
+    return read_existing_overrides(wb, SHEET_NAME, ["Starter", "Backup"])
 
 
 def _build_rookie_assumptions(stats: pd.DataFrame, population: pd.DataFrame) -> dict:
@@ -213,6 +192,7 @@ def _build_rookie_assumptions(stats: pd.DataFrame, population: pd.DataFrame) -> 
         else:
             qb_market = market
         ranking = rank_rookie_class(qb_market, rank_col="adp", ascending=True, name_col="name")
+        market_source = "FFC ADP"
         print(f"Using FFC Dynasty Rookie ADP: {len(ranking)} QBs ranked.")
     else:
         print("FFC Dynasty Rookie ADP returned no players (see rookie_crosswalk.py's own "
@@ -224,11 +204,12 @@ def _build_rookie_assumptions(stats: pd.DataFrame, population: pd.DataFrame) -> 
         ranking = rank_rookie_class(
             qb_rookies, rank_col="value", ascending=False, name_col="player.name"
         )
+        market_source = "FantasyCalc"
         print(f"Using fantasycalc.com dynasty trade values: {len(ranking)} rookie QBs ranked.")
 
     assumptions = assign_rookie_assumptions(
         ranking, tier_averages, metric_cols, flat_baseline,
-        all_rookie_names=zero_history_names,
+        all_rookie_names=zero_history_names, market_source=market_source,
     )
     id_lookup = dict(zip(zero_history["Player Name"], zero_history["Player ID"], strict=True))
     team_lookup = dict(zip(zero_history["Player Name"], zero_history["Team"], strict=True))
@@ -244,6 +225,16 @@ def build(workbook_path: str) -> dict:
     print(f"Pulling {YEARS} play-by-play data...")
     pbp = fetch_pbp(YEARS)
     stats = compute_team_season_qb_stats(pbp)
+
+    # claude_code_spec_consolidated_fixes.md Part 1: compute_team_season_qb_stats()'s own
+    # Is Rookie Season is a "first season observed in the pulled window" proxy -- overwrite
+    # it with real per-season entry_year data (confirmed live this was contaminating the
+    # Rookie Baseline with real veterans: Mahomes, Allen, Jackson, Hurts, Lawrence all had a
+    # pulled-window season wrongly flagged True).
+    print(f"Pulling {YEARS} seasonal rosters for real Is Rookie Season data...")
+    rosters = fetch_seasonal_rosters(YEARS)
+    stats = attach_real_rookie_season(stats, rosters)
+
     roles = compute_qb_roles(stats)
 
     role_lookup = {

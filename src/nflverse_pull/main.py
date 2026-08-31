@@ -13,8 +13,9 @@ Two stages:
      / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
      CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
      Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring / Explosive
-     Play Matchup / the Explosive Play Matchup wiring / Turnover & Red-Zone Regression --
-     fully REBUILT from scratch each run (not a Section-1-only value refresh), because their
+     Play Matchup / the Explosive Play Matchup wiring / Turnover & Red-Zone Regression /
+     Team-Specific HFA / the Game Environment Upgrades Week 1 Matchups wiring -- fully
+     REBUILT from scratch each run (not a Section-1-only value refresh), because their
      row counts are inherently dynamic: which players currently qualify as a Starter/Backup,
      how many games have been played this season, etc. Skipped, non-fatally, on a workbook
      that doesn't have 'Advanced Efficiency Metrics' yet (run
@@ -74,6 +75,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_effective_qb_rating_wiring
     import build_explosive_play_matchup
     import build_explosive_play_matchup_wiring
+    import build_game_environment_wiring
     import build_kicking_index
     import build_lb_index
     import build_ol_pass_rush_wiring
@@ -88,6 +90,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_secondary_index
     import build_special_teams_index
     import build_special_teams_player_index
+    import build_team_specific_hfa
     import build_turnover_redzone_regression
     import build_wr_te_index
 
@@ -231,6 +234,22 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # formula from build_special_teams_player_index -- see this function's own N-ownership
     # comment above and that constant's own note on the tab itself.
     build_turnover_redzone_regression.build(workbook_path)
+
+    # claude_code_spec_game_environment_upgrades.md. build_team_specific_hfa has no upstream
+    # dependency beyond real schedule data (pull.compute_team_season_home_away_splits) -- it
+    # could run anywhere in this function, placed here for a sensible reading order with the
+    # rest of this session's work. build_game_environment_wiring requires it AND the current
+    # Availability Index (already built above, with its own Section 2b Consecutive Road
+    # Games column) -- it appends its own new terms to Week 1 Matchups' Z/AA (order relative
+    # to the other Z/AA-appending wiring scripts above doesn't matter, append_term_once is
+    # order-independent) and overwrites columns O (Rest Effect) and U (Weather Adj) in place
+    # -- safe since nothing else in the workbook reads O/U except Z/AA by cell address (see
+    # that script's own module docstring). NEITHER script touches Team Ratings or the N
+    # formula -- HFA and rest/travel/weather are inherently per-game adjustments, not static
+    # team-quality numbers, so N ownership stays with build_turnover_redzone_regression
+    # above.
+    build_team_specific_hfa.build(workbook_path)
+    build_game_environment_wiring.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

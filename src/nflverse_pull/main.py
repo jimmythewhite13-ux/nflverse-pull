@@ -14,10 +14,11 @@ Two stages:
      CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
      Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring / Explosive
      Play Matchup / the Explosive Play Matchup wiring / Turnover & Red-Zone Regression /
-     Team-Specific HFA / the Game Environment Upgrades Week 1 Matchups wiring -- fully
-     REBUILT from scratch each run (not a Section-1-only value refresh), because their
-     row counts are inherently dynamic: which players currently qualify as a Starter/Backup,
-     how many games have been played this season, etc. Skipped, non-fatally, on a workbook
+     Team-Specific HFA / the Game Environment Upgrades Week 1 Matchups wiring / Coaching
+     Index -- fully REBUILT from scratch each run (not a Section-1-only value refresh),
+     because their row counts are inherently dynamic: which players currently qualify as a
+     Starter/Backup, how many games have been played this season, etc. Skipped,
+     non-fatally, on a workbook
      that doesn't have 'Advanced Efficiency Metrics' yet (run
      scripts/build_efficiency_engine.py once first).
 
@@ -69,6 +70,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import add_manual_override_table
     import build_availability_index
     import build_cb_s_index
+    import build_coaching_index
     import build_defense_index
     import build_defensive_matchup_wiring
     import build_edge_idl_index
@@ -111,15 +113,15 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # build_edge_idl_index / build_lb_index / build_cb_s_index similarly write their own new
     # columns (Y/Z/AA) without touching N, for the same reason -- they run after build_
     # special_teams_index, so its N formula still wins until something later rewrites it.
-    # build_special_teams_player_index similarly wrote its own new column (AB) without
-    # touching N when it was the last Team-Ratings-wired script; build_turnover_redzone_
-    # regression -- now the LAST such script in this function -- is the one that currently
-    # owns the complete N formula (columns AC/AD, summing every term through Y/Z/AA/AB/AC/
-    # AD). If a future phase adds another Team-Ratings-wired tab,
-    # update ITS Net Power Rating formula to include every prior term too (or, if it runs
-    # before the N-rewriting scripts, just add its own new column and update whichever
-    # script currently owns N instead), and keep whichever script owns the complete N
-    # formula last in this function.
+    # build_special_teams_player_index and then build_turnover_redzone_regression each in
+    # turn wrote their own new column (AB, then AC/AD) without touching N further once a
+    # later script took over; build_coaching_index -- now the LAST Team-Ratings-wired
+    # script in this function -- is the one that currently owns the complete N formula
+    # (column AE, summing every term through Y/Z/AA/AB/AC/AD/AE). If a future phase adds
+    # another Team-Ratings-wired tab, update ITS Net Power Rating formula to include every
+    # prior term too (or, if it runs before the N-rewriting scripts, just add its own new
+    # column and update whichever script currently owns N instead), and keep whichever
+    # script owns the complete N formula last in this function.
     #
     # claude_code_spec_consolidated_fixes.md Part 2 generalized the Manual Roster Override
     # table from QB-Index-only to every tab that resolves a current-roster population --
@@ -229,9 +231,9 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
 
     # claude_code_spec_turnover_redzone_regression_engine.md. Requires Secondary Index
     # (already built above) -- references its real INT Rate directly. Writes its own new
-    # Team Ratings columns (AC/AD) and is now the LAST Team-Ratings-wired script in this
-    # function, so it takes over ownership of the "most complete" Net Power Rating (N)
-    # formula from build_special_teams_player_index -- see this function's own N-ownership
+    # Team Ratings columns (AC/AD) -- it took over N ownership from build_special_teams_
+    # player_index when this was the last Team-Ratings-wired script; build_coaching_index,
+    # added later below, is the current final owner -- see this function's own N-ownership
     # comment above and that constant's own note on the tab itself.
     build_turnover_redzone_regression.build(workbook_path)
 
@@ -250,6 +252,14 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # above.
     build_team_specific_hfa.build(workbook_path)
     build_game_environment_wiring.build(workbook_path)
+
+    # claude_code_spec_coaching_index.md. No upstream dependency beyond real schedule/pbp
+    # data (coaching_stats.py) -- could run anywhere, placed here for a sensible reading
+    # order. Writes its own new Team Ratings column (AE) and is now the LAST Team-Ratings-
+    # wired script in this function, so it takes over ownership of the "most complete" Net
+    # Power Rating (N) formula from build_turnover_redzone_regression -- see this function's
+    # own N-ownership comment above and that constant's own note on the tab itself.
+    build_coaching_index.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

@@ -38,6 +38,23 @@ STADIUM_COORDS: dict[str, tuple[float, float]] = {
     "TEN": (36.1665, -86.7713), "WAS": (38.9078, -76.8645),
 }
 
+# Real, public, standard-time UTC offsets for each team's home market --
+# claude_code_spec_game_environment_upgrades.md Part C's travel-DIRECTION signal (not just
+# distance). Deliberately STANDARD time (ignores each market's own DST calendar) -- a coarse
+# but real, defensible, honestly-documented approximation for "which way did this team
+# cross time zones," not a precise per-game local-time calculation. Arizona does not observe
+# DST at all (always UTC-7); grouped with Denver's own standard-time offset here for
+# simplicity even though Denver itself shifts to UTC-6 (Mountain Daylight Time) for most of
+# the NFL season -- a real, documented simplification, not an oversight.
+STADIUM_TIMEZONE_UTC_OFFSET: dict[str, int] = {
+    "BUF": -5, "MIA": -5, "NE": -5, "NYJ": -5, "NYG": -5, "BAL": -5, "CIN": -5, "CLE": -5,
+    "PIT": -5, "IND": -5, "JAX": -5, "DET": -5, "ATL": -5, "CAR": -5, "TB": -5, "WAS": -5,
+    "PHI": -5,
+    "CHI": -6, "GB": -6, "MIN": -6, "HOU": -6, "DAL": -6, "NO": -6, "KC": -6, "TEN": -6,
+    "DEN": -7, "ARI": -7,
+    "LV": -8, "LAC": -8, "LA": -8, "SF": -8, "SEA": -8,
+}
+
 
 def fetch_injuries(years: list[int]) -> pd.DataFrame:
     """Network call -- pulls weekly injury reports from nflverse for the given seasons."""
@@ -96,12 +113,17 @@ def _haversine_miles(coord_a: tuple[float, float], coord_b: tuple[float, float])
 def compute_team_game_log(sched: pd.DataFrame) -> pd.DataFrame:
     """
     Pure function, no network. One row per team per game they played (both home and away
-    games), with the game date and miles traveled for that specific game (0 for a home
-    game; real airline distance from the team's home stadium to the opponent's for an away
-    game). This is the raw material 'Availability Index' Section 2's rolling COUNTIFS/
-    SUMIFS-over-a-date-window formulas operate on -- it deliberately does NOT pre-compute
-    "games in trailing N days" itself, since that's only meaningful as of a specific date
-    (a given week's matchup), which belongs in the workbook, not baked into this pull.
+    games), with the game date, miles traveled for that specific game (0 for a home game;
+    real airline distance from the team's home stadium to the opponent's for an away game),
+    and a real Is Away flag (directly from whether this row came from the home_team or
+    away_team side of that real schedule row -- claude_code_spec_game_environment_upgrades.
+    md Part C's own real "no new data source needed" instruction). This is the raw material
+    'Availability Index' Section 2's rolling COUNTIFS/SUMIFS-over-a-date-window formulas
+    operate on -- it deliberately does NOT pre-compute "games in trailing N days" itself,
+    since that's only meaningful as of a specific date (a given week's matchup), which
+    belongs in the workbook, not baked into this pull. Same reasoning now applies to
+    consecutive-road-games tracking (Part C) -- Is Away is the real raw material; the
+    rolling "how many of the last N games were away" count is a workbook-side formula.
     """
     reg = sched[sched["game_type"] == "REG"].copy()
     reg["gameday"] = pd.to_datetime(reg["gameday"])
@@ -110,10 +132,12 @@ def compute_team_game_log(sched: pd.DataFrame) -> pd.DataFrame:
         columns={"home_team": "team_abbr", "away_team": "opponent_abbr"}
     )
     home["miles_traveled"] = 0.0
+    home["is_away"] = False
 
     away = reg[["season", "week", "gameday", "away_team", "home_team"]].rename(
         columns={"away_team": "team_abbr", "home_team": "opponent_abbr"}
     )
+    away["is_away"] = True
     away["miles_traveled"] = [
         _haversine_miles(STADIUM_COORDS[t], STADIUM_COORDS[o])
         if t in STADIUM_COORDS and o in STADIUM_COORDS
@@ -130,7 +154,9 @@ def compute_team_game_log(sched: pd.DataFrame) -> pd.DataFrame:
 
     out = out.rename(columns={
         "season": "Season", "week": "Week", "gameday": "Game Date",
-        "miles_traveled": "Miles Traveled (This Game)",
+        "miles_traveled": "Miles Traveled (This Game)", "is_away": "Is Away",
     })
     out = out.sort_values(["Team", "Game Date"]).reset_index(drop=True)
-    return out[["Team", "Season", "Week", "Game Date", "Miles Traveled (This Game)"]]
+    return out[[
+        "Team", "Season", "Week", "Game Date", "Miles Traveled (This Game)", "Is Away",
+    ]]

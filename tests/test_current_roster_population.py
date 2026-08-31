@@ -1,6 +1,11 @@
 import pandas as pd
 
-from nflverse_pull.current_roster import merge_with_historical_fallback, resolve_scored_population
+from nflverse_pull.current_roster import (
+    merge_with_historical_fallback,
+    resolve_priority_slots_with_backup,
+    resolve_scored_population,
+    resolve_slot_with_backup,
+)
 
 CURRENT_STARTER_COLS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]
 
@@ -317,3 +322,68 @@ def test_merge_fallback_fills_only_the_missing_role_not_the_present_one():
     assert out.loc["Starter", "Player Name"] == "New.Starter"  # NOT overwritten
     assert out.loc["Backup", "Player Name"] == "Old.Backup"  # filled via fallback
     assert "historical-proxy fallback" in out.loc["Backup", "Source"]
+
+
+def test_resolve_slot_with_backup_pairs_real_starter_and_backup():
+    current = _current_starters([
+        ["Buffalo Bills", "LDE", "A.Starter", "P1", 1, "depth_charts"],
+        ["Buffalo Bills", "LDE", "B.Backup", "P2", 2, "depth_charts"],
+        # Miami has only a real starter, no real 2nd LDE listed at all.
+        ["Miami Dolphins", "LDE", "C.Solo", "P3", 1, "depth_charts"],
+    ])
+    out = resolve_slot_with_backup(current, _overrides([]), "LDE", "EDGE1").set_index("Team")
+
+    buf = out.loc["Buffalo Bills"]
+    assert buf["Slot"] == "EDGE1"
+    assert buf["Starter Name"] == "A.Starter"
+    assert buf["Starter Player ID"] == "P1"
+    assert buf["Backup Name"] == "B.Backup"
+    assert buf["Backup Player ID"] == "P2"
+
+    mia = out.loc["Miami Dolphins"]
+    assert mia["Starter Name"] == "C.Solo"
+    assert pd.isna(mia["Backup Name"])
+    assert pd.isna(mia["Backup Player ID"])
+
+
+def test_resolve_priority_slots_with_backup_picks_by_priority_and_pairs_own_backup():
+    # Buffalo runs a real LDT + RDT (both real starters -- fills IDL1 from LDT, IDL2 from
+    # RDT per priority order); each slot's Backup is THAT SAME real position's own rank-2,
+    # not a generic "next-best interior lineman".
+    current = _current_starters([
+        ["Buffalo Bills", "LDT", "LDT.Starter", "P1", 1, "depth_charts"],
+        ["Buffalo Bills", "LDT", "LDT.Backup", "P2", 2, "depth_charts"],
+        ["Buffalo Bills", "RDT", "RDT.Starter", "P3", 1, "depth_charts"],
+        # No real RDT backup listed -- Buffalo's IDL2 slot should show a blank Backup.
+        # Miami runs only a real NT (no LDT/RDT at all) -- fills IDL1 from NT via priority.
+        ["Miami Dolphins", "NT", "NT.Starter", "P4", 1, "depth_charts"],
+        ["Miami Dolphins", "NT", "NT.Backup", "P5", 2, "depth_charts"],
+    ])
+    out = resolve_priority_slots_with_backup(
+        current, _overrides([]), ["LDT", "RDT", "NT"], "IDL", max_slots=2
+    )
+
+    buf = out[out["Team"] == "Buffalo Bills"].set_index("Slot")
+    assert buf.loc["IDL1", "Starter Name"] == "LDT.Starter"
+    assert buf.loc["IDL1", "Backup Name"] == "LDT.Backup"
+    assert buf.loc["IDL2", "Starter Name"] == "RDT.Starter"
+    assert pd.isna(buf.loc["IDL2", "Backup Name"])
+
+    mia = out[out["Team"] == "Miami Dolphins"].set_index("Slot")
+    assert list(mia.index) == ["IDL1"]  # only 1 real interior-line starter -- no IDL2 row
+    assert mia.loc["IDL1", "Starter Name"] == "NT.Starter"
+    assert mia.loc["IDL1", "Backup Name"] == "NT.Backup"
+
+
+def test_resolve_priority_slots_with_backup_caps_at_max_slots():
+    # A team with real starters at all 3 priority positions still only fills up to
+    # max_slots=2 -- the 3rd (NT here, lowest priority) is not scored.
+    current = _current_starters([
+        ["Buffalo Bills", "LDT", "A", "P1", 1, "depth_charts"],
+        ["Buffalo Bills", "RDT", "B", "P2", 1, "depth_charts"],
+        ["Buffalo Bills", "NT", "C", "P3", 1, "depth_charts"],
+    ])
+    out = resolve_priority_slots_with_backup(
+        current, _overrides([]), ["LDT", "RDT", "NT"], "IDL", max_slots=2
+    )
+    assert list(out["Slot"]) == ["IDL1", "IDL2"]

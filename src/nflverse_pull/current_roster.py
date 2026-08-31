@@ -259,6 +259,114 @@ def resolve_scored_population(
     return out
 
 
+def resolve_slot_with_backup(
+    current_starters: pd.DataFrame, overrides: pd.DataFrame, real_position: str, slot: str,
+) -> pd.DataFrame:
+    """
+    Pure function, no network. claude_code_spec_defensive_player_index.md: for a FIXED
+    (non-scheme-variable) real depth-chart position that maps 1:1 onto a scored slot (e.g.
+    real position "LDE" -> scored slot "EDGE1"), resolves BOTH the real Starter (depth-order
+    1) and real Backup (depth-order 2, if the team has one -- see POSITION_ROLE_LABELS'
+    own per-position real coverage notes) for every team with either. Confirmed with the
+    user before building this: Replacement Value is computed per REAL SLOT (EDGE1 vs its
+    own backup, EDGE2 vs its own, etc.), not one team-wide Starter/Backup pair -- these
+    positions already have 2+ real "starters" apiece, unlike QB/RB.
+
+    Output: Team | Slot | Starter Name | Starter Player ID | Starter Source | Backup Name |
+    Backup Player ID | Backup Source (Starter/Backup columns are None, not zero, for a team
+    missing either -- a true zero-history rookie still gets a real Player ID here, same as
+    resolve_scored_population's own "current data always wins" guarantee).
+    """
+    pop = resolve_scored_population(current_starters, overrides, real_position)
+    role_labels = POSITION_ROLE_LABELS[real_position]
+    starter_role, backup_role = role_labels.get(1), role_labels.get(2)
+
+    starters = pop[pop["Role"] == starter_role].set_index("Team") if starter_role else None
+    backups = pop[pop["Role"] == backup_role].set_index("Team") if backup_role else None
+
+    teams = set(starters.index) if starters is not None else set()
+    if backups is not None:
+        teams |= set(backups.index)
+
+    out_rows = []
+    for team in sorted(teams):
+        s = starters.loc[team] if starters is not None and team in starters.index else None
+        b = backups.loc[team] if backups is not None and team in backups.index else None
+        out_rows.append({
+            "Team": team, "Slot": slot,
+            "Starter Name": s["Player Name"] if s is not None else None,
+            "Starter Player ID": s["Player ID"] if s is not None else None,
+            "Backup Name": b["Player Name"] if b is not None else None,
+            "Backup Player ID": b["Player ID"] if b is not None else None,
+        })
+    return pd.DataFrame(
+        out_rows,
+        columns=["Team", "Slot", "Starter Name", "Starter Player ID", "Backup Name",
+                 "Backup Player ID"],
+    )
+
+
+def resolve_priority_slots_with_backup(
+    current_starters: pd.DataFrame,
+    overrides: pd.DataFrame,
+    priority_positions: list[str],
+    slot_prefix: str,
+    max_slots: int,
+) -> pd.DataFrame:
+    """
+    Pure function, no network. claude_code_spec_defensive_player_index.md: for a SCHEME-
+    VARIABLE position group (e.g. IDL: real LDT/RDT/NT, up to 2 real slots/team, priority
+    order LDT > RDT > NT -- the SAME priority Front Seven Index's own _pick_idl_lb already
+    established for its Section 6 display, reused here rather than re-derived so both tabs
+    agree on which real position counts as "IDL1" for a given team), picks whichever real
+    positions each team's depth chart actually populates (checked by real Starter presence
+    only, matching _pick_idl_lb's own convention) and resolves the REAL Starter+Backup pair
+    for each, mapped onto fixed `{slot_prefix}1`/`{slot_prefix}2`/... slots by priority
+    order -- a slot's Backup is that SAME real depth-chart position's own rank-2 player
+    (IDL1 mapped from a team's real LDT gets LDT's own backup, not a generic "next-best
+    interior lineman").
+
+    Output: same shape as resolve_slot_with_backup, Team | Slot | Starter Name/Player ID |
+    Backup Name/Player ID -- one row per (team, filled slot), NOT one row per unfilled slot
+    (a team that only ever runs 1 real IDL simply has no "IDL2" row at all, same as every
+    other scheme-variable-coverage case in this project).
+    """
+    per_position = {pos: resolve_scored_population(current_starters, overrides, pos)
+                     for pos in priority_positions}
+    all_teams = sorted({
+        t for pop in per_position.values() for t in pop["Team"].unique()
+    })
+
+    out_rows = []
+    for team in all_teams:
+        starter_role_by_pos = {
+            pos: POSITION_ROLE_LABELS[pos].get(1) for pos in priority_positions
+        }
+        found = [
+            pos for pos in priority_positions
+            if starter_role_by_pos[pos] is not None
+            and len(per_position[pos][
+                (per_position[pos]["Team"] == team)
+                & (per_position[pos]["Role"] == starter_role_by_pos[pos])
+            ])
+        ][:max_slots]
+
+        for slot_num, pos in enumerate(found, start=1):
+            slot_pop = resolve_slot_with_backup(current_starters, overrides, pos, "")
+            row = slot_pop[slot_pop["Team"] == team]
+            if len(row) == 0:
+                continue
+            r = row.iloc[0].to_dict()
+            r["Slot"] = f"{slot_prefix}{slot_num}"
+            out_rows.append(r)
+
+    return pd.DataFrame(
+        out_rows,
+        columns=["Team", "Slot", "Starter Name", "Starter Player ID", "Backup Name",
+                 "Backup Player ID"],
+    )
+
+
 def fetch_seasonal_rosters(years: list[int]) -> pd.DataFrame:
     """Network call -- nflverse's seasonal roster data, carrying real years_exp/entry_year."""
     import nfl_data_py as nfl  # imported lazily so tests don't require it installed

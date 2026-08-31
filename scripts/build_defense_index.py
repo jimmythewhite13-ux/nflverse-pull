@@ -71,6 +71,9 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from current_season_blend import add_current_season_blend  # noqa: E402
 
 from nflverse_pull.current_roster import (  # noqa: E402
     compute_current_starters,
@@ -458,19 +461,34 @@ def build(workbook_path: str) -> dict:
     sec4_header_row = sec4_title_row + 1
     avg_row, std_row = sec4_header_row + 1, sec4_header_row + 2
 
+    # claude_code_spec_current_season_blending.md: blend Section 3's Projected Baseline
+    # with a real Current-Season value, using the EXACT SAME Blend Weight mechanism Team
+    # Ratings' own PPG blend already uses (Model Assumptions C12/C13/C14). Games Played is
+    # cross-referenced from Team Ratings' own col H, not re-entered here.
+    proj_baseline_col = {
+        m["key"]: get_column_letter(metric_block_start_col[m["key"]] + 6) for m in METRICS
+    }
+    blended_cols = add_current_season_blend(
+        ws, team_col="A", sec3_first_row=sec3_first_row, sec3_last_row=sec3_last_row,
+        start_col=sec3_last_col + 1,
+        metrics=[
+            {"key": m["key"], "label": m["label"], "pb_col": proj_baseline_col[m["key"]]}
+            for m in METRICS
+        ],
+    )
+
     _section_title(
-        ws, sec4_title_row, 4, "Section 4 \u2014 League Average & Std. Dev. of the 3-Yr Baselines"
+        ws, sec4_title_row, 4,
+        "Section 4 \u2014 League Average & Std. Dev. of the 3-Yr, Current-Season-Blended "
+        "Baselines (see the new columns appended to the right of Section 3)",
     )
     _header_row(ws, sec4_header_row, ["Stat", *[m["label"] for m in METRICS]], height=18)
 
     ws.cell(row=avg_row, column=1, value="League Average").font = FORMULA_FONT
     ws.cell(row=std_row, column=1, value="League Std. Dev.").font = FORMULA_FONT
 
-    proj_baseline_col = {
-        m["key"]: get_column_letter(metric_block_start_col[m["key"]] + 6) for m in METRICS
-    }
     for j, m in enumerate(METRICS):
-        pcol = proj_baseline_col[m["key"]]
+        pcol = blended_cols[m["key"]]
         pb_range = f"{pcol}${sec3_first_row}:{pcol}${sec3_last_row}"
         a = ws.cell(row=avg_row, column=2 + j, value=f"=AVERAGE({pb_range})")
         s = ws.cell(row=std_row, column=2 + j, value=f"=STDEVP({pb_range})")
@@ -512,7 +530,7 @@ def build(workbook_path: str) -> dict:
 
         z_cols = []
         for j, m in enumerate(METRICS):
-            pcol = proj_baseline_col[m["key"]]
+            pcol = blended_cols[m["key"]]
             formula = f"=({pcol}{sec3_row}-{avg_cell_ref[m['key']]})/{std_cell_ref[m['key']]}"
             col = 2 + j
             cell = ws.cell(row=row, column=col, value=formula)

@@ -13,11 +13,12 @@ Two stages:
      / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
      CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
      Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring / Explosive
-     Play Matchup / the Explosive Play Matchup wiring -- fully REBUILT from scratch each run
-     (not a Section-1-only value refresh), because their row counts are inherently dynamic:
-     which players currently qualify as a Starter/Backup, how many games have been played
-     this season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced
-     Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
+     Play Matchup / the Explosive Play Matchup wiring / Turnover & Red-Zone Regression --
+     fully REBUILT from scratch each run (not a Section-1-only value refresh), because their
+     row counts are inherently dynamic: which players currently qualify as a Starter/Backup,
+     how many games have been played this season, etc. Skipped, non-fatally, on a workbook
+     that doesn't have 'Advanced Efficiency Metrics' yet (run
+     scripts/build_efficiency_engine.py once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -87,6 +88,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_secondary_index
     import build_special_teams_index
     import build_special_teams_player_index
+    import build_turnover_redzone_regression
     import build_wr_te_index
 
     # NOTE: these scripts each pull their own fixed [2023, 2024, 2025] internally -- the
@@ -106,9 +108,11 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # build_edge_idl_index / build_lb_index / build_cb_s_index similarly write their own new
     # columns (Y/Z/AA) without touching N, for the same reason -- they run after build_
     # special_teams_index, so its N formula still wins until something later rewrites it.
-    # build_special_teams_player_index -- the LAST Team-Ratings-wired script in this
-    # function -- is the one that currently owns the complete N formula (column AB, summing
-    # every term through Y/Z/AA/AB). If a future phase adds another Team-Ratings-wired tab,
+    # build_special_teams_player_index similarly wrote its own new column (AB) without
+    # touching N when it was the last Team-Ratings-wired script; build_turnover_redzone_
+    # regression -- now the LAST such script in this function -- is the one that currently
+    # owns the complete N formula (columns AC/AD, summing every term through Y/Z/AA/AB/AC/
+    # AD). If a future phase adds another Team-Ratings-wired tab,
     # update ITS Net Power Rating formula to include every prior term too (or, if it runs
     # before the N-rewriting scripts, just add its own new column and update whichever
     # script currently owns N instead), and keep whichever script owns the complete N
@@ -219,6 +223,14 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # Neither script touches Team Ratings or the N formula.
     build_explosive_play_matchup.build(workbook_path)
     build_explosive_play_matchup_wiring.build(workbook_path)
+
+    # claude_code_spec_turnover_redzone_regression_engine.md. Requires Secondary Index
+    # (already built above) -- references its real INT Rate directly. Writes its own new
+    # Team Ratings columns (AC/AD) and is now the LAST Team-Ratings-wired script in this
+    # function, so it takes over ownership of the "most complete" Net Power Rating (N)
+    # formula from build_special_teams_player_index -- see this function's own N-ownership
+    # comment above and that constant's own note on the tab itself.
+    build_turnover_redzone_regression.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

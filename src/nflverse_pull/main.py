@@ -11,11 +11,12 @@ Two stages:
      Index / Kicking Index / Offensive Line Index / Front Seven Index / Secondary Index /
      Special Teams Index / Availability Index / Pass Defense Matchup / Run Defense Matchup
      / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
-     CB-S Index / Special Teams Player Index -- fully REBUILT from scratch each run (not a
-     Section-1-only value refresh), because their row counts are inherently dynamic: which
-     players currently qualify as a Starter/Backup, how many games have been played this
-     season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced Efficiency
-     Metrics' yet (run scripts/build_efficiency_engine.py once first).
+     CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
+     Rush Matchup wiring -- fully REBUILT from scratch each run (not a Section-1-only value
+     refresh), because their row counts are inherently dynamic: which players currently
+     qualify as a Starter/Backup, how many games have been played this season, etc. Skipped,
+     non-fatally, on a workbook that doesn't have 'Advanced Efficiency Metrics' yet (run
+     scripts/build_efficiency_engine.py once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -70,8 +71,10 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_edge_idl_index
     import build_kicking_index
     import build_lb_index
+    import build_ol_pass_rush_wiring
     import build_oline_index
     import build_pass_defense_matchup
+    import build_pass_rush_generation_index
     import build_qb_index
     import build_rb_index
     import build_replacement_value
@@ -173,6 +176,21 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     add_manual_override_table.build(
         workbook_path, "Special Teams Player Index", ["P1", "P2", "KR1", "KR2", "PR1", "PR2"]
     )
+
+    # claude_code_spec_ol_vs_pass_rush_matchup.md. Extends the Defensive Matchup Engine
+    # pattern to Offensive Line vs. opposing pass rush. build_pass_rush_generation_index
+    # requires 'Pass Defense Matchup' to already exist (it's a 100% live-referenced
+    # composite of that tab's own Sack Rate/Pressure Proxy/Blitz Rate columns -- no new data
+    # pull of its own). build_ol_pass_rush_wiring requires both 'Offensive Line Index' and
+    # 'Pass Rush Generation Index', and appends to the SAME Week 1 Matchups Z/AA formulas
+    # build_defensive_matchup_wiring already appended to above -- append_term_once makes the
+    # order between the two wiring scripts functionally irrelevant, but this one places its
+    # own closing note a few rows below the Defensive Matchup Engine's, so it runs after for
+    # a sensible reading order. Neither of these two scripts touches Team Ratings or the N
+    # formula -- same reasoning as Pass/Run Defense Matchup: a matchup-specific differential,
+    # not a static team-quality number.
+    build_pass_rush_generation_index.build(workbook_path)
+    build_ol_pass_rush_wiring.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

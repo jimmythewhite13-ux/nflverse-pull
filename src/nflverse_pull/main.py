@@ -7,20 +7,27 @@ Two stages:
   1. update_workbook.py -- writes fresh PPG and efficiency data into YoY Baseline Engine /
      Advanced Efficiency Metrics Section 1 (fixed 96/32-row shape, values refreshed in
      place).
-  2. QB Index / Replacement Value / Manual Override table / RB Value Index / WR-TE Value
-     Index / Kicking Index / Offensive Line Index / Front Seven Index / Secondary Index /
-     Special Teams Index / Availability Index / Pass Defense Matchup / Run Defense Matchup
-     / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
-     CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
-     Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring / Explosive
-     Play Matchup / the Explosive Play Matchup wiring / Turnover & Red-Zone Regression /
-     Team-Specific HFA / the Game Environment Upgrades Week 1 Matchups wiring / Coaching
-     Index -- fully REBUILT from scratch each run (not a Section-1-only value refresh),
-     because their row counts are inherently dynamic: which players currently qualify as a
-     Starter/Backup, how many games have been played this season, etc. Skipped,
-     non-fatally, on a workbook
-     that doesn't have 'Advanced Efficiency Metrics' yet (run
-     scripts/build_efficiency_engine.py once first).
+  2. QB Index / Season Matchups / Replacement Value / Manual Override table / RB Value
+     Index / WR-TE Value Index / Kicking Index / Offensive Line Index / Front Seven Index /
+     Secondary Index / Special Teams Index / Availability Index / Pass Defense Matchup /
+     Run Defense Matchup / the Defensive Matchup Engine's Season Matchups wiring / EDGE-IDL
+     Index / LB Index / CB-S Index / Special Teams Player Index / Pass Rush Generation
+     Index / the OL vs. Pass Rush Matchup wiring / QB Environment Model / the Effective QB
+     Rating wiring / Explosive Play Matchup / the Explosive Play Matchup wiring / Turnover &
+     Red-Zone Regression / Team-Specific HFA / the Game Environment Upgrades Season
+     Matchups wiring / Coaching Index -- fully REBUILT from scratch each run (not a
+     Section-1-only value refresh), because their row counts are inherently dynamic: which
+     players currently qualify as a Starter/Backup, how many games have been played this
+     season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced Efficiency
+     Metrics' yet (run scripts/build_efficiency_engine.py once first).
+
+     claude_code_spec_full_season_matchups.md replaced the old hardcoded 16-game "Week 1
+     Matchups" tab with "Season Matchups" (one long-format row per real game across all 18
+     real weeks, 272 games) -- retired entirely per the user's own confirmed choice, not
+     kept as a filtered view. Every wiring script that used to target "Week 1 Matchups" now
+     targets "Season Matchups" instead (same MATCHUPS_SHEET constant convention, just
+     repointed) -- see build_season_matchups.py's own module docstring for why it must run
+     immediately after build_qb_index and before build_replacement_value specifically.
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -89,6 +96,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_rb_index
     import build_replacement_value
     import build_run_defense_matchup
+    import build_season_matchups
     import build_secondary_index
     import build_special_teams_index
     import build_special_teams_player_index
@@ -130,6 +138,15 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # reasoning as QB's original placement: the tab's own build script deletes/recreates the
     # whole sheet, wiping any override table along with it, so it must be rebuilt every run.
     build_qb_index.build(workbook_path)
+
+    # claude_code_spec_full_season_matchups.md. Replaces the old hardcoded 16-game "Week 1
+    # Matchups" tab with ONE long-format table (272 real games, all 18 real weeks) -- must
+    # run here, right after QB Index and before build_replacement_value, because that's the
+    # FIRST of this project's existing Week 1 Matchups wiring scripts to touch this tab
+    # (writes AQ-AT + appends into Z/AA) and needs it to already exist. Confirmed with the
+    # user: "Week 1 Matchups" is retired entirely, not kept as a filtered view -- this
+    # script deletes it once "Season Matchups" exists.
+    build_season_matchups.build(workbook_path)
     build_replacement_value.build(workbook_path)
     add_manual_override_table.build(workbook_path, "QB Index", ["Starter", "Backup"])
     build_rb_index.build(workbook_path)

@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_replacement_value import append_term_once  # noqa: E402
 
 EXPLOSIVE_SHEET = "Explosive Play Matchup"
-MATCHUPS_SHEET = "Week 1 Matchups"
+MATCHUPS_SHEET = "Season Matchups"
 
 # Explosive Play Matchup's own real Section 5 layout (verified against that tab's own build
 # script): 32 teams, rows 150-181. Team=A, Explosive Pass Rate (Off) Z=B, Explosive Run Rate

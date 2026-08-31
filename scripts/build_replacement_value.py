@@ -35,7 +35,7 @@ TEAM_ORDER = [
 
 QB_INDEX_SHEET = "QB Index"
 TEAM_RATINGS_SHEET = "Team Ratings"
-MATCHUPS_SHEET = "Week 1 Matchups"
+MATCHUPS_SHEET = "Season Matchups"
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
 TITLE_FILL = PatternFill("solid", fgColor="FFD9E1F2")

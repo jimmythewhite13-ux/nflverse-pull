@@ -61,7 +61,7 @@ from build_replacement_value import append_term_once  # noqa: E402
 
 OL_INDEX_SHEET = "Offensive Line Index"
 PASS_RUSH_GEN_SHEET = "Pass Rush Generation Index"
-MATCHUPS_SHEET = "Week 1 Matchups"
+MATCHUPS_SHEET = "Season Matchups"
 
 # Real Section 5 ranges on each source tab, verified against the live workbook before writing
 # this (each tab's own build script already fixes these; documented here since this script

@@ -62,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 QB_ENV_SHEET = "QB Environment Model"
 RB_INDEX_SHEET = "RB Value Index"
-MATCHUPS_SHEET = "Week 1 Matchups"
+MATCHUPS_SHEET = "Season Matchups"
 
 # QB Environment Model's own real Section 1 (Team=C, Season=D, Dropbacks=M -- added
 # specifically for this wiring script, since QB Index's own Section 1 doesn't expose real

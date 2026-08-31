@@ -80,7 +80,7 @@ from build_replacement_value import append_term_once  # noqa: E402
 
 HFA_SHEET = "Team-Specific HFA"
 AVAIL_SHEET = "Availability Index"
-MATCHUPS_SHEET = "Week 1 Matchups"
+MATCHUPS_SHEET = "Season Matchups"
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
 TITLE_FILL = PatternFill("solid", fgColor="FFD9E1F2")

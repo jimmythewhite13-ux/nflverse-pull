@@ -85,21 +85,31 @@ POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "C": {1: "C"},
     "RG": {1: "RG"},
     "RT": {1: "RT"},
-    "LDE": {1: "LDE"},
-    "RDE": {1: "RDE"},
-    "LDT": {1: "LDT"},
-    "RDT": {1: "RDT"},
-    "NT": {1: "NT"},
-    "MLB": {1: "MLB"},
-    "WLB": {1: "WLB"},
-    "SLB": {1: "SLB"},
-    "LILB": {1: "LILB"},
-    "RILB": {1: "RILB"},
-    "LCB": {1: "LCB"},
-    "RCB": {1: "RCB"},
-    "NB": {1: "NB"},
-    "FS": {1: "FS"},
-    "SS": {1: "SS"},
+    # UPDATED per claude_code_spec_defensive_player_index.md: a real 2nd depth-chart slot
+    # (verified live against the real 2026 pull before adding this -- see that spec's own
+    # per-position coverage counts, e.g. 32/32 real teams list a real 2nd LDE/RDE/WLB/SLB/
+    # LCB/RCB/NB/FS, 31/32 for SS, fewer for the scheme-variable interior-line/off-ball-LB
+    # slots that don't exist on every real defense to begin with) feeds Defensive Player
+    # Index's per-SLOT Replacement Value (EDGE1 vs its own real backup, IDL1 vs its own,
+    # etc. -- NOT a single team-wide Starter/Backup pair, since these positions already
+    # have 2 real "starters" apiece unlike QB/RB). A team without a real 2nd-string player
+    # at a given slot simply has no row for it, same "missing means blank" handling used
+    # everywhere else in this project.
+    "LDE": {1: "LDE", 2: "LDE2"},
+    "RDE": {1: "RDE", 2: "RDE2"},
+    "LDT": {1: "LDT", 2: "LDT2"},
+    "RDT": {1: "RDT", 2: "RDT2"},
+    "NT": {1: "NT", 2: "NT2"},
+    "MLB": {1: "MLB", 2: "MLB2"},
+    "WLB": {1: "WLB", 2: "WLB2"},
+    "SLB": {1: "SLB", 2: "SLB2"},
+    "LILB": {1: "LILB", 2: "LILB2"},
+    "RILB": {1: "RILB", 2: "RILB2"},
+    "LCB": {1: "LCB", 2: "LCB2"},
+    "RCB": {1: "RCB", 2: "RCB2"},
+    "NB": {1: "NB", 2: "NB2"},
+    "FS": {1: "FS", 2: "FS2"},
+    "SS": {1: "SS", 2: "SS2"},
     # UPDATED per claude_code_spec_defensive_player_index.md's special-teams expansion:
     # a 2nd real depth-chart slot exists for all three (verified live against the real
     # 2026 depth-chart pull before adding this -- KR/PR commonly list several real

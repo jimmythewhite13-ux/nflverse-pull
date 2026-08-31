@@ -100,9 +100,17 @@ POSITION_ROLE_LABELS: dict[str, dict[int, str]] = {
     "NB": {1: "NB"},
     "FS": {1: "FS"},
     "SS": {1: "SS"},
-    "P": {1: "P1"},
-    "KR": {1: "KR1"},
-    "PR": {1: "PR1"},
+    # UPDATED per claude_code_spec_defensive_player_index.md's special-teams expansion:
+    # a 2nd real depth-chart slot exists for all three (verified live against the real
+    # 2026 depth-chart pull before adding this -- KR/PR commonly list several real
+    # candidates per team since return duty is often shared/committee'd, P less so: only
+    # 14 of 32 real teams currently roster a real 2nd punter at all). A team without a
+    # real 2nd-string player at any of these positions simply has no row for that slot --
+    # same "missing means blank, not zero" handling every other Backup/2nd-slot position
+    # in this project already uses (e.g. a team with no real 2nd interior lineman).
+    "P": {1: "P1", 2: "P2"},
+    "KR": {1: "KR1", 2: "KR2"},
+    "PR": {1: "PR1", 2: "PR2"},
 }
 
 OUTPUT_COLUMNS = ["Team", "Position", "Player Name", "Player ID", "Depth Order", "Source"]

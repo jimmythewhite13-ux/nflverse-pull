@@ -10,11 +10,12 @@ Two stages:
   2. QB Index / Replacement Value / Manual Override table / RB Value Index / WR-TE Value
      Index / Kicking Index / Offensive Line Index / Front Seven Index / Secondary Index /
      Special Teams Index / Availability Index / Pass Defense Matchup / Run Defense Matchup
-     / the Defensive Matchup Engine's Week 1 Matchups wiring -- fully REBUILT from scratch
-     each run (not a Section-1-only value refresh), because their row counts are inherently
-     dynamic: which players currently qualify as a Starter/Backup, how many games have been
-     played this season, etc. Skipped, non-fatally, on a workbook that doesn't have
-     'Advanced Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
+     / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
+     CB-S Index / Special Teams Player Index -- fully REBUILT from scratch each run (not a
+     Section-1-only value refresh), because their row counts are inherently dynamic: which
+     players currently qualify as a Starter/Backup, how many games have been played this
+     season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced Efficiency
+     Metrics' yet (run scripts/build_efficiency_engine.py once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -63,9 +64,12 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
         sys.path.insert(0, str(SCRIPTS_DIR))
     import add_manual_override_table
     import build_availability_index
+    import build_cb_s_index
     import build_defense_index
     import build_defensive_matchup_wiring
+    import build_edge_idl_index
     import build_kicking_index
+    import build_lb_index
     import build_oline_index
     import build_pass_defense_matchup
     import build_qb_index
@@ -74,6 +78,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_run_defense_matchup
     import build_secondary_index
     import build_special_teams_index
+    import build_special_teams_player_index
     import build_wr_te_index
 
     # NOTE: these scripts each pull their own fixed [2023, 2024, 2025] internally -- the
@@ -84,20 +89,22 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # Override) must be rebuilt immediately after it, every run. build_rb_index,
     # build_kicking_index, build_oline_index, build_defense_index, build_secondary_index,
     # and build_special_teams_index EACH rewrite Team Ratings' Net Power Rating (column N)
-    # formula wholesale with whatever set of adjustment terms that script knows about --
-    # build_special_teams_index's version is the most complete (includes the QB/RB/Kicking/
-    # OL/Front-7/Secondary/Special-Teams/WR-TE-Corps-Quality terms), so it must run LAST,
-    # after build_secondary_index, or an older script's formula would win and silently drop
-    # whichever column it doesn't know about (written, but never summed into N). build_wr_
-    # te_index (claude_code_spec_consolidated_fixes.md Part 3) now DOES touch 'Team Ratings'
-    # -- it writes its own new column X (WR/TE Corps Quality Adjustment) -- but deliberately
-    # does NOT touch column N itself, since it runs before every N-rewriting script above and
-    # N gets rewritten wholesale by each of them anyway; only build_special_teams_index's own
-    # N formula was updated to sum column X. If a future phase adds another Team-Ratings-
-    # wired tab, update ITS Net Power Rating formula to include every prior term too (or, if
-    # it runs before the N-rewriting scripts like build_wr_te_index does, just add its new
-    # column and update build_special_teams_index's own formula instead), and keep whichever
-    # script owns the complete N formula last here.
+    # formula wholesale with whatever set of adjustment terms that script knows about.
+    # build_wr_te_index (claude_code_spec_consolidated_fixes.md Part 3) touches 'Team
+    # Ratings' too -- it writes its own new column X (WR/TE Corps Quality Adjustment) -- but
+    # deliberately does NOT touch column N itself, since it runs before every N-rewriting
+    # script above and N gets rewritten wholesale by each of them anyway; only build_special_
+    # teams_index's own N formula (at that point in the sequence) summed through column X.
+    # build_edge_idl_index / build_lb_index / build_cb_s_index similarly write their own new
+    # columns (Y/Z/AA) without touching N, for the same reason -- they run after build_
+    # special_teams_index, so its N formula still wins until something later rewrites it.
+    # build_special_teams_player_index -- the LAST Team-Ratings-wired script in this
+    # function -- is the one that currently owns the complete N formula (column AB, summing
+    # every term through Y/Z/AA/AB). If a future phase adds another Team-Ratings-wired tab,
+    # update ITS Net Power Rating formula to include every prior term too (or, if it runs
+    # before the N-rewriting scripts, just add its own new column and update whichever
+    # script currently owns N instead), and keep whichever script owns the complete N
+    # formula last in this function.
     #
     # claude_code_spec_consolidated_fixes.md Part 2 generalized the Manual Roster Override
     # table from QB-Index-only to every tab that resolves a current-roster population --
@@ -137,6 +144,35 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     build_pass_defense_matchup.build(workbook_path)
     build_run_defense_matchup.build(workbook_path)
     build_defensive_matchup_wiring.build(workbook_path)
+
+    # claude_code_spec_defensive_player_index.md Part B/C, folding in P/KR/PR per the
+    # user's own "fold in P/KR/PR now too" decision. Each of these four writes its own new
+    # Team Ratings column (Y/Z/AA/AB) WITHOUT touching N, same convention build_wr_te_index
+    # already established -- EXCEPT build_special_teams_player_index, which runs LAST of
+    # the four and therefore owns the updated "most complete" N formula (taking over from
+    # build_special_teams_index above), per this project's established convention: whichever
+    # Team-Ratings-wired script runs last owns N. Order among these four doesn't otherwise
+    # matter -- they're independent of each other and of the Defensive Matchup Engine tabs
+    # above (own current-roster populations, own Team Ratings columns).
+    build_edge_idl_index.build(workbook_path)
+    add_manual_override_table.build(
+        workbook_path, "EDGE-IDL Index",
+        ["LDE", "LDE2", "RDE", "RDE2", "LDT", "LDT2", "RDT", "RDT2", "NT", "NT2"],
+    )
+    build_lb_index.build(workbook_path)
+    add_manual_override_table.build(
+        workbook_path, "LB Index",
+        ["WLB", "WLB2", "SLB", "SLB2", "MLB", "MLB2", "LILB", "LILB2"],
+    )
+    build_cb_s_index.build(workbook_path)
+    add_manual_override_table.build(
+        workbook_path, "CB-S Index",
+        ["LCB", "LCB2", "RCB", "RCB2", "NB", "NB2", "FS", "FS2", "SS", "SS2"],
+    )
+    build_special_teams_player_index.build(workbook_path)
+    add_manual_override_table.build(
+        workbook_path, "Special Teams Player Index", ["P1", "P2", "KR1", "KR2", "PR1", "PR2"]
+    )
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

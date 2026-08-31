@@ -12,11 +12,12 @@ Two stages:
      Special Teams Index / Availability Index / Pass Defense Matchup / Run Defense Matchup
      / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
      CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
-     Rush Matchup wiring -- fully REBUILT from scratch each run (not a Section-1-only value
-     refresh), because their row counts are inherently dynamic: which players currently
-     qualify as a Starter/Backup, how many games have been played this season, etc. Skipped,
-     non-fatally, on a workbook that doesn't have 'Advanced Efficiency Metrics' yet (run
-     scripts/build_efficiency_engine.py once first).
+     Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring -- fully
+     REBUILT from scratch each run (not a Section-1-only value refresh), because their row
+     counts are inherently dynamic: which players currently qualify as a Starter/Backup, how
+     many games have been played this season, etc. Skipped, non-fatally, on a workbook that
+     doesn't have 'Advanced Efficiency Metrics' yet (run scripts/build_efficiency_engine.py
+     once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -69,12 +70,14 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_defense_index
     import build_defensive_matchup_wiring
     import build_edge_idl_index
+    import build_effective_qb_rating_wiring
     import build_kicking_index
     import build_lb_index
     import build_ol_pass_rush_wiring
     import build_oline_index
     import build_pass_defense_matchup
     import build_pass_rush_generation_index
+    import build_qb_environment_model
     import build_qb_index
     import build_rb_index
     import build_replacement_value
@@ -191,6 +194,18 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # not a static team-quality number.
     build_pass_rush_generation_index.build(workbook_path)
     build_ol_pass_rush_wiring.build(workbook_path)
+
+    # claude_code_spec_qb_environment_model.md. build_qb_environment_model requires QB
+    # Index and Availability Index (both already built above); build_effective_qb_rating_
+    # wiring requires it, plus Offensive Line Index and the OL vs. Pass Rush Matchup wiring
+    # (both already built above too) -- it OVERWRITES Week 1 Matchups' AU/AX cells (Home/
+    # Away Starter QB Index Score) to reference the new Effective QB Rating instead, so it
+    # must run AFTER build_defensive_matchup_wiring (which originally wrote AU/AX) -- see
+    # that script's own module docstring for why this overwrite is safe (AU/AX are read
+    # only by the Pass Matchup Differential, AW/AZ, which picks up the new value with no
+    # changes of its own). Neither script touches Team Ratings or the N formula.
+    build_qb_environment_model.build(workbook_path)
+    build_effective_qb_rating_wiring.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

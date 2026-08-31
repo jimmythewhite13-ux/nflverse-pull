@@ -15,6 +15,16 @@ edge cases) while `yards_gained` is never null and agrees with rushing_yards eve
 IS populated -- used yards_gained for YPC to avoid silently dropping those plays, and for
 consistency with efficiency.py's team-level NY/A, which uses the same column.
 
+Red-Zone Carry Share (claude_code_spec_route_redzone_usage.md): real red-zone carries
+(yardline_100<=20, this module's own existing "Carries" definition: play_type=="run" AND
+rusher_player_id notna, for internal consistency) / team's total real red-zone carries that
+season. A real "how often is this player actually involved near the goal line" signal, not an
+efficiency measure -- see build_rb_index.py's own notes on why this is added as a visible,
+zero-weighted column rather than folded into the existing composite. No separate qualifying
+threshold: a qualifying (>= MIN_QUALIFYING_CARRIES) RB-season with zero real red-zone carries
+gets a real 0.0, not a blank -- the denominator (team red-zone carry volume) is never zero for
+a real team-season.
+
 Rush Yards Over Expected per Attempt (RYOE/Att): real, OFFICIAL NFL Next Gen Stats data
 (nfl_data_py.import_ngs_data("rushing", years)), not derived from pbp -- NGS's own tracking-
 data model of expected yards per carry based on defender positioning at handoff, isolating
@@ -163,6 +173,35 @@ def compute_carry_share(population: pd.DataFrame, season_stats: pd.DataFrame) ->
         out_rows,
         columns=["Team", "Carry Share (Y-1)", "Starter Carries (Y-1)", "Backup Carries (Y-1)"],
     )
+
+
+def compute_player_season_red_zone_carry_share(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real Red-Zone Carry Share -- see this module's own docstring.
+
+    Columns: Player ID | Season | Team | Red-Zone Carry Share
+    """
+    reg = pbp[(pbp["season_type"] == "REG") & (pbp["yardline_100"] <= 20)]
+    runs = reg[(reg["play_type"] == "run") & (reg["rusher_player_id"].notna())]
+
+    group_cols = ["rusher_player_id", "season", "posteam"]
+    rz_carries = runs.groupby(group_cols).size().rename("RZ Carries")
+    team_rz_carries = runs.groupby(["season", "posteam"]).size().rename("Team RZ Carries")
+
+    out = rz_carries.reset_index().merge(
+        team_rz_carries.reset_index(), on=["season", "posteam"], how="left"
+    )
+    out = out.rename(columns={
+        "rusher_player_id": "Player ID", "season": "Season", "posteam": "team_abbr",
+    })
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+    out["Red-Zone Carry Share"] = out["RZ Carries"] / out["Team RZ Carries"]
+
+    return out[["Player ID", "Season", "Team", "Red-Zone Carry Share"]]
 
 
 def fetch_ngs_rushing(years: list[int]) -> pd.DataFrame:

@@ -5,6 +5,7 @@ from nflverse_pull.rb_stats import (
     MIN_QUALIFYING_CARRIES,
     SEASON_STATS_COLUMNS,
     compute_carry_share,
+    compute_player_season_red_zone_carry_share,
     compute_player_season_ryoe,
     compute_team_season_rb_stats,
 )
@@ -205,3 +206,41 @@ def test_ryoe_skips_rows_with_no_real_player_id():
     out = compute_player_season_ryoe(pd.DataFrame(rows))
     assert len(out) == 1
     assert out.iloc[0]["Player ID"] == "P1"
+
+
+def _rz_run_row(posteam, season, yardline_100, rusher_id):
+    return {
+        "season_type": "REG", "play_type": "run", "posteam": posteam, "season": season,
+        "yardline_100": yardline_100, "rusher_player_id": rusher_id,
+    }
+
+
+def test_red_zone_carry_share_computes_share_of_team_rz_carries():
+    # BUF: 3 real red-zone carries total -- P1 gets 2, P2 gets 1.
+    rows = [
+        _rz_run_row("BUF", 2025, 15, "P1"),
+        _rz_run_row("BUF", 2025, 10, "P1"),
+        _rz_run_row("BUF", 2025, 5, "P2"),
+        _rz_run_row("BUF", 2025, 45, "P1"),  # outside red zone -- excluded
+    ]
+    out = compute_player_season_red_zone_carry_share(pd.DataFrame(rows)).set_index("Player ID")
+    assert out.loc["P1", "Red-Zone Carry Share"] == pytest.approx(2 / 3)
+    assert out.loc["P2", "Red-Zone Carry Share"] == pytest.approx(1 / 3)
+    assert out.loc["P1", "Team"] == "Buffalo Bills"
+
+
+def test_red_zone_carry_share_excludes_non_run_plays_and_missing_rusher_id():
+    rows = [
+        _rz_run_row("BUF", 2025, 10, "P1"),
+        {**_rz_run_row("BUF", 2025, 8, "P1"), "play_type": "pass"},
+        _rz_run_row("BUF", 2025, 12, None),
+    ]
+    out = compute_player_season_red_zone_carry_share(pd.DataFrame(rows)).set_index("Player ID")
+    assert list(out.index) == ["P1"]
+    assert out.loc["P1", "Red-Zone Carry Share"] == pytest.approx(1.0)
+
+
+def test_red_zone_carry_share_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_rz_run_row("ZZZ", 2025, 10, "P1")])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_red_zone_carry_share(df)

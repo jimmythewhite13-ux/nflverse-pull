@@ -39,6 +39,34 @@ qualifying-volume threshold (2023-2025 minimum real targets: 45) than this modul
 MIN_QUALIFYING_TARGETS=40, so some real, qualifying receiver-seasons here won't have real NGS
 values -- handled as a genuinely missing data point (left blank), not zero-filled or assumed,
 same pattern as RYOE/Att and everywhere else in this project.
+
+Pass-Play Snap Participation % / Red-Zone Target Share (claude_code_spec_route_redzone_usage.md
+-- "Route Participation" in that spec's own title, renamed here per an explicit finding
+reported to and confirmed by the user): a real "how often is this player actually involved"
+signal, distinct from the efficiency metrics above (which measure value GIVEN opportunity, not
+how much opportunity exists).
+
+HONESTY NOTE on Pass-Play Snap Participation %: the spec asked for true "Route Participation"
+(routes run / team pass plays). Verified live before building this: no free source has that.
+nflverse's real `route` pbp column (FTN-charted, confirmed genuinely free) is the route TYPE
+of the TARGETED receiver only on plays where a target happened -- it says nothing about the
+other ~10 offensive players on that same play, let alone plays where this player wasn't
+targeted at all. NFL Next Gen Stats' receiving data (already used above for Avg Separation/
+YAC Over Expectation) has no route-count field either. What IS real and free: nflverse's own
+participation data (`offense_players`, verified live: 0 nulls on 2025's real pass plays)
+lists every player literally on the field for a given play. Pass-Play Snap Participation % =
+(real pass plays this player was on the field for) / (team's total real pass plays that
+season) -- a genuine, defensible proxy for "how much this player is used in the passing game,"
+but NOT confirmed route-running (a player on the field to pass-block, or on a called run-pass-
+option, still counts here). Same "real proxy, honestly distinguished from the ideal" treatment
+as this project's "Pressure Proxy" (= QB Hit Rate) on Pass Defense Matchup.
+
+Red-Zone Target Share = real red-zone targets (yardline_100<=20, using this module's own
+existing "target" definition: pass_attempt==1 AND sack==0 AND receiver_player_id notna, for
+internal consistency) / team's total real red-zone targets that season. Unlike Avg Separation/
+YAC Over Expectation, there's no separate qualifying threshold here -- a qualifying (>=
+MIN_QUALIFYING_TARGETS) receiver-season with zero real red-zone targets gets a real 0.0, not a
+blank; the denominator (team red-zone target volume) is never zero for a real team-season.
 """
 from __future__ import annotations
 
@@ -160,6 +188,75 @@ def compute_player_season_ngs_receiving(ngs_receiving: pd.DataFrame) -> pd.DataF
         "YAC Over Expectation": season["avg_yac"] - season["avg_expected_yac"],
     })
     return out.reset_index(drop=True)
+
+
+def compute_player_season_pass_play_participation(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real "Pass-Play Snap Participation %" -- see this module's own
+    docstring for the honesty note on why this is a real, defensible PROXY for route
+    participation, not a confirmed route-run count (no free source has that).
+
+    Columns: Player ID | Season | Team | Pass-Play Snap Participation %
+    """
+    reg = pbp[(pbp["season_type"] == "REG") & (pbp["play_type"] == "pass")]
+    reg = reg[reg["offense_players"].notna()]
+
+    team_totals = reg.groupby(["season", "posteam"]).size().rename("Team Pass Plays")
+
+    exploded = reg[["season", "posteam", "offense_players"]].copy()
+    exploded["Player ID"] = exploded["offense_players"].str.split(";")
+    exploded = exploded.explode("Player ID")
+    on_field = (
+        exploded.groupby(["Player ID", "season", "posteam"]).size()
+        .rename("Pass Plays On Field")
+    )
+
+    out = on_field.reset_index().merge(
+        team_totals.reset_index(), on=["season", "posteam"], how="left"
+    )
+    out = out.rename(columns={"season": "Season", "posteam": "team_abbr"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+    out["Pass-Play Snap Participation %"] = out["Pass Plays On Field"] / out["Team Pass Plays"]
+
+    return out[["Player ID", "Season", "Team", "Pass-Play Snap Participation %"]]
+
+
+def compute_player_season_red_zone_target_share(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real Red-Zone Target Share (yardline_100<=20; same "target"
+    definition this module's own compute_team_season_receiving_stats already uses --
+    pass_attempt==1 AND sack==0 AND receiver_player_id notna -- for internal consistency).
+
+    Columns: Player ID | Season | Team | Red-Zone Target Share
+    """
+    reg = pbp[(pbp["season_type"] == "REG") & (pbp["yardline_100"] <= 20)]
+    targets = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0)]
+    targets = targets[targets["receiver_player_id"].notna()]
+
+    group_cols = ["receiver_player_id", "season", "posteam"]
+    rz_targets = targets.groupby(group_cols).size().rename("RZ Targets")
+    team_rz_targets = (
+        targets.groupby(["season", "posteam"]).size().rename("Team RZ Targets")
+    )
+
+    out = rz_targets.reset_index().merge(
+        team_rz_targets.reset_index(), on=["season", "posteam"], how="left"
+    )
+    out = out.rename(columns={
+        "receiver_player_id": "Player ID", "season": "Season", "posteam": "team_abbr",
+    })
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+    out["Red-Zone Target Share"] = out["RZ Targets"] / out["Team RZ Targets"]
+
+    return out[["Player ID", "Season", "Team", "Red-Zone Target Share"]]
 
 
 def main(

@@ -71,8 +71,14 @@ MATCHUPS_SHEET = "Week 1 Matchups"
 # script reads them, not writes them). Score column + Team|Role (or Team) key column.
 QB_SEC5_RANGE = (245, 308)
 QB_SCORE_COL, QB_KEY_COL = "I", "K"
+# RB Index's own Score/Team|Role-key columns shift with METRICS' length (each metric adds a
+# 7-column Section 3 block and a 1-column Section 5 Z block) -- these were J/L when RB Index
+# had 4 METRICS; claude_code_spec_route_redzone_usage.md added Red-Zone Carry Share as a 5th
+# (weight defaults to 0, but it's still a real METRICS entry, so it still shifts the layout),
+# moving them to K/M. Row range is unaffected -- adding a metric only changes COLUMN width,
+# not row counts (verified against build_rb_index.py's own row math).
 RB_SEC5_RANGE = (335, 398)
-RB_SCORE_COL, RB_KEY_COL = "J", "L"
+RB_SCORE_COL, RB_KEY_COL = "K", "M"
 PASS_DEF_SEC5_RANGE = (150, 181)
 PASS_DEF_SCORE_COL, PASS_DEF_TEAM_COL = "H", "A"
 RUN_DEF_SEC5_RANGE = (150, 181)

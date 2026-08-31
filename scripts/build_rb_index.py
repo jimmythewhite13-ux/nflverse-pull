@@ -51,6 +51,17 @@ not the historical-attempts-only proxy QB Index still uses as of this writing):
   trade-value crosswalk), the 2026 depth-chart snapshot this tab is built from was pulled
   BEFORE final 53-man roster cuts -- see the tab's own closing note.
 
+UPDATED (claude_code_spec_route_redzone_usage.md): added Red-Zone Carry Share as METRICS'
+5th entry -- a real USAGE signal (rb_stats.compute_player_season_red_zone_carry_share),
+flowing through the full Section 1/3/4/5 pipeline like every other metric, but with its
+Section 5 composite weight defaulting to 0 (Model Assumptions C124) so the existing RB Index
+Score is completely unchanged until someone deliberately activates it. Adding this 5th metric
+shifted Section 6's Score/Team|Role-key columns by one letter (J/L -> K/M) -- fixed a second,
+proactively-caught instance of the same "hardcoded column" bug class RYOE/Att's own key-column
+fix found (score_range was still hardcoded to "$J$"; now computed dynamically like key_col
+already was), and updated build_defensive_matchup_wiring.py's own RB_SCORE_COL/RB_KEY_COL
+constants to match.
+
 Usage:
     uv run python scripts/build_rb_index.py "C:\\path\\to\\NFL_Prediction_Model.xlsx"
 """
@@ -80,6 +91,7 @@ from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.rb_stats import (  # noqa: E402
     compute_carry_share,
     compute_historical_rb_roles,
+    compute_player_season_red_zone_carry_share,
     compute_player_season_ryoe,
     compute_team_season_rb_stats,
     fetch_ngs_rushing,
@@ -111,6 +123,15 @@ METRICS = [
     # rb_stats.py's own module docstring and this script's _ysub for the full reasoning.
     {"key": "ryoe", "col": "RYOE/Att", "label": "RYOE/Att\n(NGS)", "fmt": "0.00",
      "partial_coverage": True},
+    # claude_code_spec_route_redzone_usage.md. A real USAGE signal (how often this player is
+    # involved near the goal line), not an efficiency measure like the four above -- weight
+    # DEFAULTS TO 0 (Model Assumptions C124) per the spec's own explicit instruction: usage
+    # share and efficiency are different kinds of signal that shouldn't be silently mixed
+    # into the existing score. Still flows through the full Section 1->3->4->5 pipeline
+    # (real 3-yr decay-weighted history, real Z-score) exactly like every other metric --
+    # only its WEIGHT is zero, so activating it later is a single-cell change, not a rebuild.
+    {"key": "rz_share", "col": "Red-Zone Carry Share", "label": "Red-Zone\nCarry Share",
+     "fmt": "0.00"},
 ]
 
 # Same canonical 32-team row order as build_replacement_value.py (copied, not imported --
@@ -200,6 +221,14 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          "yards per carry is arguably the single most precise real signal available "
          "here, isolating the runner's own skill from blocking/scheme more directly "
          "than EPA (which conflates play-calling and blocking context) can."),
+        (124, "Red-Zone Carry Share Weight (RB Index, pts per SD)", 0.0,
+         "claude_code_spec_route_redzone_usage.md -- DEFAULTS TO 0 (informational only). "
+         "Red-Zone Carry Share is a real USAGE signal, not an efficiency measure like "
+         "every other weight above -- the spec's own explicit instruction is to keep "
+         "usage share out of the existing weighted composite by default rather than "
+         "silently change what a RB Index Score means. The metric itself is fully "
+         "computed and flows through Section 1/3/4/5 like any other; set this above 0 "
+         "to activate it deliberately."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -250,6 +279,14 @@ def _pull_data(overrides: pd.DataFrame) -> dict:
     n_missing_ryoe = season_stats["RYOE/Att"].isna().sum()
     print(f"{len(season_stats) - n_missing_ryoe} of {len(season_stats)} RB-seasons have a "
           f"real RYOE/Att value ({n_missing_ryoe} below NGS's own qualifying threshold).")
+
+    print("Computing Red-Zone Carry Share (claude_code_spec_route_redzone_usage.md)...")
+    rz_share = compute_player_season_red_zone_carry_share(pbp)
+    season_stats = season_stats.merge(rz_share, on=["Player ID", "Season", "Team"], how="left")
+    # Unlike RYOE/Att (a genuinely separate NGS pull with its own qualifying threshold), a
+    # qualifying RB-season with zero real red-zone carries is a REAL 0.0, not a missing data
+    # point -- the merge only fails to find a row when the player truly had none.
+    season_stats["Red-Zone Carry Share"] = season_stats["Red-Zone Carry Share"].fillna(0.0)
 
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster RB population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
@@ -352,7 +389,7 @@ def build(workbook_path: str) -> dict:
     ws.column_dimensions["A"].width = 18.0
     ws.column_dimensions["C"].width = 20.0
 
-    ws.merge_cells("A1:K1")
+    ws.merge_cells("A1:L1")
     t = ws.cell(row=1, column=1, value=(
         "RB Value Index -- Multi-Year Decay-Weighted RUSHING Rating (Rushing EPA/Play, "
         "Rushing Success Rate, YPC from nflverse pbp; RYOE/Att from real, official NFL "
@@ -366,17 +403,21 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(season_stats) - 1
     _section_title(
-        ws, 3, 11,
+        ws, 3, 12,
         "Section 1 \u2014 Raw 3-Year Data per RB-Season (from nflverse pbp; Role here is "
         "HISTORICAL attempts-ranking per past season -- labeling only, NOT used to pick "
         "who is scored in Section 3/5/6, see Section 3's population note). RYOE/Att (K) "
         "is real NFL Next Gen Stats data with its OWN, higher qualifying threshold -- "
-        "blank means genuinely no real NGS value for that player-season, not zero.",
+        "blank means genuinely no real NGS value for that player-season, not zero. "
+        "Red-Zone Carry Share (L, claude_code_spec_route_redzone_usage.md) is a real "
+        "USAGE signal -- see this tab's closing note for why its composite weight "
+        "defaults to 0.",
     )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "Carries", "Rushing EPA/Play",
-         "Rushing Success Rate", "YPC", "Is Rookie Season", "Role", "RYOE/Att\n(NGS)"],
+         "Rushing Success Rate", "YPC", "Is Rookie Season", "Role", "RYOE/Att\n(NGS)",
+         "Red-Zone\nCarry Share"],
     )
     for i, r in enumerate(season_stats.to_dict("records")):
         row = sec1_first_row + i
@@ -385,20 +426,21 @@ def build(workbook_path: str) -> dict:
             r["Player Name"], r["Player ID"], r["Team"], int(r["Season"]), int(r["Carries"]),
             float(r["Rushing EPA/Play"]), float(r["Rushing Success Rate"]), float(r["YPC"]),
             bool(r["Is Rookie Season"]), r["Role"], ryoe_v,
+            float(r["Red-Zone Carry Share"]),
         ]
         for col, v in enumerate(values, start=1):
             cell = ws.cell(row=row, column=col, value=v)
             cell.font = INPUT_FONT
             if col == 6:
                 cell.number_format = "0.000"
-            elif col in (7, 8, 11):
+            elif col in (7, 8, 11, 12):
                 cell.number_format = "0.00"
 
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
     rookie_range = f"$I${sec1_first_row}:$I${sec1_last_row}"
     role_range = f"$J${sec1_first_row}:$J${sec1_last_row}"
-    sec1_col_of = {"epa": "F", "success": "G", "ypc": "H", "ryoe": "K"}
+    sec1_col_of = {"epa": "F", "success": "G", "ypc": "H", "ryoe": "K", "rz_share": "L"}
     metric_ranges = {
         m["key"]: (
             f"${sec1_col_of[m['key']]}${sec1_first_row}:${sec1_col_of[m['key']]}${sec1_last_row}"
@@ -683,7 +725,10 @@ def build(workbook_path: str) -> dict:
     std_cell_ref = {
         m["key"]: f"${get_column_letter(2 + j)}${std_row}" for j, m in enumerate(METRICS)
     }
-    weight_cells = {"epa": "$C$44", "success": "$C$45", "ypc": "$C$46", "ryoe": "$C$82"}
+    weight_cells = {
+        "epa": "$C$44", "success": "$C$45", "ypc": "$C$46", "ryoe": "$C$82",
+        "rz_share": "$C$124",
+    }
 
     for i in range(n_rb):
         sec3_row = sec3_first_row + i
@@ -751,7 +796,15 @@ def build(workbook_path: str) -> dict:
     # key string on every build since RYOE/Att shipped. Now computed as wz_col+3, matching
     # every other tab's own dynamic (not hardcoded) key-column convention.
     key_col = get_column_letter(wz_col + 3)
-    score_range = f"$J${sec5_first_row}:$J${sec5_last_row}"
+    # score_range had the SAME class of bug, caught here proactively before it repeated:
+    # hardcoded to "$J$", which was only correct for the CURRENT METRICS count (4 -> wz_col=9
+    # -> score=wz_col+1=10=J). claude_code_spec_route_redzone_usage.md's Red-Zone Carry
+    # Share is METRICS' 5th entry, shifting score to column K -- a hardcoded "$J$" here would
+    # have silently pointed Section 6's Starter/Backup score lookups (and therefore
+    # Replacement Value) at the Weighted Z-Score Sum column instead of the real Score column.
+    # Computed dynamically now, matching key_col's own fix above.
+    score_col = get_column_letter(wz_col + 1)
+    score_range = f"${score_col}${sec5_first_row}:${score_col}${sec5_last_row}"
     key_range = f"${key_col}${sec5_first_row}:${key_col}${sec5_last_row}"
     name_range = f"$A${sec5_first_row}:$A${sec5_last_row}"
 
@@ -840,7 +893,13 @@ def build(workbook_path: str) -> dict:
         "current-roster population (Section 3/5/6) is built from was pulled BEFORE "
         "final 53-man roster cuts -- same caveat as the rookie ADP/trade-value "
         "crosswalk in Section 2B, per the user's explicit decision to proceed anyway "
-        "with this noted rather than wait."
+        "with this noted rather than wait. Red-Zone Carry Share (Section 1 col L, "
+        "claude_code_spec_route_redzone_usage.md) is a real USAGE signal (how often "
+        "this player is involved near the goal line), not efficiency -- it flows "
+        "through the full Section 1->3->4->5 pipeline like every other metric, but its "
+        "composite weight (Model Assumptions C124) DEFAULTS TO 0 so it stays "
+        "informational-only rather than silently changing what the RB Index Score "
+        "means; set C124 above 0 to activate it deliberately."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")

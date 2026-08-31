@@ -5,6 +5,8 @@ from nflverse_pull.receiving_stats import (
     MIN_QUALIFYING_TARGETS,
     SEASON_STATS_COLUMNS,
     compute_player_season_ngs_receiving,
+    compute_player_season_pass_play_participation,
+    compute_player_season_red_zone_target_share,
     compute_team_season_receiving_stats,
 )
 
@@ -146,3 +148,77 @@ def test_ngs_receiving_skips_rows_with_no_real_player_id():
     out = compute_player_season_ngs_receiving(pd.DataFrame(rows))
     assert len(out) == 1
     assert out.iloc[0]["Player ID"] == "P1"
+
+
+def _pass_play(posteam, season, offense_players):
+    return {
+        "season_type": "REG", "play_type": "pass", "posteam": posteam, "season": season,
+        "offense_players": offense_players,
+    }
+
+
+def test_pass_play_participation_computes_share_of_team_pass_plays():
+    # BUF has 4 real pass plays in 2025. P1 is on the field for 3 of them, P2 for 1.
+    rows = [
+        _pass_play("BUF", 2025, "P1;P2;X3;X4"),
+        _pass_play("BUF", 2025, "P1;X2;X3;X4"),
+        _pass_play("BUF", 2025, "P1;X2;X3;X4"),
+        _pass_play("BUF", 2025, "X1;X2;X3;X4"),
+    ]
+    out = compute_player_season_pass_play_participation(pd.DataFrame(rows)).set_index("Player ID")
+    assert out.loc["P1", "Pass-Play Snap Participation %"] == pytest.approx(3 / 4)
+    assert out.loc["P2", "Pass-Play Snap Participation %"] == pytest.approx(1 / 4)
+    assert out.loc["P1", "Team"] == "Buffalo Bills"
+
+
+def test_pass_play_participation_ignores_non_pass_plays():
+    rows = [
+        _pass_play("BUF", 2025, "P1;X2;X3;X4"),
+        {**_pass_play("BUF", 2025, "P1;X2;X3;X4"), "play_type": "run"},
+    ]
+    out = compute_player_season_pass_play_participation(pd.DataFrame(rows)).set_index("Player ID")
+    assert out.loc["P1", "Pass-Play Snap Participation %"] == pytest.approx(1.0)
+
+
+def test_pass_play_participation_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_pass_play("ZZZ", 2025, "P1;X2;X3;X4")])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_pass_play_participation(df)
+
+
+def _rz_target_row(posteam, season, yardline_100, receiver_id, pass_attempt=1, sack=0):
+    return {
+        "season_type": "REG", "posteam": posteam, "season": season,
+        "yardline_100": yardline_100, "pass_attempt": pass_attempt, "sack": sack,
+        "receiver_player_id": receiver_id,
+    }
+
+
+def test_red_zone_target_share_computes_share_of_team_rz_targets():
+    # BUF: 3 real red-zone targets total -- P1 gets 2, P2 gets 1.
+    rows = [
+        _rz_target_row("BUF", 2025, 15, "P1"),
+        _rz_target_row("BUF", 2025, 10, "P1"),
+        _rz_target_row("BUF", 2025, 5, "P2"),
+        _rz_target_row("BUF", 2025, 45, "P1"),  # outside red zone -- excluded
+    ]
+    out = compute_player_season_red_zone_target_share(pd.DataFrame(rows)).set_index("Player ID")
+    assert out.loc["P1", "Red-Zone Target Share"] == pytest.approx(2 / 3)
+    assert out.loc["P2", "Red-Zone Target Share"] == pytest.approx(1 / 3)
+
+
+def test_red_zone_target_share_excludes_sacks_and_targetless_plays():
+    rows = [
+        _rz_target_row("BUF", 2025, 10, "P1"),
+        _rz_target_row("BUF", 2025, 8, "P1", sack=1),
+        _rz_target_row("BUF", 2025, 12, None),
+    ]
+    out = compute_player_season_red_zone_target_share(pd.DataFrame(rows)).set_index("Player ID")
+    assert list(out.index) == ["P1"]
+    assert out.loc["P1", "Red-Zone Target Share"] == pytest.approx(1.0)
+
+
+def test_red_zone_target_share_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_rz_target_row("ZZZ", 2025, 10, "P1")])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_red_zone_target_share(df)

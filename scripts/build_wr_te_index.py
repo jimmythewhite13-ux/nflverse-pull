@@ -28,6 +28,18 @@ Where this departs from QB/RB Index, and why:
   Section 1 entirely, and with 4 scored roles instead of 2 per team, a similar "who's a real
   starter historically" filter would need its own historical-role concept this phase
   deliberately doesn't build (a documented scope simplification, not an oversight).
+- UPDATED (claude_code_spec_route_redzone_usage.md): added Pass-Play Snap Participation %
+  and Red-Zone Target Share as METRICS' 6th/7th entries -- real USAGE signals
+  (receiving_stats.compute_player_season_pass_play_participation /
+  compute_player_season_red_zone_target_share), flowing through the full Section 1/3/4/5
+  pipeline like every other metric, but with their Section 5 composite weights defaulting to
+  0 (Model Assumptions C125/C126) so the existing WR/TE Index Score is completely unchanged
+  until someone deliberately activates them. Pass-Play Snap Participation % is an honest
+  PROXY for the spec's own "Route Participation" ask -- verified live before building this
+  that true route-run data isn't free anywhere, reported to and confirmed by the user (see
+  receiving_stats.py's own docstring). Unlike RB Index's own version of this addition, no
+  external script hardcodes this tab's Section 5 columns, and this tab's Section 6 already
+  computed its score/key columns dynamically from len(METRICS) -- no column-shift bug to fix.
 - Section 2B's historical tier-average pool (used for a zero-history rookie's fallback) is
   COMBINED across WR and TE rookies -- receiving_stats.py's stats pull carries no Position
   column (same as qb_stats.py / rb_stats.py, by design: position identity comes from
@@ -81,6 +93,8 @@ from nflverse_pull.current_roster import (  # noqa: E402
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.receiving_stats import (  # noqa: E402
     compute_player_season_ngs_receiving,
+    compute_player_season_pass_play_participation,
+    compute_player_season_red_zone_target_share,
     compute_team_season_receiving_stats,
     fetch_ngs_receiving,
 )
@@ -121,6 +135,19 @@ METRICS = [
      "partial_coverage": True},
     {"key": "yacoe", "col": "YAC Over Expectation", "label": "YAC Over\nExpectation (NGS)",
      "fmt": "0.00", "partial_coverage": True},
+    # claude_code_spec_route_redzone_usage.md. Two real USAGE signals (how often this player
+    # is actually involved), not efficiency like the five above -- BOTH default to weight 0
+    # (Model Assumptions C125/C126) per the spec's own explicit instruction: usage share and
+    # efficiency are different kinds of signal that shouldn't be silently mixed into the
+    # existing score. Both still flow through the full Section 1->3->4->5 pipeline exactly
+    # like every other metric -- only the WEIGHT is zero, so activating either later is a
+    # single-cell change, not a rebuild. "Pass-Play Snap Participation %" is a real,
+    # honestly-labeled PROXY for what the spec called "Route Participation" -- see
+    # receiving_stats.py's own docstring for why true route-run data isn't free anywhere.
+    {"key": "pass_play_participation", "col": "Pass-Play Snap Participation %",
+     "label": "Pass-Play Snap\nParticipation %", "fmt": "0.00"},
+    {"key": "rz_target_share", "col": "Red-Zone Target Share", "label": "Red-Zone\nTarget Share",
+     "fmt": "0.00"},
 ]
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
@@ -194,6 +221,16 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          "receivers. Weighted equal with Avg Separation: both are real, partial-"
          "coverage NGS skill-isolation signals distinct from the outcome-based "
          "metrics above."),
+        (125, "Pass-Play Snap Participation % Weight (WR/TE Index, pts per SD)", 0.0,
+         "claude_code_spec_route_redzone_usage.md -- DEFAULTS TO 0 (informational "
+         "only). A real usage signal (see receiving_stats.py's own docstring for why "
+         "this is a Pass-Play Snap Participation % proxy, not confirmed route-run "
+         "data), not efficiency -- the spec's own explicit instruction is to keep "
+         "usage share out of the existing weighted composite by default. Set above 0 "
+         "to activate deliberately."),
+        (126, "Red-Zone Target Share Weight (WR/TE Index, pts per SD)", 0.0,
+         "claude_code_spec_route_redzone_usage.md -- DEFAULTS TO 0 (informational "
+         "only), same reasoning as C125."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -231,6 +268,23 @@ def _pull_data(overrides: pd.DataFrame) -> dict:
     print(f"{len(season_stats) - n_missing_ngs} of {len(season_stats)} WR/TE-seasons have "
           f"real NGS Avg Separation / YAC Over Expectation values ({n_missing_ngs} below "
           "NGS's own qualifying threshold).")
+
+    print("Computing Pass-Play Snap Participation % / Red-Zone Target Share "
+          "(claude_code_spec_route_redzone_usage.md)...")
+    participation = compute_player_season_pass_play_participation(pbp)
+    season_stats = season_stats.merge(
+        participation, on=["Player ID", "Season", "Team"], how="left"
+    )
+    rz_share = compute_player_season_red_zone_target_share(pbp)
+    season_stats = season_stats.merge(rz_share, on=["Player ID", "Season", "Team"], how="left")
+    # Both are real 0.0s when the merge finds no row (a qualifying receiver-season truly had
+    # zero real red-zone targets, or -- practically impossible above MIN_QUALIFYING_TARGETS
+    # -- zero on-field pass plays), not a missing-data blank like the partial-coverage NGS
+    # metrics above.
+    season_stats["Pass-Play Snap Participation %"] = (
+        season_stats["Pass-Play Snap Participation %"].fillna(0.0)
+    )
+    season_stats["Red-Zone Target Share"] = season_stats["Red-Zone Target Share"].fillna(0.0)
 
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster WR/TE population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
@@ -359,7 +413,7 @@ def build(workbook_path: str) -> dict:
     ws.column_dimensions["A"].width = 18.0
     ws.column_dimensions["C"].width = 20.0
 
-    ws.merge_cells("A1:L1")
+    ws.merge_cells("A1:M1")
     t = ws.cell(row=1, column=1, value=(
         "WR/TE Value Index -- Multi-Year Decay-Weighted Receiving Rating (Receiving "
         "EPA/Target, Reception Success Rate, YPT, real NGS Avg Separation / YAC Over "
@@ -372,18 +426,22 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(season_stats) - 1
     _section_title(
-        ws, 3, 11,
+        ws, 3, 13,
         "Section 1 \u2014 Raw 3-Year Data per Receiver-Season (from nflverse pbp; no "
         "Position or historical Role column -- see this tab's closing note). Avg "
         "Separation / YAC Over Expectation (J/K) are real NFL Next Gen Stats data with "
         "their OWN, higher qualifying threshold than this tab's -- a blank cell means a "
-        "real, qualifying receiver-season with no real NGS value, not a zero.",
+        "real, qualifying receiver-season with no real NGS value, not a zero. Pass-Play "
+        "Snap Participation % / Red-Zone Target Share (L/M, "
+        "claude_code_spec_route_redzone_usage.md) are real USAGE signals -- see this "
+        "tab's closing note for why their composite weight defaults to 0.",
     )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "Targets", "Receiving EPA/Target",
          "Reception Success Rate", "YPT", "Is Rookie Season", "Avg Separation\n(NGS)",
-         "YAC Over\nExpectation (NGS)"],
+         "YAC Over\nExpectation (NGS)", "Pass-Play Snap\nParticipation %",
+         "Red-Zone\nTarget Share"],
     )
     for i, r in enumerate(season_stats.to_dict("records")):
         row = sec1_first_row + i
@@ -410,10 +468,22 @@ def build(workbook_path: str) -> dict:
         sep_cell.number_format = "0.00"
         yac_cell.number_format = "0.00"
 
+        pp_cell = ws.cell(
+            row=row, column=12, value=float(r["Pass-Play Snap Participation %"])
+        )
+        rz_cell = ws.cell(row=row, column=13, value=float(r["Red-Zone Target Share"]))
+        pp_cell.font = INPUT_FONT
+        rz_cell.font = INPUT_FONT
+        pp_cell.number_format = "0.00"
+        rz_cell.number_format = "0.00"
+
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
     rookie_range = f"$I${sec1_first_row}:$I${sec1_last_row}"
-    sec1_col_of = {"epa": "F", "success": "G", "ypt": "H", "sep": "J", "yacoe": "K"}
+    sec1_col_of = {
+        "epa": "F", "success": "G", "ypt": "H", "sep": "J", "yacoe": "K",
+        "pass_play_participation": "L", "rz_target_share": "M",
+    }
     metric_ranges = {
         m["key"]: (
             f"${sec1_col_of[m['key']]}${sec1_first_row}:${sec1_col_of[m['key']]}${sec1_last_row}"
@@ -679,6 +749,7 @@ def build(workbook_path: str) -> dict:
     weight_cells = {
         "epa": "$C$49", "success": "$C$50", "ypt": "$C$51",
         "sep": "$C$84", "yacoe": "$C$85",
+        "pass_play_participation": "$C$125", "rz_target_share": "$C$126",
     }
 
     for i in range(n_players):
@@ -831,7 +902,16 @@ def build(workbook_path: str) -> dict:
         "does not break the top-3 blend (LARGE ignores blank/text cells). The 2026 "
         "depth-chart snapshot this tab's population is built from was pulled BEFORE final "
         "53-man roster cuts -- same caveat as every other current-roster-driven tab in this "
-        "workbook."
+        "workbook. Pass-Play Snap Participation % / Red-Zone Target Share (Section 1 cols "
+        "L/M, claude_code_spec_route_redzone_usage.md) are real USAGE signals (how often "
+        "this player is actually involved), not efficiency -- both flow through the full "
+        "Section 1->3->4->5 pipeline like every other metric, but their composite weights "
+        "(Model Assumptions C125/C126) DEFAULT TO 0 so they stay informational-only rather "
+        "than silently changing what the WR/TE Index Score means. Pass-Play Snap "
+        "Participation % is an HONEST PROXY for the spec's own \"Route Participation\" "
+        "concept, not confirmed route-run data -- see receiving_stats.py's own docstring "
+        "for why true route-run data isn't free anywhere (verified live before building "
+        "this, reported to and confirmed by the user)."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")

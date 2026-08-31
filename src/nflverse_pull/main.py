@@ -12,12 +12,12 @@ Two stages:
      Special Teams Index / Availability Index / Pass Defense Matchup / Run Defense Matchup
      / the Defensive Matchup Engine's Week 1 Matchups wiring / EDGE-IDL Index / LB Index /
      CB-S Index / Special Teams Player Index / Pass Rush Generation Index / the OL vs. Pass
-     Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring -- fully
-     REBUILT from scratch each run (not a Section-1-only value refresh), because their row
-     counts are inherently dynamic: which players currently qualify as a Starter/Backup, how
-     many games have been played this season, etc. Skipped, non-fatally, on a workbook that
-     doesn't have 'Advanced Efficiency Metrics' yet (run scripts/build_efficiency_engine.py
-     once first).
+     Rush Matchup wiring / QB Environment Model / the Effective QB Rating wiring / Explosive
+     Play Matchup / the Explosive Play Matchup wiring -- fully REBUILT from scratch each run
+     (not a Section-1-only value refresh), because their row counts are inherently dynamic:
+     which players currently qualify as a Starter/Backup, how many games have been played
+     this season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced
+     Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
 
      Order matters here and is NOT arbitrary: build_qb_index.py deletes and recreates the
      whole 'QB Index' sheet, which wipes Section 6 (Replacement Value) and Section 7 (Manual
@@ -71,6 +71,8 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_defensive_matchup_wiring
     import build_edge_idl_index
     import build_effective_qb_rating_wiring
+    import build_explosive_play_matchup
+    import build_explosive_play_matchup_wiring
     import build_kicking_index
     import build_lb_index
     import build_ol_pass_rush_wiring
@@ -206,6 +208,17 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # changes of its own). Neither script touches Team Ratings or the N formula.
     build_qb_environment_model.build(workbook_path)
     build_effective_qb_rating_wiring.build(workbook_path)
+
+    # claude_code_spec_explosive_play_engine.md. build_explosive_play_matchup requires Pass
+    # Defense Matchup and Run Defense Matchup (both already built above) -- it references
+    # their own Section 5 Explosive Rate Allowed Z's directly. build_explosive_play_matchup_
+    # wiring requires it, and appends its own new terms to Week 1 Matchups' Z/AA (already
+    # carrying every prior adjustment at this point) -- order relative to the other Z/AA-
+    # appending wiring scripts above doesn't matter (append_term_once is order-independent),
+    # but this runs last among them for a sensible reading order on the tab's closing notes.
+    # Neither script touches Team Ratings or the N formula.
+    build_explosive_play_matchup.build(workbook_path)
+    build_explosive_play_matchup_wiring.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

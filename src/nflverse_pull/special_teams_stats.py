@@ -28,12 +28,39 @@ not attempted here.
 
 Return Average = real return_yards per real return, kickoff and punt returns tracked
 separately (a team's KR1 and PR1 are often different players).
+
+Extended for claude_code_spec_defensive_player_index.md's folded-in special-teams scope
+(the "Fold in P/KR/PR now too" decision): compute_player_season_punting_rates() and
+compute_player_season_return_rates() layer a real qualifying-sample threshold plus the real
+per-season rookie flag (current_roster.attach_real_rookie_season, used from the START --
+not retrofitted the way it had to be on four other tabs) onto the existing per-player
+functions above. No snap-rate conversion is needed here, unlike defense_stats.py's
+per-snap-rate layer -- Net Punt Average and KR/PR Average are already natural per-event
+averages (yards per punt, yards per return), not counting totals that need normalizing by
+opportunity; only the sample-size floor changes below the threshold.
+
+MIN_QUALIFYING_PUNTS / MIN_QUALIFYING_KR_RETURNS / MIN_QUALIFYING_PR_RETURNS were each
+picked from the real 2023-2025 season-total distribution for that specific event (verified
+live before choosing them): punts per punter-season median 56 (20 comfortably clears "a
+handful of mop-up punts" while still including every real full-time punter); kickoff
+returns per returner-season median just 2 in the modern low-volume kickoff era (most
+kickoffs are now touchbacks) -- 5 is deliberately low relative to punts/PR precisely because
+the real opportunity volume itself has collapsed league-wide, not because the bar is looser;
+punt returns per returner-season median 8, so 10 sits just above the middle of the real
+distribution. Three DIFFERENT thresholds, unlike defense_stats.py's one shared
+MIN_QUALIFYING_DEFENSIVE_SNAPS, because punts/KR/PR are three real, structurally different
+event types on three different real volume scales -- not one shared per-snap denominator.
 """
 from __future__ import annotations
 
 import pandas as pd
 
+from nflverse_pull.current_roster import attach_real_rookie_season
 from nflverse_pull.pull import TEAM_NAMES
+
+MIN_QUALIFYING_PUNTS = 20
+MIN_QUALIFYING_KR_RETURNS = 5
+MIN_QUALIFYING_PR_RETURNS = 10
 
 
 def compute_team_season_special_teams_stats(pbp: pd.DataFrame) -> pd.DataFrame:
@@ -143,6 +170,49 @@ def compute_player_season_return_stats(pbp: pd.DataFrame) -> pd.DataFrame:
     return combined[
         ["Player ID", "Season", "Team", "KR Average", "KR Returns", "PR Average", "PR Returns"]
     ]
+
+
+def compute_player_season_punting_rates(
+    pbp: pd.DataFrame, rosters: pd.DataFrame, min_punts: int = MIN_QUALIFYING_PUNTS
+) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-punter-season Net Punt Average, restricted to
+    real qualifying seasons (>= min_punts real, non-blocked punts) -- a punter-season
+    below the threshold is excluded entirely, not zero-filled, same pattern as
+    defense_stats.compute_player_season_defensive_rates. Real per-season rookie flag
+    attached from the start.
+
+    Columns: Player ID | Season | Team | Net Punt Average | Punts | Is Rookie Season
+    """
+    stats = compute_player_season_punting_stats(pbp)
+    stats = stats[stats["Punts"] >= min_punts].reset_index(drop=True)
+    return attach_real_rookie_season(stats, rosters)
+
+
+def compute_player_season_return_rates(
+    pbp: pd.DataFrame,
+    rosters: pd.DataFrame,
+    min_kr: int = MIN_QUALIFYING_KR_RETURNS,
+    min_pr: int = MIN_QUALIFYING_PR_RETURNS,
+) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-returner-season KR/PR averages, EACH independently
+    qualified by its own real threshold -- a player can qualify at KR without qualifying at
+    PR (or vice versa); the side that doesn't qualify (or was never used) is blanked, not
+    zero-filled, same "excluded, not fabricated" rule as everywhere else in this project. A
+    player-season that qualifies on neither side is dropped entirely. Real per-season
+    rookie flag attached from the start.
+
+    Columns: Player ID | Season | Team | KR Average | KR Returns | PR Average | PR Returns |
+    Is Rookie Season
+    """
+    stats = compute_player_season_return_stats(pbp).copy()
+    kr_ok = stats["KR Returns"].fillna(0) >= min_kr
+    pr_ok = stats["PR Returns"].fillna(0) >= min_pr
+    stats.loc[~kr_ok, ["KR Average", "KR Returns"]] = pd.NA
+    stats.loc[~pr_ok, ["PR Average", "PR Returns"]] = pd.NA
+    stats = stats[kr_ok | pr_ok].reset_index(drop=True)
+    return attach_real_rookie_season(stats, rosters)
 
 
 def main(

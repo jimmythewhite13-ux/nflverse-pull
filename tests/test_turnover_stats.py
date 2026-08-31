@@ -75,6 +75,9 @@ def test_turnover_components_computes_expected_rates():
     assert buf["Fumble Lost Rate (Off)"] == pytest.approx(1 / 20)
     assert buf["Fumble Recovery Rate"] == pytest.approx(0.5)
     assert buf["Actual Turnover Differential"] == pytest.approx(-3.0)
+    assert buf["Pass Attempts (Off)"] == 10
+    assert buf["Offensive Plays"] == 20
+    assert buf["Defensive Pass Attempts Faced"] == 0  # BUF never plays defense here
 
     mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
     assert mia["Fumble Forced Rate (Def)"] == pytest.approx(1 / 20)

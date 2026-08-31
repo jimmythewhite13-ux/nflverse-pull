@@ -44,16 +44,28 @@ from nflverse_pull.pull import TEAM_NAMES
 TURNOVER_OUTPUT_COLUMNS = [
     "Team", "Season", "INT Rate Thrown (Off)", "Fumble Lost Rate (Off)",
     "Fumble Forced Rate (Def)", "Fumble Recovery Rate", "Actual Turnover Differential",
+    "Pass Attempts (Off)", "Offensive Plays", "Defensive Plays",
+    "Defensive Pass Attempts Faced",
 ]
 
 
 def compute_team_season_turnover_components(pbp: pd.DataFrame) -> pd.DataFrame:
     """
     Pure function, no network. See this module's own docstring for the full real-data
-    reasoning behind each column's exact definition.
+    reasoning behind each column's exact definition. The four trailing count columns (Pass
+    Attempts (Off), Offensive Plays, Defensive Plays, Defensive Pass Attempts Faced) are the
+    REAL denominators behind the rate columns -- exposed so the Excel tab can compute
+    Expected Turnover Differential as a dimensionally-consistent COUNT (rate x real play
+    count), not by subtracting raw rates against a raw count the spec's own pseudocode
+    would otherwise mismatch in units. Defensive Pass Attempts Faced uses pass_attempt==1
+    WITHOUT excluding sacks -- deliberately matching Secondary Index's own defense_stats.
+    compute_team_season_secondary_stats() denominator exactly (not this module's own
+    sack-excluding Pass Attempts (Off) convention), since it's multiplied against Secondary
+    Index's own real INT Rate, referenced not recomputed.
 
     Columns: Team | Season | INT Rate Thrown (Off) | Fumble Lost Rate (Off) | Fumble Forced
-    Rate (Def) | Fumble Recovery Rate | Actual Turnover Differential
+    Rate (Def) | Fumble Recovery Rate | Actual Turnover Differential | Pass Attempts (Off) |
+    Offensive Plays | Defensive Plays | Defensive Pass Attempts Faced
     """
     reg = pbp[pbp["season_type"] == "REG"]
     scrimmage = reg[reg["play_type"].isin(["pass", "run"])]
@@ -133,14 +145,33 @@ def compute_team_season_turnover_components(pbp: pd.DataFrame) -> pd.DataFrame:
         - giveaways.reindex(involved.index, fill_value=0)
     ).rename("Actual Turnover Differential")
 
+    pass_attempts_off = att_count.rename_axis(axis_names).rename("Pass Attempts (Off)")
+    offensive_plays = off_plays.rename_axis(axis_names).rename("Offensive Plays")
+    defensive_plays = def_plays.rename_axis(axis_names).rename("Defensive Plays")
+    def_pass_attempts_faced = (
+        reg[reg["pass_attempt"] == 1].groupby(["defteam", "season"]).size()
+        .rename_axis(axis_names).rename("Defensive Pass Attempts Faced")
+    )
+
     out = (
         int_rate_thrown.to_frame()
         .join(fumble_lost_rate, how="outer")
         .join(fumble_forced_rate, how="outer")
         .join(fumble_recovery_rate, how="outer")
         .join(turnover_diff, how="outer")
+        .join(pass_attempts_off, how="outer")
+        .join(offensive_plays, how="outer")
+        .join(defensive_plays, how="outer")
+        .join(def_pass_attempts_faced, how="outer")
         .reset_index()
     )
+    # The 4 real count columns are genuine 0s (not missing data) when a team has no
+    # matching rows for that side of the ball in the pulled data -- fillna(0), not left NaN.
+    count_cols = [
+        "Pass Attempts (Off)", "Offensive Plays", "Defensive Plays",
+        "Defensive Pass Attempts Faced",
+    ]
+    out[count_cols] = out[count_cols].fillna(0)
     out = out.rename(columns={"team": "team_abbr", "season": "Season"})
 
     unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))

@@ -2,8 +2,12 @@ import pandas as pd
 import pytest
 
 from nflverse_pull.defense_stats import (
+    MIN_QUALIFYING_DEFENSIVE_SNAPS,
+    compute_player_season_defensive_rates,
+    compute_player_season_defensive_snaps,
     compute_player_season_front7_stats,
     compute_player_season_secondary_stats,
+    compute_player_season_tackle_stats,
     compute_team_season_front7_stats,
     compute_team_season_participation_context,
     compute_team_season_secondary_stats,
@@ -204,3 +208,103 @@ def test_participation_context_raises_on_unmapped_team_abbreviation():
     df = pd.DataFrame([_participation_pbp_row("ZZZ", 2025, 1, 5, 6)])
     with pytest.raises(ValueError, match="No full-name mapping"):
         compute_team_season_participation_context(df)
+
+
+def _tackle_play(defteam, season, solo1=None, solo2=None, twa1=None,
+                  assist1=None, assist2=None, assist3=None, assist4=None):
+    return {
+        "season_type": "REG", "defteam": defteam, "season": season,
+        "solo_tackle_1_player_id": solo1, "solo_tackle_2_player_id": solo2,
+        "tackle_with_assist_1_player_id": twa1,
+        "assist_tackle_1_player_id": assist1, "assist_tackle_2_player_id": assist2,
+        "assist_tackle_3_player_id": assist3, "assist_tackle_4_player_id": assist4,
+    }
+
+
+def test_tackle_stats_credits_solo_and_assist_at_full_weight():
+    """
+    SF defense, 2025:
+      - P1 gets 2 solo tackles (solo_tackle_1_player_id).
+      - P2 makes a tackle WITH an assist -- credited via tackle_with_assist_1_player_id
+        (real quirk: solo_tackle_1_player_id is null on this play), P3 gets the assist.
+    P1 = 2 tackles, P2 = 1 tackle, P3 = 1 tackle (assist counts full weight, not split).
+    """
+    rows = [
+        _tackle_play("SF", 2025, solo1="P1"),
+        _tackle_play("SF", 2025, solo1="P1"),
+        _tackle_play("SF", 2025, twa1="P2", assist1="P3"),
+    ]
+    out = compute_player_season_tackle_stats(pd.DataFrame(rows)).set_index("Player ID")
+    assert out.loc["P1", "Tackles"] == 2.0
+    assert out.loc["P2", "Tackles"] == 1.0
+    assert out.loc["P3", "Tackles"] == 1.0
+    assert out.loc["P1", "Team"] == "San Francisco 49ers"
+
+
+def test_tackle_stats_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_tackle_play("ZZZ", 2025, solo1="P1")])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_tackle_stats(df)
+
+
+def _snap_row(pfr_player_id, season, defense_snaps, game_type="REG"):
+    return {"pfr_player_id": pfr_player_id, "season": season,
+            "defense_snaps": defense_snaps, "game_type": game_type}
+
+
+def _id_row(pfr_id, gsis_id):
+    return {"pfr_id": pfr_id, "gsis_id": gsis_id}
+
+
+def test_defensive_snaps_sums_real_season_total_and_joins_gsis_id():
+    snaps = pd.DataFrame([
+        _snap_row("SmitJo01", 2025, 40),
+        _snap_row("SmitJo01", 2025, 35),
+        _snap_row("SmitJo01", 2025, 0),  # a real game with 0 defensive snaps -- excluded
+        _snap_row("JoneMi01", 2025, 20, game_type="POST"),  # postseason -- excluded
+    ])
+    ids = pd.DataFrame([_id_row("SmitJo01", "00-1111111"), _id_row("JoneMi01", "00-2222222")])
+
+    out = compute_player_season_defensive_snaps(snaps, ids).set_index("Player ID")
+    assert out.loc["00-1111111", "Defensive Snaps"] == 75
+    assert "00-2222222" not in out.index  # only a postseason row -- no real REG total
+
+
+def test_defensive_snaps_drops_unmatched_players():
+    snaps = pd.DataFrame([_snap_row("GhosPl01", 2025, 100)])
+    ids = pd.DataFrame([_id_row("SmitJo01", "00-1111111")])  # no match for GhosPl01
+
+    out = compute_player_season_defensive_snaps(snaps, ids)
+    assert len(out) == 0
+
+
+def test_defensive_rates_converts_to_per_snap_and_excludes_below_threshold():
+    assert MIN_QUALIFYING_DEFENSIVE_SNAPS == 200
+    raw = pd.DataFrame([
+        {"Player ID": "P1", "Season": 2025, "Team": "Buffalo Bills", "Sacks": 8.0},
+        {"Player ID": "P2", "Season": 2025, "Team": "Buffalo Bills", "Sacks": 1.0},
+    ])
+    snaps = pd.DataFrame([
+        {"Player ID": "P1", "Season": 2025, "Defensive Snaps": 400},  # qualifies
+        {"Player ID": "P2", "Season": 2025, "Defensive Snaps": 50},  # below threshold
+    ])
+    rosters = pd.DataFrame([
+        {"player_id": "P1", "season": 2025, "entry_year": 2020},
+    ])
+
+    out = compute_player_season_defensive_rates(raw, ["Sacks"], snaps, rosters)
+    assert len(out) == 1  # P2 excluded, not zero-filled
+    assert out.iloc[0]["Player ID"] == "P1"
+    assert out.iloc[0]["Sacks Rate"] == pytest.approx(8.0 / 400)
+    assert out.iloc[0]["Is Rookie Season"] == False  # noqa: E712 (numpy bool from merge)
+
+
+def test_defensive_rates_drops_player_season_with_no_real_snap_match():
+    raw = pd.DataFrame([
+        {"Player ID": "P1", "Season": 2025, "Team": "Buffalo Bills", "Sacks": 8.0},
+    ])
+    snaps = pd.DataFrame(columns=["Player ID", "Season", "Defensive Snaps"])
+    rosters = pd.DataFrame(columns=["player_id", "season", "entry_year"])
+
+    out = compute_player_season_defensive_rates(raw, ["Sacks"], snaps, rosters)
+    assert len(out) == 0

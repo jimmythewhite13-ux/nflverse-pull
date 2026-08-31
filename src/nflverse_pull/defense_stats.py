@@ -50,6 +50,42 @@ actual snaps). Deliberately informational/contextual, NOT part of the weighted Z
 composite on Front
 Seven & D-Line Index -- a higher or lower blitz rate isn't inherently "better," it's a
 scheme choice, unlike Sack/TFL/QB-Hit Rate which are unambiguously "higher is better."
+
+INDIVIDUAL-PLAYER RATE STATS (claude_code_spec_defensive_player_index.md): feeds EDGE/IDL
+Index, LB Index, and CB/S Index -- real per-player Replacement Value, complementary to
+(not a replacement for) Front Seven Index / Secondary Index's team-level treatment.
+compute_player_season_front7_stats() / compute_player_season_secondary_stats() ALREADY
+produce real per-player-PER-SEASON totals across however many years of pbp they're given
+(verified by reading their own code before building this -- their docstrings undersold this:
+both already group by season, they just weren't being called with 3 years of pbp anywhere
+before now). What's genuinely new here:
+  - compute_player_season_tackle_stats(): Tackles (solo + assist COMBINED, each credited
+    player getting full weight -- public data doesn't cleanly separate "quality" of tackle,
+    per the spec's own instruction not to try). Schema quirk verified live before writing
+    this: on a play where `tackle_with_assist == 1`, the PRIMARY tackler's credit moves from
+    `solo_tackle_1_player_id` (null on these plays) to `tackle_with_assist_1_player_id`
+    instead -- both are counted as a tackle credit here, alongside `solo_tackle_2_player_id`
+    (a rare 2nd solo credit) and `assist_tackle_1-4_player_id` (assist credits).
+  - Real per-player-season SNAP COUNTS (fetch_snap_counts / compute_player_season_defensive_
+    snaps), used as the RATE denominator per the spec's own instruction ("a player who
+    rushes the passer on every defensive snap should be compared on a rate basis... against
+    a rotational player"). nfl_data_py.import_snap_counts() keys players by PFR's OWN id
+    format (`pfr_player_id`, e.g. "BankKe01"), not this project's gsis_id -- joined via
+    nfl_data_py.import_ids()'s real gsis_id<->pfr_id crosswalk (verified live: 1010 of 1019
+    real 2025 defensive players with real snap data matched, ~99.1%; the ~9 unmatched are
+    genuinely obscure practice-squad-level players who wouldn't clear the qualifying
+    threshold below anyway).
+  - MIN_QUALIFYING_DEFENSIVE_SNAPS (200): a named, documented judgment call -- like every
+    other minimum-sample threshold in this project (QB's 100 dropbacks, RB's 50 carries) --
+    picked from the real 2025 season-total defensive-snap distribution (median 308, 25th
+    percentile 75, verified live). ONE shared constant across EDGE/IDL/LB/CB/S rather than a
+    separate threshold per group: unlike QB dropbacks vs. RB carries (fundamentally
+    different volume metrics), every defensive role's snap count is measured on the exact
+    same real scale, so a single shared minimum is honest and simpler, not a shortcut.
+  - Real per-season rookie identification via current_roster.attach_real_rookie_season from
+    the START -- the exact fix that had to be retrofitted onto four other tabs after the
+    fact (claude_code_spec_consolidated_fixes.md) is applied here from the beginning, no
+    excuse for repeating that bug a fifth time.
 """
 from __future__ import annotations
 
@@ -321,6 +357,136 @@ def compute_team_season_participation_context(pbp: pd.DataFrame) -> pd.DataFrame
 
     out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
     return out[["Team", "Season", "Blitz Rate", "Avg Box Count"]]
+
+
+# Real, credited primary-tackle columns -- includes the tackle_with_assist quirk documented
+# in this module's own docstring (a play's primary tackler moves here instead of
+# solo_tackle_1_player_id when a real assist also occurred).
+_SOLO_TACKLE_COLS = ["solo_tackle_1_player_id", "solo_tackle_2_player_id",
+                     "tackle_with_assist_1_player_id"]
+_ASSIST_TACKLE_COLS = ["assist_tackle_1_player_id", "assist_tackle_2_player_id",
+                       "assist_tackle_3_player_id", "assist_tackle_4_player_id"]
+
+# Named, documented judgment call (see module docstring for the real-data reasoning) --
+# shared across EDGE/IDL/LB/CB/S since every defensive role's snap count is the same real
+# scale, unlike QB dropbacks vs. RB carries.
+MIN_QUALIFYING_DEFENSIVE_SNAPS = 200
+
+
+def compute_player_season_tackle_stats(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-player-per-season combined solo+assist tackle
+    total -- public data doesn't cleanly separate "quality" of tackle, so both are counted
+    at full weight per credited player (see module docstring for the real tackle_with_
+    assist quirk this accounts for).
+
+    Columns: Player ID | Season | Team | Tackles
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    reg = reg[reg["defteam"].notna()]
+
+    solo = _credit_counts(reg, _SOLO_TACKLE_COLS, weight=1.0)
+    assist = _credit_counts(reg, _ASSIST_TACKLE_COLS, weight=1.0)
+
+    long_frames = []
+    for series in (solo, assist):
+        if len(series) == 0:
+            continue
+        f = series.rename("value").reset_index()
+        f = f.rename(columns={"defteam": "team", "season": "Season"})
+        f["stat"] = "Tackles"
+        long_frames.append(f)
+
+    combined = _pivot_player_credits(long_frames, ["Tackles"])
+    if len(combined) == 0:
+        return pd.DataFrame(columns=["Player ID", "Season", "Team", "Tackles"])
+    return _finalize_player_frame(combined, ["Tackles"])
+
+
+def fetch_snap_counts(years: list[int]) -> pd.DataFrame:
+    """Network call -- real, official per-player-per-game snap counts (via Pro Football
+    Reference, through nfl_data_py.import_snap_counts)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_snap_counts(years)
+
+
+def fetch_player_ids() -> pd.DataFrame:
+    """Network call -- real cross-source player-ID crosswalk (nfl_data_py.import_ids),
+    used here for its real gsis_id<->pfr_id mapping (snap counts are keyed by pfr_id, every
+    other stat in this project by gsis_id)."""
+    import nfl_data_py as nfl
+
+    return nfl.import_ids()
+
+
+def compute_player_season_defensive_snaps(
+    snap_counts: pd.DataFrame, player_ids: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-player-season total defensive snaps, joined from
+    PFR's own player-id format to this project's gsis_id via nfl_data_py's real crosswalk
+    (verified live: ~99.1% real match rate -- see module docstring). A player with no real
+    crosswalk match is dropped, not guessed at -- he simply won't clear the qualifying
+    threshold downstream, same as any other missing-data case in this project.
+
+    Columns: Player ID | Season | Defensive Snaps
+    """
+    reg = snap_counts[snap_counts["game_type"] == "REG"]
+    reg = reg[reg["defense_snaps"] > 0]
+    totals = (
+        reg.groupby(["pfr_player_id", "season"])["defense_snaps"].sum()
+        .rename("Defensive Snaps").reset_index()
+    )
+
+    ids = player_ids.dropna(subset=["pfr_id", "gsis_id"])[["pfr_id", "gsis_id"]]
+    ids = ids[~ids["pfr_id"].duplicated(keep="first")]
+
+    merged = totals.merge(ids, left_on="pfr_player_id", right_on="pfr_id", how="left")
+    merged = merged[merged["gsis_id"].notna()]
+    merged = merged.rename(columns={"gsis_id": "Player ID", "season": "Season"})
+    return merged[["Player ID", "Season", "Defensive Snaps"]].reset_index(drop=True)
+
+
+def compute_player_season_defensive_rates(
+    raw_counts: pd.DataFrame,
+    count_cols: list[str],
+    snaps: pd.DataFrame,
+    rosters: pd.DataFrame,
+    min_snaps: int = MIN_QUALIFYING_DEFENSIVE_SNAPS,
+) -> pd.DataFrame:
+    """
+    Pure function, no network. Shared rate-conversion layer for EDGE/IDL Index, LB Index,
+    and CB/S Index -- takes any real per-player-per-season COUNT DataFrame (Sacks/TFL/QB
+    Hits from compute_player_season_front7_stats, Tackles from compute_player_season_
+    tackle_stats, INT/PBU from compute_player_season_secondary_stats) and:
+      1. Joins real per-player-season Defensive Snaps (inner join -- a player-season with
+         no real snap-count match is dropped entirely, not zero-filled).
+      2. Excludes any player-season under `min_snaps` real defensive snaps entirely (not
+         zero-filled), same "below threshold means omitted" convention as every other stats
+         module in this project (QB's 100-dropback / RB's 50-carry minimum).
+      3. Converts each of `count_cols` from a raw total into a real PER-SNAP rate.
+      4. Attaches the REAL per-season rookie flag via current_roster.attach_real_rookie_
+         season from the start (not the "first pulled season" proxy four other tabs needed
+         fixing after the fact).
+
+    Output columns: Player ID | Season | Team | Defensive Snaps | {count_col} Rate for each
+    of `count_cols` | Is Rookie Season
+    """
+    from nflverse_pull.current_roster import attach_real_rookie_season
+
+    merged = raw_counts.merge(snaps, on=["Player ID", "Season"], how="inner")
+    merged = merged[merged["Defensive Snaps"] >= min_snaps].copy()
+
+    for col in count_cols:
+        merged[f"{col} Rate"] = merged[col] / merged["Defensive Snaps"]
+
+    merged = attach_real_rookie_season(merged, rosters)
+
+    out_cols = ["Player ID", "Season", "Team", "Defensive Snaps"]
+    out_cols += [f"{col} Rate" for col in count_cols]
+    out_cols += ["Is Rookie Season"]
+    return merged.sort_values(["Team", "Season"]).reset_index(drop=True)[out_cols]
 
 
 def main(

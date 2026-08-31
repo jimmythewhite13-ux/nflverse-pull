@@ -33,11 +33,27 @@ qualifying-volume threshold (2023-2025 minimum real attempts: 136-160) than this
 MIN_QUALIFYING_DROPBACKS=100, so some real, qualifying QB-seasons here won't have real NGS
 context -- handled as a genuinely missing data point (left blank), not zero-filled or assumed,
 same pattern as everywhere else in this project.
+
+Success Rate / Explosive Pass Rate / Sack Rate / TD / INT (claude_code_spec_qb_environment_
+model.md Part A): compute_player_season_qb_extended_stats(). Success Rate and Explosive Pass
+Rate use the SAME play_type=="pass" population (includes sacks as a real negative dropback
+outcome, excludes scrambles) efficiency.py's own team-level Pass Success Rate / Explosive
+Pass Rate (EXPLOSIVE_PASS_YARDS, imported not redefined) already use, for internal
+consistency rather than a new convention. Sack Rate uses the BROADER qb_dropback population
+(includes scrambles) this module's own EPA/Play already uses -- the standard "sacks per real
+dropback" definition. TD/INT Ratio is CONTEXT ONLY, never scored, per the spec's own explicit
+instruction not to double-count a signal ANY/A's formula (+20*TD-45*INT) already includes --
+blank when INT=0 for that QB-season (division genuinely undefined), not a fabricated infinity
+or a silent 0. Sack Rate is likewise NOT a scored Talent metric -- see
+claude_code_spec_qb_environment_model.md Part A/C for why it's tracked separately instead
+(taking a sack isn't inherently a skill deficiency; it matters specifically combined with a
+bad pass-protection environment, a different question).
 """
 from __future__ import annotations
 
 import pandas as pd
 
+from nflverse_pull.efficiency import EXPLOSIVE_PASS_YARDS
 from nflverse_pull.pull import TEAM_NAMES
 
 # Below this many dropbacks in a season, a QB-season is mop-up duty or an injury-shortened
@@ -143,6 +159,81 @@ def compute_team_season_qb_stats(pbp: pd.DataFrame) -> pd.DataFrame:
         ["Team", "Season", "Dropbacks"], ascending=[True, True, False]
     ).reset_index(drop=True)
     return out[SEASON_STATS_COLUMNS]
+
+
+def compute_player_season_qb_extended_stats(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-QB-season Success Rate, Explosive Pass Rate, Sack
+    Rate, TD, INT, TD/INT Ratio -- see this module's own docstring for each metric's exact
+    population/denominator and why TD/INT Ratio and Sack Rate are unscored. Meant to be
+    LEFT-JOINED onto compute_team_season_qb_stats()'s own output by (Player ID, Season,
+    Team) -- not filtered by MIN_QUALIFYING_DROPBACKS itself (that filter already applies
+    via the join, since this covers every real dropback in the pulled years).
+
+    Columns: Player ID | Season | Team | Success Rate | Explosive Pass Rate | Sack Rate |
+    TD | INT | TD/INT Ratio
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+
+    if "qb_dropback" in reg.columns:
+        dropbacks = reg[reg["qb_dropback"] == 1]
+    else:
+        dropbacks = reg[
+            (reg["pass_attempt"] == 1) | (reg["sack"] == 1) | (reg["qb_scramble"] == 1)
+        ]
+    dropbacks = dropbacks[dropbacks["passer_id"].notna()].copy()
+
+    group_cols = ["passer_id", "season", "posteam"]
+    dropback_count = dropbacks.groupby(group_cols).size()
+
+    # Sack Rate: sacks / ALL real dropbacks (the broader qb_dropback population, matching
+    # this module's own EPA/Play denominator) -- computed from the SAME groupby object as
+    # dropback_count (not a separately-filtered subset), so every group gets a real 0 sack
+    # count rather than a missing one that would need reindexing.
+    dropbacks["is_sack"] = dropbacks["sack"] == 1
+    sack_count = dropbacks.groupby(group_cols)["is_sack"].sum()
+    sack_rate = (sack_count / dropback_count).rename("Sack Rate")
+
+    # Success Rate / Explosive Pass Rate: play_type=="pass" only (includes sacks, excludes
+    # scrambles) -- matches efficiency.py's own team-level convention for these two metrics
+    # specifically (different from EPA/Play's broader qb_dropback denominator above).
+    pass_plays = dropbacks[dropbacks["play_type"] == "pass"].copy()
+    pass_plays["explosive"] = pass_plays["yards_gained"] >= EXPLOSIVE_PASS_YARDS
+    success_rate = pass_plays.groupby(group_cols)["success"].mean().rename("Success Rate")
+    explosive_rate = (
+        pass_plays.groupby(group_cols)["explosive"].mean().rename("Explosive Pass Rate")
+    )
+
+    attempts = dropbacks[dropbacks["pass_attempt"] == 1]
+    td = attempts.groupby(group_cols)["pass_touchdown"].sum().rename("TD")
+    interceptions = attempts.groupby(group_cols)["interception"].sum().rename("INT")
+
+    out = (
+        dropback_count.rename("_dropbacks").to_frame()
+        .join(success_rate)
+        .join(explosive_rate)
+        .join(sack_rate)
+        .join(td)
+        .join(interceptions)
+        .reset_index()
+    )
+    out = out.rename(columns={
+        "passer_id": "Player ID", "season": "Season", "posteam": "team_abbr",
+    })
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out["TD/INT Ratio"] = [
+        (t / i) if i > 0 else None for t, i in zip(out["TD"], out["INT"], strict=True)
+    ]
+
+    return out[[
+        "Player ID", "Season", "Team", "Success Rate", "Explosive Pass Rate", "Sack Rate",
+        "TD", "INT", "TD/INT Ratio",
+    ]]
 
 
 def fetch_ngs_passing(years: list[int]) -> pd.DataFrame:

@@ -314,6 +314,122 @@ def compute_team_season_matchup_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
     return out[MATCHUP_SEASON_OUTPUT_COLUMNS]
 
 
+DEEP_PASS_AIR_YARDS = 20
+
+DEEP_YAC_OUTPUT_COLUMNS = [
+    "Team", "Season", "Deep Pass Completion Rate Allowed (Def)", "YAC Allowed (Def)",
+]
+
+
+def compute_team_season_deep_pass_yac_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real Deep Pass Completion Rate Allowed and YAC Allowed --
+    claude_code_spec_explosive_play_engine.md Part B. Both GENUINELY DISTINCT from
+    Explosive Pass Rate Allowed (already computed above): Deep Pass Completion Rate Allowed
+    measures "how often is a defense beaten deep" (completions / attempts on throws with
+    real air_yards >= DEEP_PASS_AIR_YARDS=20, regardless of total yards gained after the
+    catch) -- a short pass that turns into a 25-yard gain via YAC is "explosive" but was
+    never actually a deep throw, and a deep incompletion (pass defensed, e.g.) still counts
+    in this rate's denominator even though it produced zero explosive yardage. YAC Allowed
+    (real, from pbp's own `yards_after_catch` field, verified live: 1 null out of 11,217
+    real 2025 completions) is a genuine, free, DIFFERENT signal again -- how many yards a
+    defense gives up AFTER the catch specifically, a real proxy for "not making a play in
+    space" (missed tackles themselves require charting/tracking data this project doesn't
+    have access to -- NOT attempted here, see this module's own docstring / claude_code_
+    spec_explosive_play_engine.md's own "confirmed not buildable" note).
+
+    Deep Pass Completion Rate Allowed = real completions / real attempts among throws with
+    air_yards >= 20 (excludes sacks -- no air_yards concept applies to a sack). YAC Allowed
+    = mean real yards_after_catch across real completions, same per-play-average convention
+    every other rate stat in this project uses (not a total).
+
+    Columns: Team | Season | Deep Pass Completion Rate Allowed (Def) | YAC Allowed (Def)
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    axis_names = ["team_abbr", "season"]
+
+    deep_attempts = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0) &
+                         (reg["air_yards"] >= DEEP_PASS_AIR_YARDS)]
+    deep_comp_def = (
+        deep_attempts.groupby(["defteam", "season"])["complete_pass"].mean()
+        .rename_axis(axis_names).rename("Deep Pass Completion Rate Allowed (Def)")
+    )
+
+    completions = reg[reg["complete_pass"] == 1]
+    yac_def = (
+        completions.groupby(["defteam", "season"])["yards_after_catch"].mean()
+        .rename_axis(axis_names).rename("YAC Allowed (Def)")
+    )
+
+    out = deep_comp_def.to_frame().join(yac_def, how="outer").reset_index()
+    out = out.rename(columns={"season": "Season"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[DEEP_YAC_OUTPUT_COLUMNS]
+
+
+EXPLOSIVE_TIER_OUTPUT_COLUMNS = [
+    "Team", "Season", "Pass 20+ Rate (Off)", "Pass 30+ Rate (Off)", "Pass 40+ Rate (Off)",
+    "Run 15+ Rate (Off)", "Run 20+ Rate (Off)",
+]
+
+
+def compute_team_season_explosive_tiers(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real, CONTEXT-ONLY reference tiers -- claude_code_spec_
+    explosive_play_engine.md's own "design trap to avoid" section. 15+/10+ yards
+    (EXPLOSIVE_PASS_YARDS/EXPLOSIVE_RUN_YARDS above) are already the SINGLE scored
+    Explosive Rate threshold per phase (used by compute_team_season_matchup_metrics's own
+    Explosive Pass/Run Rate columns) -- these additional 20+/30+/40+ (passing) and 15+/20+
+    (rushing) tiers exist ONLY so a reader can see how big a team's real big plays actually
+    run, without ever being fed into a Z-score or weighted composite anywhere. A 40-yard
+    completion IS also a 30+/20+/15+ yard completion -- nested, not independent, categories;
+    weighting all of them would double- (triple-, quadruple-) count the same real play.
+
+    Columns: Team | Season | Pass 20+ Rate (Off) | Pass 30+ Rate (Off) | Pass 40+ Rate (Off)
+    | Run 15+ Rate (Off) | Run 20+ Rate (Off)
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    axis_names = ["team_abbr", "season"]
+
+    pass_plays = reg[reg["play_type"] == "pass"].copy()
+    run_plays = reg[reg["play_type"] == "run"].copy()
+
+    series = []
+    for threshold in (20, 30, 40):
+        pass_plays[f"p{threshold}"] = pass_plays["yards_gained"] >= threshold
+        s = (
+            pass_plays.groupby(["posteam", "season"])[f"p{threshold}"].mean()
+            .rename_axis(axis_names).rename(f"Pass {threshold}+ Rate (Off)")
+        )
+        series.append(s)
+    for threshold in (15, 20):
+        run_plays[f"r{threshold}"] = run_plays["yards_gained"] >= threshold
+        s = (
+            run_plays.groupby(["posteam", "season"])[f"r{threshold}"].mean()
+            .rename_axis(axis_names).rename(f"Run {threshold}+ Rate (Off)")
+        )
+        series.append(s)
+
+    out = series[0].to_frame()
+    for s in series[1:]:
+        out = out.join(s, how="outer")
+    out = out.reset_index().rename(columns={"season": "Season"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[EXPLOSIVE_TIER_OUTPUT_COLUMNS]
+
+
 def compute_league_stats(raw: pd.DataFrame) -> pd.DataFrame:
     """Pure function. Section 2 equivalent: league average and population std-dev per metric."""
     return pd.DataFrame(

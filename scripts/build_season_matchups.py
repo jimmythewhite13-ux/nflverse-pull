@@ -49,6 +49,7 @@ from pathlib import Path
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -62,6 +63,25 @@ HISTORICAL_YEARS = [2023, 2024, 2025]
 CURRENT_SEASON = 2026
 SHEET_NAME = "Season Matchups"
 OLD_SHEET_NAME = "Week 1 Matchups"
+
+# claude_code_spec_additional_sportsbooks_prediction_market.md Part A -- properly licensed,
+# regionally regulated books ONLY (confirmed with the user which books before adding any).
+# The user later asked for "an additional 5" beyond the spec's own named 3 -- genuinely
+# ambiguous (WHICH 5?), so this was NOT auto-extended; confirmed with the user first
+# (5 more major US-licensed, state-regulated operators, same real bar as FanDuel/BetMGM/
+# Caesars -- BetRivers, ESPN BET, Fanatics Sportsbook, Bally Bet, Hard Rock Bet, all real,
+# properly licensed US operators, none offshore/crypto-circumvention).
+# (book label, edge/rec-play abbreviation, starting column).
+BOOKS = [
+    ("FanDuel", "FD", 113),
+    ("BetMGM", "MGM", 119),
+    ("Caesars", "CZR", 125),
+    ("BetRivers", "RIV", 131),
+    ("ESPN BET", "ESPN", 137),
+    ("Fanatics Sportsbook", "FAN", 143),
+    ("Bally Bet", "BALLY", 149),
+    ("Hard Rock Bet", "HR", 155),
+]
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
 TITLE_FILL = PatternFill("solid", fgColor="FFD9E1F2")
@@ -84,7 +104,7 @@ READBACK_HEADERS = [
     "Away Add'l\nInjury (pts)", "DraftKings Spread\n(Home)", "DraftKings\nTotal",
     "Sportsbook", "MyBookie Spread\n(Home)", "MyBookie\nTotal", "Actual Home\nScore",
     "Actual Away\nScore", "Home\nMoneyline", "Away\nMoneyline",
-]
+] + [h for book, _abbr, _sc in BOOKS for h in (f"{book} Spread\n(Home)", f"{book}\nTotal")]
 
 
 
@@ -193,10 +213,24 @@ def build(workbook_path: str) -> dict:
     # claude_code_spec_season_win_total_moneyline.md Part B, manual odds input alongside
     # the existing DK/MyBookie spread/total block, same convention (blue input, real
     # sportsbook odds the user types in).
-    for col, htext in (
+    header_cells = [
         (108, "Actual Home\nScore"), (109, "Actual Away\nScore"), (110, "Game Key\n(helper)"),
         (111, "Home\nMoneyline"), (112, "Away\nMoneyline"),
-    ):
+    ]
+    # claude_code_spec_additional_sportsbooks_prediction_market.md Part A -- three more
+    # properly licensed, regionally regulated books, same real pattern as DraftKings/
+    # MyBookie above (independent Spread/Total inputs, independent Edge/Recommended-Play
+    # formulas, no book treated as "primary"). Confirmed excluded: any offshore/
+    # unlicensed/crypto-circumvention platform -- not attempted here, not an oversight.
+    for book, abbr, start_col in BOOKS:
+        header_cells += [
+            (start_col, f"{book} Spread\n(Home)"), (start_col + 1, f"{book}\nTotal"),
+            (start_col + 2, f"{abbr} Spread Edge\n(Model-{abbr})"),
+            (start_col + 3, f"{abbr} Total Edge\n(Model-{abbr})"),
+            (start_col + 4, f"{abbr} Recommended\nSpread Play"),
+            (start_col + 5, f"{abbr} Recommended\nTotal Play"),
+        ]
+    for col, htext in header_cells:
         c = ws.cell(row=2, column=col, value=htext)
         c.font = HEADER_FONT
         c.fill = HEADER_FILL
@@ -366,6 +400,35 @@ def build(workbook_path: str) -> dict:
         away_ml = ws.cell(row=row, column=112, value=rb.get("Away\nMoneyline"))
         home_ml.font = INPUT_FONT
         away_ml.font = INPUT_FONT
+
+        # ---- Additional sportsbooks: same real pattern as DK/MyBookie above -- fully
+        # independent Spread/Total inputs and Edge/Recommended-Play formulas per book, no
+        # book treated as "primary", each one allowed to disagree with every other.
+        for book, abbr, sc in BOOKS:
+            spread_col = get_column_letter(sc)
+            total_col = get_column_letter(sc + 1)
+            spread_edge_col = get_column_letter(sc + 2)
+            total_edge_col = get_column_letter(sc + 3)
+
+            spread = ws.cell(row=row, column=sc, value=rb.get(f"{book} Spread\n(Home)", 0))
+            total = ws.cell(row=row, column=sc + 1, value=rb.get(f"{book}\nTotal", 0))
+            spread.font = INPUT_FONT
+            total.font = INPUT_FONT
+
+            spread_edge = ws.cell(row=row, column=sc + 2, value=f"=AC{row}+{spread_col}{row}")
+            total_edge = ws.cell(row=row, column=sc + 3, value=f"=AB{row}-{total_col}{row}")
+            rec_spread = ws.cell(row=row, column=sc + 4, value=(
+                f'=IF(ABS({spread_edge_col}{row})>=\'Model Assumptions\'!$C$15,'
+                f'IF({spread_edge_col}{row}>0,"Home","Away"),"No Edge")'
+            ))
+            rec_total = ws.cell(row=row, column=sc + 5, value=(
+                f'=IF(ABS({total_edge_col}{row})>=\'Model Assumptions\'!$C$16,'
+                f'IF({total_edge_col}{row}>0,"Over","Under"),"No Edge")'
+            ))
+            for cell in (spread_edge, total_edge, rec_spread, rec_total):
+                cell.font = FORMULA_FONT
+            spread_edge.number_format = "0.0;(0.0)"
+            total_edge.number_format = "0.0;(0.0)"
 
     last_row = first_row + len(schedule) - 1
 

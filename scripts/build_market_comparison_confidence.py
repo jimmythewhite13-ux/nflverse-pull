@@ -87,6 +87,8 @@ FORMULA_FONT = Font(name="Arial", size=10, color="FF000000")
 LINK_FONT = Font(name="Arial", size=10, color="FF008000")
 NOTE_FONT = Font(name="Arial", size=9, color="FF808080")
 ASSUMPTION_FILL = PatternFill("solid", fgColor="FFFFFF00")
+WARN_FILL = PatternFill("solid", fgColor="FFFFC7CE")
+WARN_FONT = Font(name="Arial", size=10, bold=True, color="FF9C0006")
 
 # Column layout, by NAME -- avoids hand-counted literal column numbers scattered through the
 # row-writing loop (the exact class of bug an earlier draft of this script fell into).
@@ -122,7 +124,23 @@ COLUMNS = [
     "Home Raw Implied\nProbability", "Away Raw Implied\nProbability",
     "Home De-Vigged\nProbability", "Away De-Vigged\nProbability",
     "Moneyline Edge\n(Home)", "Moneyline Edge\n(Away)",
+    # claude_code_spec_additional_sportsbooks_prediction_market.md Part B -- Kalshi/
+    # Polymarket, structurally separate from the sportsbook spread/total pattern: real
+    # probability-priced contracts, not point spreads. MANDATORY legal-status disclaimer
+    # lives on this tab itself (see the section title written in build(), not just in the
+    # spec) -- sports-event contracts are under active, unresolved legal dispute in
+    # multiple US states as of mid-2026; availability depends on the user's own
+    # jurisdiction and can change with little notice.
+    "Kalshi Home\nContract Price (¢)", "Kalshi Away\nContract Price (¢)",
+    "Kalshi Home Implied\nProbability", "Kalshi Away Implied\nProbability",
+    "Kalshi Prediction\nMarket Edge (Home)", "Kalshi Prediction\nMarket Edge (Away)",
+    "Polymarket Home\nContract Price (¢)", "Polymarket Away\nContract Price (¢)",
+    "Polymarket Home Implied\nProbability", "Polymarket Away Implied\nProbability",
+    "Polymarket Prediction\nMarket Edge (Home)", "Polymarket Prediction\nMarket Edge (Away)",
 ]
+
+# (platform, prefix for column-name lookups)
+PREDICTION_MARKETS = ["Kalshi", "Polymarket"]
 COL = {name: i + 1 for i, name in enumerate(COLUMNS)}
 LET = {name: get_column_letter(i + 1) for i, name in enumerate(COLUMNS)}
 
@@ -223,6 +241,41 @@ def _pull_schedule():
     return compute_season_schedule(sched_current, CURRENT_SEASON, roof_fallback)
 
 
+# The Kalshi/Polymarket contract prices are the first genuinely discretionary manual
+# inputs on this tab -- read back across a rebuild by real Game Key, the same "preserve
+# real user input" discipline Season Matchups' own manual columns already use.
+PRICE_HEADERS = [
+    f"{platform} {side} Contract Price (¢)".replace(" Contract", "\nContract")
+    for platform in PREDICTION_MARKETS for side in ("Home", "Away")
+]
+
+
+def _read_back(wb: openpyxl.Workbook) -> dict[str, dict[str, float]]:
+    if SHEET_NAME not in wb.sheetnames:
+        return {}
+    ws = wb[SHEET_NAME]
+    header_row = 3
+    headers = {ws.cell(row=header_row, column=c).value: c for c in range(1, ws.max_column + 1)}
+    key_col = headers.get("Game Key")
+    if not key_col:
+        return {}
+    out: dict[str, dict[str, float]] = {}
+    row = header_row + 1
+    while ws.cell(row=row, column=1).value is not None:
+        key = ws.cell(row=row, column=key_col).value
+        vals = {}
+        for h in PRICE_HEADERS:
+            c = headers.get(h)
+            if c is not None:
+                v = ws.cell(row=row, column=c).value
+                if v not in (None, "") and not (isinstance(v, str) and v.startswith("=")):
+                    vals[h] = v
+        if key and vals:
+            out[key] = vals
+        row += 1
+    return out
+
+
 def build(workbook_path: str) -> dict:
     schedule = _pull_schedule()
 
@@ -234,6 +287,8 @@ def build(workbook_path: str) -> dict:
                 "script's own module docstring for the required order)."
             )
     add_model_assumptions_weights(wb)
+
+    readback = _read_back(wb)
 
     if SHEET_NAME in wb.sheetnames:
         del wb[SHEET_NAME]
@@ -249,6 +304,28 @@ def build(workbook_path: str) -> dict:
         "the existing OL-Pressure-to-Effective-QB-Rating link."
     ))
     t.font = Font(name="Arial", size=12, bold=True)
+
+    # MANDATORY, per claude_code_spec_additional_sportsbooks_prediction_market.md Part B --
+    # must appear on the TAB ITSELF, not just in the spec document. Kept in its own
+    # prominent, distinctly-styled row directly under the title (not buried in the closing
+    # note at the bottom, below 272 rows of data) so it's unmissable before anyone reaches
+    # the Kalshi/Polymarket columns further right.
+    ws.row_dimensions[2].height = 45
+    ws.merge_cells("A2:M2")
+    disclaimer = ws.cell(row=2, column=1, value=(
+        "⚠ LEGAL DISCLAIMER (Kalshi/Polymarket columns, far right of this tab): sports-"
+        "specific event contracts on these federally regulated (CFTC) prediction-market "
+        "exchanges are under ACTIVE, UNRESOLVED legal dispute in multiple US states as of "
+        "mid-2026 (confirmed restricted/banned in at least Nevada, Massachusetts, and "
+        "Michigan, with several more states in active litigation). Availability and "
+        "legality depend on YOUR OWN specific jurisdiction and can change with little "
+        "notice as courts rule -- these are NOT universally available the way DraftKings/"
+        "FanDuel are within their own licensed states. YOU are responsible for confirming "
+        "your own jurisdiction's current status before using this section."
+    ))
+    disclaimer.font = WARN_FONT
+    disclaimer.fill = WARN_FILL
+    disclaimer.alignment = Alignment(wrap_text=True, vertical="center")
 
     # ---- Real ranges on Season Matchups, discovered dynamically (survives any row-count
     # shift, e.g. a future season with a different real schedule length). ----------------
@@ -284,9 +361,10 @@ def build(workbook_path: str) -> dict:
     ol_pos_range = f"'{OL_SHEET}'!$B${ol_sec6_first}:$B${ol_sec6_last}"
     ol_rookie_range = f"'{OL_SHEET}'!$F${ol_sec6_first}:$F${ol_sec6_last}"
 
-    ws.row_dimensions[2].height = 32
+    # Header lives on row 3 -- row 1 is the title, row 2 is the MANDATORY disclaimer above.
+    ws.row_dimensions[3].height = 32
     for name in COLUMNS:
-        c = ws.cell(row=2, column=COL[name], value=name)
+        c = ws.cell(row=3, column=COL[name], value=name)
         c.font = HEADER_FONT
         c.fill = HEADER_FILL
         c.alignment = HEADER_ALIGN
@@ -294,7 +372,7 @@ def build(workbook_path: str) -> dict:
     def L(name: str, row: int) -> str:
         return f"{LET[name]}{row}"
 
-    first_row = 3
+    first_row = 4
     for i, rec in enumerate(schedule.to_dict("records")):
         row = first_row + i
         week = int(rec["Week"])
@@ -592,6 +670,57 @@ def build(workbook_path: str) -> dict:
         ml_edge_home.number_format = "0.0%;(0.0%)"
         ml_edge_away.number_format = "0.0%;(0.0%)"
 
+        # ==== claude_code_spec_additional_sportsbooks_prediction_market.md Part B ==========
+        # Kalshi/Polymarket -- real contract prices (manual input, cents) converted directly
+        # to implied probability (price/100), compared against Model Win Probability. No
+        # de-vigging here -- unlike a two-sided sportsbook moneyline pair, these are two
+        # INDEPENDENT real contracts (one per team), not a matched pair guaranteed to share
+        # a single book's margin structure.
+        rb = readback.get(game_key, {})
+        for platform in PREDICTION_MARKETS:
+            home_price_col = f"{platform} Home\nContract Price (¢)"
+            away_price_col = f"{platform} Away\nContract Price (¢)"
+            home_price = ws.cell(
+                row=row, column=COL[home_price_col], value=rb.get(home_price_col)
+            )
+            away_price = ws.cell(
+                row=row, column=COL[away_price_col], value=rb.get(away_price_col)
+            )
+            home_price.font = INPUT_FONT
+            away_price.font = INPUT_FONT
+
+            home_price_ref = L(home_price_col, row)
+            away_price_ref = L(away_price_col, row)
+            home_implied_col = f"{platform} Home Implied\nProbability"
+            away_implied_col = f"{platform} Away Implied\nProbability"
+            home_implied = ws.cell(row=row, column=COL[home_implied_col], value=(
+                f'=IF({home_price_ref}="","",{home_price_ref}/100)'
+            ))
+            away_implied = ws.cell(row=row, column=COL[away_implied_col], value=(
+                f'=IF({away_price_ref}="","",{away_price_ref}/100)'
+            ))
+            home_implied.font = FORMULA_FONT
+            away_implied.font = FORMULA_FONT
+            home_implied.number_format = "0.0%"
+            away_implied.number_format = "0.0%"
+
+            home_implied_ref = L(home_implied_col, row)
+            away_implied_ref = L(away_implied_col, row)
+            home_edge_col = f"{platform} Prediction\nMarket Edge (Home)"
+            away_edge_col = f"{platform} Prediction\nMarket Edge (Away)"
+            home_pm_edge = ws.cell(row=row, column=COL[home_edge_col], value=(
+                f'=IF(OR({ref["margin"]}="",{home_implied_ref}=""),"",'
+                f'{wp_ref}-{home_implied_ref})'
+            ))
+            away_pm_edge = ws.cell(row=row, column=COL[away_edge_col], value=(
+                f'=IF(OR({ref["margin"]}="",{away_implied_ref}=""),"",'
+                f'(1-{wp_ref})-{away_implied_ref})'
+            ))
+            home_pm_edge.font = FORMULA_FONT
+            away_pm_edge.font = FORMULA_FONT
+            home_pm_edge.number_format = "0.0%;(0.0%)"
+            away_pm_edge.number_format = "0.0%;(0.0%)"
+
     last_row = first_row + len(schedule) - 1
 
     note_row = last_row + 2
@@ -619,7 +748,18 @@ def build(workbook_path: str) -> dict:
         "modeling. De-vigging normalizes both teams' raw implied probabilities (which sum "
         "to MORE than 100% due to the book's own margin) so they sum to exactly 100% before "
         "computing Moneyline Edge -- comparing the model against the raw, un-de-vigged "
-        "number would unfairly make the model look better than it is."
+        "number would unfairly make the model look better than it is. "
+        "claude_code_spec_additional_sportsbooks_prediction_market.md Part A added 8 more "
+        "properly licensed, regionally regulated sportsbooks to Season Matchups (same real "
+        "Spread/Total/Edge/Recommended-Play pattern as DraftKings, each fully independent, "
+        "no book treated as primary) -- 3 named directly in the spec (FanDuel, BetMGM, "
+        "Caesars) plus 5 more confirmed with the user afterward (BetRivers, ESPN BET, "
+        "Fanatics Sportsbook, Bally Bet, Hard Rock Bet), all real US state-licensed "
+        "operators, none offshore/crypto-circumvention. Part B added the Kalshi/Polymarket "
+        "section on THIS tab (far right columns) -- structurally separate real contract-"
+        "price comparison against Model Win Probability, NOT forced into the spread/total "
+        "pattern; see the MANDATORY legal-status disclaimer in row 2 of this tab, not just "
+        "in the spec document."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")

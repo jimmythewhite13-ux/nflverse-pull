@@ -81,11 +81,15 @@ def build(workbook_path: str) -> dict:
                 "script's own module docstring for the required dependency check)."
             )
 
+    # Market Comparison & Confidence's own real layout: row 1 title, row 2 MANDATORY
+    # Kalshi/Polymarket legal disclaimer, row 3 header, row 4+ data (verified live against
+    # that tab's own build script before writing this).
     market = wb[MARKET_SHEET]
-    mk_home_col = _find_col(market, 2, "Home Team")
-    mk_away_col = _find_col(market, 2, "Away Team")
-    mk_wp_col = _find_col(market, 2, "Win Probability\n(Home)")
-    mk_first, mk_last = 3, 3
+    mk_header_row = 3
+    mk_home_col = _find_col(market, mk_header_row, "Home Team")
+    mk_away_col = _find_col(market, mk_header_row, "Away Team")
+    mk_wp_col = _find_col(market, mk_header_row, "Win Probability\n(Home)")
+    mk_first, mk_last = mk_header_row + 1, mk_header_row + 1
     while market.cell(row=mk_last + 1, column=1).value is not None:
         mk_last += 1
     from openpyxl.utils import get_column_letter

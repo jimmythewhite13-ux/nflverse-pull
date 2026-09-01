@@ -128,10 +128,18 @@ REF_COLUMNS = [
     "De-Vigged Prob\n(Home, ref)", "Moneyline Edge\n(Home, ref)",
     "Confidence Tier\n(raw, ref)", "Primary Advantage\n(raw, ref)",
 ]
-PROP_COLUMNS = []
-for _slot_num in range(1, len(ALL_PROP_SLOTS) + 1):
-    PROP_COLUMNS.append(f"Prop {_slot_num} Sentence\n(helper)")
-    PROP_COLUMNS.append(f"Prop {_slot_num} |Edge|\n(helper)")
+# Two separate contiguous blocks -- all 20 Sentence columns, then all 20 |Edge| columns --
+# rather than interleaving Sentence/Edge pairs per slot. An interleaved layout would still be
+# mathematically correct here (the two 20-cell "start-to-start" range strings Excel builds
+# from the first/last column of each block would each stay offset by the same constant 1
+# column as every individual Sentence-Edge pair, so INDEX/MATCH's relative positions would
+# still line up) -- verified this by hand before rejecting it anyway, because that
+# correctness depends on an invariant a future reader can't see just from the formula text,
+# exactly the kind of "looks wrong, is actually right" formula this project avoids
+# elsewhere. Two separate blocks make INDEX(sentence_block, MATCH(LARGE(edge_block,k),
+# edge_block,0)) obviously correct on inspection instead.
+PROP_COLUMNS = [f"Prop {n} Sentence\n(helper)" for n in range(1, len(ALL_PROP_SLOTS) + 1)]
+PROP_COLUMNS += [f"Prop {n} |Edge|\n(helper)" for n in range(1, len(ALL_PROP_SLOTS) + 1)]
 
 COLUMNS = (
     ["Week", "Away Team", "Home Team", "Game Key\n(helper)"]

@@ -83,7 +83,7 @@ READBACK_HEADERS = [
     "Temp\n(F)", "Wind\n(mph)", "Precip\n(Y/N)", "Home Add'l\nInjury (pts)",
     "Away Add'l\nInjury (pts)", "DraftKings Spread\n(Home)", "DraftKings\nTotal",
     "Sportsbook", "MyBookie Spread\n(Home)", "MyBookie\nTotal", "Actual Home\nScore",
-    "Actual Away\nScore",
+    "Actual Away\nScore", "Home\nMoneyline", "Away\nMoneyline",
 ]
 
 
@@ -189,9 +189,13 @@ def build(workbook_path: str) -> dict:
     # helper (Week|Away|Home) -- lets a LATER tab (e.g. Market Comparison & Confidence)
     # look up a specific real game via a single-criteria MATCH instead of an unwrapped
     # multi-criteria array MATCH (the exact pattern this project caught and removed as a
-    # real bug earlier this session).
+    # real bug earlier this session). Cols 111/112 (DG/DH): Home/Away Moneyline --
+    # claude_code_spec_season_win_total_moneyline.md Part B, manual odds input alongside
+    # the existing DK/MyBookie spread/total block, same convention (blue input, real
+    # sportsbook odds the user types in).
     for col, htext in (
         (108, "Actual Home\nScore"), (109, "Actual Away\nScore"), (110, "Game Key\n(helper)"),
+        (111, "Home\nMoneyline"), (112, "Away\nMoneyline"),
     ):
         c = ws.cell(row=2, column=col, value=htext)
         c.font = HEADER_FONT
@@ -357,6 +361,11 @@ def build(workbook_path: str) -> dict:
 
         gk = ws.cell(row=row, column=110, value=f'=A{row}&"|"&C{row}&"|"&D{row}')
         gk.font = FORMULA_FONT
+
+        home_ml = ws.cell(row=row, column=111, value=rb.get("Home\nMoneyline"))
+        away_ml = ws.cell(row=row, column=112, value=rb.get("Away\nMoneyline"))
+        home_ml.font = INPUT_FONT
+        away_ml.font = INPUT_FONT
 
     last_row = first_row + len(schedule) - 1
 

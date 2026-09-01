@@ -98,6 +98,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_replacement_value
     import build_run_defense_matchup
     import build_season_matchups
+    import build_season_win_totals
     import build_secondary_index
     import build_special_teams_index
     import build_special_teams_player_index
@@ -287,6 +288,13 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # append_term_once implications and can safely run anywhere after its dependencies
     # exist.
     build_market_comparison_confidence.build(workbook_path)
+
+    # claude_code_spec_season_win_total_moneyline.md. Requires Season Matchups (for the new
+    # Home/Away Moneyline manual inputs) and Market Comparison & Confidence's own real Win
+    # Probability column (both already built above) -- pure aggregation/consolidation, no
+    # writes into Team Ratings or Z/AA, so it can safely run anywhere after its
+    # dependencies exist.
+    build_season_win_totals.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

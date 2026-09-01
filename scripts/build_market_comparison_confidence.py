@@ -113,6 +113,15 @@ COLUMNS = [
     "Rest OS", "Injury OS", "QB Repl. OS", "Phase OS", "OL Press. OS", "Explosive OS",
     "HFA OS", "Road Fat. OS", "Travel OS",
     "Primary\nAdvantage", "Secondary\nAdvantage", "Negative /\nRisk",
+    # claude_code_spec_season_win_total_moneyline.md Part B -- standard, well-established
+    # conversions, not new modeling. Home/Away Moneyline are real refs into Season
+    # Matchups' own new manual input columns (DG/DH); everything else here is a direct,
+    # standard formula.
+    "Home\nMoneyline (ref)", "Away\nMoneyline (ref)",
+    "Model WP -> ML\n(Home)", "Model WP -> ML\n(Away)",
+    "Home Raw Implied\nProbability", "Away Raw Implied\nProbability",
+    "Home De-Vigged\nProbability", "Away De-Vigged\nProbability",
+    "Moneyline Edge\n(Home)", "Moneyline Edge\n(Away)",
 ]
 COL = {name: i + 1 for i, name in enumerate(COLUMNS)}
 LET = {name: get_column_letter(i + 1) for i, name in enumerate(COLUMNS)}
@@ -514,6 +523,75 @@ def build(workbook_path: str) -> dict:
         for cell in (primary, secondary, risk):
             cell.font = FORMULA_FONT
 
+        # ==== claude_code_spec_season_win_total_moneyline.md Part B: Moneyline ============
+        # Standard, well-established conversions -- not new modeling.
+        home_ml = ws.cell(row=row, column=COL["Home\nMoneyline (ref)"], value=(
+            f'=IFERROR(INDEX({sm_col("DG")},MATCH({ref["key"]},{key_range},0)),"")'
+        ))
+        away_ml = ws.cell(row=row, column=COL["Away\nMoneyline (ref)"], value=(
+            f'=IFERROR(INDEX({sm_col("DH")},MATCH({ref["key"]},{key_range},0)),"")'
+        ))
+        home_ml.font = LINK_FONT
+        away_ml.font = LINK_FONT
+
+        home_ml_ref = L("Home\nMoneyline (ref)", row)
+        away_ml_ref = L("Away\nMoneyline (ref)", row)
+
+        wp_ref = L("Win Probability\n(Home)", row)
+        wp_to_ml_home = ws.cell(row=row, column=COL["Model WP -> ML\n(Home)"], value=(
+            f'=IF({wp_ref}="","",IF({wp_ref}>=0.5,-({wp_ref}/(1-{wp_ref}))*100,'
+            f'((1-{wp_ref})/{wp_ref})*100))'
+        ))
+        wp_to_ml_away = ws.cell(row=row, column=COL["Model WP -> ML\n(Away)"], value=(
+            f'=IF({wp_ref}="","",IF((1-{wp_ref})>=0.5,-((1-{wp_ref})/{wp_ref})*100,'
+            f'({wp_ref}/(1-{wp_ref}))*100))'
+        ))
+        wp_to_ml_home.font = FORMULA_FONT
+        wp_to_ml_away.font = FORMULA_FONT
+        wp_to_ml_home.number_format = "+0;-0"
+        wp_to_ml_away.number_format = "+0;-0"
+
+        home_raw = ws.cell(row=row, column=COL["Home Raw Implied\nProbability"], value=(
+            f'=IF({home_ml_ref}="","",IF({home_ml_ref}<0,-{home_ml_ref}/(-{home_ml_ref}+100),'
+            f'100/({home_ml_ref}+100)))'
+        ))
+        away_raw = ws.cell(row=row, column=COL["Away Raw Implied\nProbability"], value=(
+            f'=IF({away_ml_ref}="","",IF({away_ml_ref}<0,-{away_ml_ref}/(-{away_ml_ref}+100),'
+            f'100/({away_ml_ref}+100)))'
+        ))
+        home_raw.font = FORMULA_FONT
+        away_raw.font = FORMULA_FONT
+        home_raw.number_format = "0.0%"
+        away_raw.number_format = "0.0%"
+
+        home_raw_ref = L("Home Raw Implied\nProbability", row)
+        away_raw_ref = L("Away Raw Implied\nProbability", row)
+        home_devig = ws.cell(row=row, column=COL["Home De-Vigged\nProbability"], value=(
+            f'=IF(OR({home_raw_ref}="",{away_raw_ref}=""),"",'
+            f'{home_raw_ref}/({home_raw_ref}+{away_raw_ref}))'
+        ))
+        away_devig = ws.cell(row=row, column=COL["Away De-Vigged\nProbability"], value=(
+            f'=IF(OR({home_raw_ref}="",{away_raw_ref}=""),"",'
+            f'{away_raw_ref}/({home_raw_ref}+{away_raw_ref}))'
+        ))
+        home_devig.font = FORMULA_FONT
+        away_devig.font = FORMULA_FONT
+        home_devig.number_format = "0.0%"
+        away_devig.number_format = "0.0%"
+
+        home_devig_ref = L("Home De-Vigged\nProbability", row)
+        away_devig_ref = L("Away De-Vigged\nProbability", row)
+        ml_edge_home = ws.cell(row=row, column=COL["Moneyline Edge\n(Home)"], value=(
+            f'=IF(OR({wp_ref}="",{home_devig_ref}=""),"",{wp_ref}-{home_devig_ref})'
+        ))
+        ml_edge_away = ws.cell(row=row, column=COL["Moneyline Edge\n(Away)"], value=(
+            f'=IF(OR({wp_ref}="",{away_devig_ref}=""),"",(1-{wp_ref})-{away_devig_ref})'
+        ))
+        ml_edge_home.font = FORMULA_FONT
+        ml_edge_away.font = FORMULA_FONT
+        ml_edge_home.number_format = "0.0%;(0.0%)"
+        ml_edge_away.number_format = "0.0%;(0.0%)"
+
     last_row = first_row + len(schedule) - 1
 
     note_row = last_row + 2
@@ -534,7 +612,14 @@ def build(workbook_path: str) -> dict:
         "already-computed 'Net Home Advantage' values -- never free-text generation. "
         "Weather and Divisional adjustments are deliberately excluded from this ranking: "
         "both feed Z AND AA identically (+U/2 and +Y/2 to each side), so neither "
-        "differentiates which team it favors -- they affect the game TOTAL, not the split."
+        "differentiates which team it favors -- they affect the game TOTAL, not the split. "
+        "claude_code_spec_season_win_total_moneyline.md Part B (Moneyline) was added here: "
+        "Model Win Probability -> American Moneyline and Sportsbook Moneyline -> de-vigged "
+        "implied probability are both standard, well-established conversions, not new "
+        "modeling. De-vigging normalizes both teams' raw implied probabilities (which sum "
+        "to MORE than 100% due to the book's own margin) so they sum to exactly 100% before "
+        "computing Moneyline Edge -- comparing the model against the raw, un-de-vigged "
+        "number would unfairly make the model look better than it is."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")

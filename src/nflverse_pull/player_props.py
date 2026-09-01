@@ -20,6 +20,17 @@ distinct from claude_code_spec_route_redzone_usage.md's own Pass-Play Snap Parti
 
 compute_player_season_catch_rate(): real Receptions/Targets per player-season -- the
 "derivable from existing Success Rate/completion data" the spec calls for.
+
+compute_player_game_schedule(): cross-joins each scored player-role (Team | Role | Player
+Name | Player ID | Position -- current_roster.resolve_scored_population's own output, one
+per position) with that player's own team's real 17-game season schedule
+(season_schedule.compute_season_schedule's own output), producing one row per (player, real
+game) carrying that game's real Week, Opponent, Home/Away flag, and a Game Key in the exact
+same "Week|Away|Home" convention Season Matchups' own Game Key helper column uses. Computed
+in PYTHON rather than as an Excel multi-criteria array match -- keeps the ~3,264-row Excel
+tab's own formulas single-criterion MATCH-only, avoiding the exact "unwrapped multi-criteria
+array MATCH" bug class already caught once this project (Explosive Play Matchup Explanation
+Engine).
 """
 from __future__ import annotations
 
@@ -148,3 +159,44 @@ def compute_player_season_catch_rate(pbp: pd.DataFrame) -> pd.DataFrame:
     out["Catch Rate"] = out["completions"] / out["targets"]
     out = out.rename(columns={"receiver_player_id": "Player ID", "season": "Season"})
     return out[["Player ID", "Season", "Team", "Catch Rate"]]
+
+
+def compute_player_game_schedule(
+    population: pd.DataFrame, schedule: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Pure function, no network. `population` columns: Team | Role | Player Name | Player ID |
+    Position (current_roster.resolve_scored_population's own output for one position, with
+    a Position column stamped on by the caller -- the same pattern build_wr_te_index.py's
+    own _pull_data() already uses for WR+TE). `schedule` columns:
+    season_schedule.compute_season_schedule's own real Week | Date | Away Team | Home Team |
+    ... output.
+
+    Each player-role gets one row per real game his team plays (his team's full real 17-game
+    schedule, home and away both), carrying that game's real Week, Opponent, Home/Away flag,
+    and a real Game Key built the identical way Season Matchups' own Game Key helper column
+    is (Week|Away Team|Home Team, using the game's OWN real away/home teams regardless of
+    which side `population`'s player is on).
+
+    Output: Player ID | Player Name | Team | Position | Role | Week | Opponent | Home/Away |
+    Game Key, sorted by (Position, Team, Role, Week) for a stable, deterministic row order.
+    """
+    sched = schedule.copy()
+    sched["Game Key"] = (
+        sched["Week"].astype(str) + "|" + sched["Away Team"] + "|" + sched["Home Team"]
+    )
+
+    home = sched.rename(columns={"Home Team": "Team", "Away Team": "Opponent"}).copy()
+    home["Home/Away"] = "Home"
+    away = sched.rename(columns={"Away Team": "Team", "Home Team": "Opponent"}).copy()
+    away["Home/Away"] = "Away"
+    games = pd.concat([home, away], ignore_index=True)[
+        ["Team", "Week", "Opponent", "Home/Away", "Game Key"]
+    ]
+
+    out = population.merge(games, on="Team", how="left")
+    out = out.sort_values(["Position", "Team", "Role", "Week"]).reset_index(drop=True)
+    return out[[
+        "Player ID", "Player Name", "Team", "Position", "Role", "Week", "Opponent",
+        "Home/Away", "Game Key",
+    ]]

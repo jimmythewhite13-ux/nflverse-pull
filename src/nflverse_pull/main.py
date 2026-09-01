@@ -15,11 +15,12 @@ Two stages:
      Index / the OL vs. Pass Rush Matchup wiring / QB Environment Model / the Effective QB
      Rating wiring / Explosive Play Matchup / the Explosive Play Matchup wiring / Turnover &
      Red-Zone Regression / Team-Specific HFA / the Game Environment Upgrades Season
-     Matchups wiring / Coaching Index -- fully REBUILT from scratch each run (not a
-     Section-1-only value refresh), because their row counts are inherently dynamic: which
-     players currently qualify as a Starter/Backup, how many games have been played this
-     season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced Efficiency
-     Metrics' yet (run scripts/build_efficiency_engine.py once first).
+     Matchups wiring / Coaching Index / Market Comparison & Confidence / Season Win Totals /
+     Player Prop Projections -- fully REBUILT from scratch each run (not a Section-1-only
+     value refresh), because their row counts are inherently dynamic: which players
+     currently qualify as a Starter/Backup, how many games have been played this season,
+     etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced Efficiency Metrics'
+     yet (run scripts/build_efficiency_engine.py once first).
 
      claude_code_spec_full_season_matchups.md replaced the old hardcoded 16-game "Week 1
      Matchups" tab with "Season Matchups" (one long-format row per real game across all 18
@@ -92,6 +93,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_oline_index
     import build_pass_defense_matchup
     import build_pass_rush_generation_index
+    import build_player_prop_projections
     import build_qb_environment_model
     import build_qb_index
     import build_rb_index
@@ -295,6 +297,16 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # writes into Team Ratings or Z/AA, so it can safely run anywhere after its
     # dependencies exist.
     build_season_win_totals.build(workbook_path)
+
+    # claude_code_spec_player_prop_projections.md. Requires Season Matchups, QB Index, RB
+    # Value Index, and WR-TE Value Index (all already built above, including their own
+    # Section 7 Manual Roster Override rebuilds -- this script reads each tab's ALREADY-
+    # REBUILT overrides, not a second independently-pulled population). Pure downstream
+    # consolidation, same as Market Comparison & Confidence and Season Win Totals above: no
+    # writes into Team Ratings or Season Matchups' own Z/AA formulas, so no N-ownership or
+    # append_term_once implications -- placed last since it's the newest, most-downstream
+    # consumer of everything else in this pipeline.
+    build_player_prop_projections.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

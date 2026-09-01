@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from nflverse_pull.player_props import (
+    compute_player_game_schedule,
     compute_player_season_catch_rate,
     compute_player_season_qb_yards_per_attempt,
     compute_player_season_target_share,
@@ -81,3 +82,37 @@ def test_raises_on_unmapped_team():
     bad = pd.DataFrame([_row("g1", "ZZZ", 2025, play_type="run")])
     with pytest.raises(ValueError, match="No full-name mapping"):
         compute_team_season_pass_rush_volume(bad)
+
+
+def _fake_schedule():
+    # 2 real games: BUF hosts MIA in Week 1 (BUF Home), BUF at NYJ in Week 2 (BUF Away).
+    return pd.DataFrame([
+        {"Week": 1, "Date": "2026-09-06", "Away Team": "Miami Dolphins",
+         "Home Team": "Buffalo Bills", "Stadium": "Highmark Stadium", "Dome": False,
+         "Divisional": True, "Home Rest": 7, "Away Rest": 7, "Away Travel": 1000.0},
+        {"Week": 2, "Date": "2026-09-13", "Away Team": "Buffalo Bills",
+         "Home Team": "New York Jets", "Stadium": "MetLife Stadium", "Dome": False,
+         "Divisional": True, "Home Rest": 7, "Away Rest": 7, "Away Travel": 300.0},
+    ])
+
+
+def _fake_population():
+    return pd.DataFrame([
+        {"Team": "Buffalo Bills", "Role": "Starter", "Player Name": "QB1",
+         "Player ID": "QB1", "Position": "QB"},
+    ])
+
+
+def test_player_game_schedule_real_week_opponent_home_away():
+    out = compute_player_game_schedule(_fake_population(), _fake_schedule())
+    assert len(out) == 2
+
+    wk1 = out[out["Week"] == 1].iloc[0]
+    assert wk1["Opponent"] == "Miami Dolphins"
+    assert wk1["Home/Away"] == "Home"
+    assert wk1["Game Key"] == "1|Miami Dolphins|Buffalo Bills"
+
+    wk2 = out[out["Week"] == 2].iloc[0]
+    assert wk2["Opponent"] == "New York Jets"
+    assert wk2["Home/Away"] == "Away"
+    assert wk2["Game Key"] == "2|Buffalo Bills|New York Jets"

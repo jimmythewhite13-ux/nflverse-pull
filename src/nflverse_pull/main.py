@@ -87,6 +87,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_game_environment_wiring
     import build_kicking_index
     import build_lb_index
+    import build_market_comparison_confidence
     import build_ol_pass_rush_wiring
     import build_oline_index
     import build_pass_defense_matchup
@@ -277,6 +278,15 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # Power Rating (N) formula from build_turnover_redzone_regression -- see this function's
     # own N-ownership comment above and that constant's own note on the tab itself.
     build_coaching_index.build(workbook_path)
+
+    # claude_code_spec_market_comparison_confidence_explanation_engine.md (Version 8,
+    # partial). Requires Season Matchups, QB Index, Offensive Line Index, and Team Ratings
+    # (all already built above) -- placed last since it's a pure consolidation tab that
+    # only reads from other tabs via real INDEX/MATCH references, never writes into Team
+    # Ratings or Season Matchups' own Z/AA formulas, so it has no N-ownership or
+    # append_term_once implications and can safely run anywhere after its dependencies
+    # exist.
+    build_market_comparison_confidence.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

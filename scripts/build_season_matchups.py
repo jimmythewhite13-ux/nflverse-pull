@@ -185,8 +185,14 @@ def build(workbook_path: str) -> dict:
         c.alignment = HEADER_ALIGN
     # Actual Home/Away Score live at cols 108/109 (DD/DE) -- past every wiring script's own
     # territory (ends at DC/107) -- written here directly since `headers` only covers the
-    # contiguous A-AT block this script owns outright.
-    for col, htext in ((108, "Actual Home\nScore"), (109, "Actual Away\nScore")):
+    # contiguous A-AT block this script owns outright. Col 110 (DF) is a real "Game Key"
+    # helper (Week|Away|Home) -- lets a LATER tab (e.g. Market Comparison & Confidence)
+    # look up a specific real game via a single-criteria MATCH instead of an unwrapped
+    # multi-criteria array MATCH (the exact pattern this project caught and removed as a
+    # real bug earlier this session).
+    for col, htext in (
+        (108, "Actual Home\nScore"), (109, "Actual Away\nScore"), (110, "Game Key\n(helper)"),
+    ):
         c = ws.cell(row=2, column=col, value=htext)
         c.font = HEADER_FONT
         c.fill = HEADER_FILL
@@ -348,6 +354,9 @@ def build(workbook_path: str) -> dict:
         act_a = ws.cell(row=row, column=109, value=rb.get("Actual Away\nScore"))
         act_h.font = INPUT_FONT
         act_a.font = INPUT_FONT
+
+        gk = ws.cell(row=row, column=110, value=f'=A{row}&"|"&C{row}&"|"&D{row}')
+        gk.font = FORMULA_FONT
 
     last_row = first_row + len(schedule) - 1
 

@@ -840,7 +840,7 @@ def build(workbook_path: str) -> dict:
     print(
         f"Built '{SHEET_NAME}': Part 0 Section 1 {len(team_pace)} rows, Section 3 "
         f"{len(TEAM_ORDER)} teams, main table {len(schedule_rows)} player-game rows "
-        f"({len(population)} player-roles x {len(schedule)} real games)."
+        f"({len(population)} player-roles x {games_per_role} real games each)."
     )
     print(f"Saved to {workbook_path}")
     return {

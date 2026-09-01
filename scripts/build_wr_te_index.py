@@ -270,8 +270,18 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n.font = NOTE_FONT
         n.alignment = Alignment(wrap_text=True, vertical="top")
 
-    ws.merge_cells("A181:D181")
-    ts_cr_title = ws.cell(row=181, column=1, value=(
+    # Row 189, NOT 181 -- 181 is already QB Index's own Pure Y/A weight row (Model
+    # Assumptions C181, see build_qb_index.py's add_model_assumptions_weights). A real bug
+    # caught live: an earlier version of this title merge collided with that row, silently
+    # destroying QB Index's own B181/C181/D181 on the first pipeline run that touched both
+    # (merge_cells() converts non-anchor cells in a merged range into read-only MergedCell
+    # placeholders, discarding whatever was already written there), then crashing the NEXT
+    # run when build_qb_index tried to write to the now-merged cells. Placed at 189, past
+    # Player Prop Projections' own C185-C188 block (184-188) -- those are already live in
+    # 3,264 real formula cells across 'Player Prop Projections', so this fix moves ONLY this
+    # tab's own title rather than renumbering anything already wired elsewhere.
+    ws.merge_cells("A189:D189")
+    ts_cr_title = ws.cell(row=189, column=1, value=(
         "WR/TE Target Share & Catch Rate -- Volume-Projection Only (see 'WR-TE Value "
         "Index' tab's own Section 3/5 'Target Share'/'Catch Rate' block; NOT part of "
         "WR/TE Index Score)"

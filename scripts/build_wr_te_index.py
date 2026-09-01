@@ -92,6 +92,10 @@ from nflverse_pull.current_roster import (  # noqa: E402
     resolve_scored_population,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
+from nflverse_pull.player_props import (  # noqa: E402
+    compute_player_season_catch_rate,
+    compute_player_season_target_share,
+)
 from nflverse_pull.receiving_stats import (  # noqa: E402
     compute_player_season_ngs_receiving,
     compute_player_season_pass_play_participation,
@@ -148,6 +152,15 @@ METRICS = [
     {"key": "pass_play_participation", "col": "Pass-Play Snap Participation %",
      "label": "Pass-Play Snap\nParticipation %", "fmt": "0.00"},
     {"key": "rz_target_share", "col": "Red-Zone Target Share", "label": "Red-Zone\nTarget Share",
+     "fmt": "0.00"},
+    # claude_code_spec_player_prop_projections.md: Target Share is genuinely NEW, distinct
+    # from Pass-Play Snap Participation % above (routes run, not targets received) --
+    # weight 0 (Model Assumptions, see add_model_assumptions_weights) so it never
+    # contributes to WR/TE Index Score; exists so Player Prop Projections can reference a
+    # real, decay-weighted, current-season-blended Target Share and Catch Rate baseline.
+    {"key": "target_share", "col": "Target Share", "label": "Target Share\n(volume-proj.\nonly)",
+     "fmt": "0.00"},
+    {"key": "catch_rate", "col": "Catch Rate", "label": "Catch Rate\n(volume-proj.\nonly)",
      "fmt": "0.00"},
 ]
 
@@ -232,6 +245,20 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         (126, "Red-Zone Target Share Weight (WR/TE Index, pts per SD)", 0.0,
          "claude_code_spec_route_redzone_usage.md -- DEFAULTS TO 0 (informational "
          "only), same reasoning as C125."),
+        (182, "Target Share Weight (WR/TE Index, pts per SD) -- MUST STAY 0", 0,
+         "claude_code_spec_player_prop_projections.md: real player Target Share (own "
+         "real targets / team's own real total pass attempts) -- genuinely new, distinct "
+         "from Pass-Play Snap Participation % (C125, which measures route-running "
+         "frequency, not how often a player is actually targeted). Exists ONLY so "
+         "'Player Prop Projections' can reference a real, decay-weighted, current-"
+         "season-blended Target Share baseline for volume-projection purposes. Keep this "
+         "weight at 0 -- it must NEVER contribute to the WR/TE Index Score itself."),
+        (183, "Catch Rate Weight (WR/TE Index, pts per SD) -- MUST STAY 0", 0,
+         "claude_code_spec_player_prop_projections.md: real Receptions/Targets per "
+         "player-season -- exists ONLY so 'Player Prop Projections' can reference a "
+         "real, decay-weighted, current-season-blended Catch Rate baseline for "
+         "volume-projection purposes (Part B efficiency for receptions). Keep this "
+         "weight at 0 -- it must NEVER contribute to the WR/TE Index Score itself."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -242,6 +269,15 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n = ws.cell(row=row, column=4, value=note)
         n.font = NOTE_FONT
         n.alignment = Alignment(wrap_text=True, vertical="top")
+
+    ws.merge_cells("A181:D181")
+    ts_cr_title = ws.cell(row=181, column=1, value=(
+        "WR/TE Target Share & Catch Rate -- Volume-Projection Only (see 'WR-TE Value "
+        "Index' tab's own Section 3/5 'Target Share'/'Catch Rate' block; NOT part of "
+        "WR/TE Index Score)"
+    ))
+    ts_cr_title.font = HEADER_FONT
+    ts_cr_title.fill = HEADER_FILL
 
 
 def _pull_data(overrides: pd.DataFrame) -> dict:
@@ -286,6 +322,21 @@ def _pull_data(overrides: pd.DataFrame) -> dict:
         season_stats["Pass-Play Snap Participation %"].fillna(0.0)
     )
     season_stats["Red-Zone Target Share"] = season_stats["Red-Zone Target Share"].fillna(0.0)
+
+    print("Computing Target Share / Catch Rate "
+          "(claude_code_spec_player_prop_projections.md, volume-projection only)...")
+    target_share = compute_player_season_target_share(pbp)
+    season_stats = season_stats.merge(
+        target_share, on=["Player ID", "Season", "Team"], how="left"
+    )
+    catch_rate = compute_player_season_catch_rate(pbp)
+    season_stats = season_stats.merge(catch_rate, on=["Player ID", "Season", "Team"], how="left")
+    # Every qualifying WR/TE-season here already cleared MIN_QUALIFYING_TARGETS real targets
+    # above, so a real match should always exist; fillna(0.0) only as a defensive guard
+    # against the practically-impossible zero-target edge case, matching the Red-Zone Target
+    # Share convention above.
+    season_stats["Target Share"] = season_stats["Target Share"].fillna(0.0)
+    season_stats["Catch Rate"] = season_stats["Catch Rate"].fillna(0.0)
 
     print(f"Pulling {CURRENT_ROSTER_YEAR} depth charts for current-roster WR/TE population...")
     depth_charts = fetch_depth_charts([CURRENT_ROSTER_YEAR])
@@ -427,7 +478,7 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(season_stats) - 1
     _section_title(
-        ws, 3, 13,
+        ws, 3, 15,
         "Section 1 \u2014 Raw 3-Year Data per Receiver-Season (from nflverse pbp; no "
         "Position or historical Role column -- see this tab's closing note). Avg "
         "Separation / YAC Over Expectation (J/K) are real NFL Next Gen Stats data with "
@@ -435,14 +486,18 @@ def build(workbook_path: str) -> dict:
         "real, qualifying receiver-season with no real NGS value, not a zero. Pass-Play "
         "Snap Participation % / Red-Zone Target Share (L/M, "
         "claude_code_spec_route_redzone_usage.md) are real USAGE signals -- see this "
-        "tab's closing note for why their composite weight defaults to 0.",
+        "tab's closing note for why their composite weight defaults to 0. Target Share / "
+        "Catch Rate (N/O, claude_code_spec_player_prop_projections.md) are real "
+        "volume-projection-only signals, also weight 0 -- genuinely distinct from Pass-"
+        "Play Snap Participation % (routes run vs. targets actually received).",
     )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "Targets", "Receiving EPA/Target",
          "Reception Success Rate", "YPT", "Is Rookie Season", "Avg Separation\n(NGS)",
          "YAC Over\nExpectation (NGS)", "Pass-Play Snap\nParticipation %",
-         "Red-Zone\nTarget Share"],
+         "Red-Zone\nTarget Share", "Target Share\n(volume-proj. only)",
+         "Catch Rate\n(volume-proj. only)"],
     )
     for i, r in enumerate(season_stats.to_dict("records")):
         row = sec1_first_row + i
@@ -478,12 +533,22 @@ def build(workbook_path: str) -> dict:
         pp_cell.number_format = "0.00"
         rz_cell.number_format = "0.00"
 
+        ts_v = float(r["Target Share"]) if pd.notna(r.get("Target Share")) else None
+        cr_v = float(r["Catch Rate"]) if pd.notna(r.get("Catch Rate")) else None
+        ts_cell = ws.cell(row=row, column=14, value=ts_v)
+        cr_cell = ws.cell(row=row, column=15, value=cr_v)
+        ts_cell.font = INPUT_FONT
+        cr_cell.font = INPUT_FONT
+        ts_cell.number_format = "0.00"
+        cr_cell.number_format = "0.00"
+
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
     rookie_range = f"$I${sec1_first_row}:$I${sec1_last_row}"
     sec1_col_of = {
         "epa": "F", "success": "G", "ypt": "H", "sep": "J", "yacoe": "K",
         "pass_play_participation": "L", "rz_target_share": "M",
+        "target_share": "N", "catch_rate": "O",
     }
     metric_ranges = {
         m["key"]: (
@@ -766,6 +831,7 @@ def build(workbook_path: str) -> dict:
         "epa": "$C$49", "success": "$C$50", "ypt": "$C$51",
         "sep": "$C$84", "yacoe": "$C$85",
         "pass_play_participation": "$C$125", "rz_target_share": "$C$126",
+        "target_share": "$C$182", "catch_rate": "$C$183",
     }
 
     for i in range(n_players):

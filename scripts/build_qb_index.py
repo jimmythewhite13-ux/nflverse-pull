@@ -58,6 +58,7 @@ from nflverse_pull.current_roster import (  # noqa: E402
     resolve_scored_population,
 )
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
+from nflverse_pull.player_props import compute_player_season_qb_yards_per_attempt  # noqa: E402
 from nflverse_pull.qb_stats import (  # noqa: E402
     compute_player_season_qb_ngs_context,
     compute_qb_roles,
@@ -81,6 +82,14 @@ METRICS = [
     {"key": "epa", "col": "EPA/Play", "label": "EPA/Play", "sec1_col": "E", "fmt": "0.000"},
     {"key": "cpoe", "col": "CPOE", "label": "CPOE", "sec1_col": "F", "fmt": "0.00"},
     {"key": "anya", "col": "ANY/A", "label": "ANY/A", "sec1_col": "G", "fmt": "0.00"},
+    # claude_code_spec_player_prop_projections.md: a SEPARATE, PURE Y/A metric (no TD/INT
+    # adjustment, unlike ANY/A above) -- weight stays 0 (Model Assumptions C181, see
+    # add_model_assumptions_weights' own note) so it NEVER contributes to QB Index Score;
+    # it exists only so Player Prop Projections can reference a real, decay-weighted,
+    # current-season-blended pure Y/A baseline. Gets the exact same 3-Yr decay/current-
+    # season-blend treatment as every other METRICS entry, for free, by being one.
+    {"key": "ya", "col": "Y/A", "label": "Y/A\n(volume-proj.\nonly)", "sec1_col": "L",
+     "fmt": "0.00"},
 ]
 
 # --- Styles (same conventions as build_efficiency_engine.py / the rest of the workbook) --
@@ -141,6 +150,13 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          "A starting guess, like every other coefficient in this model: predicted scoring "
          "impact (in game points) per 1 point of QB Index gap between a team's starter and "
          "backup. Tune this if replacement-value swings feel too large or too small."),
+        (181, "Pure Y/A Weight (QB Index, pts per SD) -- MUST STAY 0", 0,
+         "claude_code_spec_player_prop_projections.md: a SEPARATE, PURE Yards/Attempt "
+         "metric (no TD/INT adjustment), deliberately distinct from ANY/A above -- ANY/A "
+         "stays the skill-evaluation metric feeding QB Index Score; this one exists ONLY "
+         "so 'Player Prop Projections' can reference a real, decay-weighted, current-"
+         "season-blended pure Y/A baseline for volume-projection purposes. Keep this "
+         "weight at 0 -- it must NEVER contribute to the QB Index Score itself."),
     ]
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
@@ -151,6 +167,14 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
         n = ws.cell(row=row, column=4, value=note)
         n.font = NOTE_FONT
         n.alignment = Alignment(wrap_text=True, vertical="top")
+
+    ws.merge_cells("A180:D180")
+    ya_title = ws.cell(row=180, column=1, value=(
+        "QB Pure Y/A -- Volume-Projection Only (see 'QB Index' tab's own Section 3/5 "
+        "'Y/A' block; NOT part of QB Index Score)"
+    ))
+    ya_title.font = HEADER_FONT
+    ya_title.fill = HEADER_FILL
 
 
 def _read_existing_overrides(wb: openpyxl.Workbook) -> pd.DataFrame:
@@ -266,6 +290,12 @@ def build(workbook_path: str) -> dict:
     print(f"{len(stats) - n_missing_ngs} of {len(stats)} QB-seasons have real NGS context "
           f"({n_missing_ngs} below NGS's own qualifying threshold).")
 
+    # claude_code_spec_player_prop_projections.md: a SEPARATE, PURE Y/A metric (see
+    # METRICS' own "ya" entry above) -- left join, same real (Player ID, Season, Team) key
+    # every other per-QB-season merge here already uses.
+    ya = compute_player_season_qb_yards_per_attempt(pbp)
+    stats = stats.merge(ya, on=["Player ID", "Season", "Team"], how="left")
+
     # Retrofit per claude_code_spec_current_roster_fix.md Part 4: the OLD population (kept
     # here, renamed, as the fallback for a team the current-roster pull/override didn't
     # cover) was every historical Starter/Backup in the most recent pulled season.
@@ -314,16 +344,19 @@ def build(workbook_path: str) -> dict:
     sec1_first_row = 5
     sec1_last_row = sec1_first_row + len(stats) - 1
     _section_title(
-        ws, 3, 11,
+        ws, 3, 12,
         "Section 1 \u2014 Raw 3-Year Data per QB-Season (from nflverse pbp). Avg Time to "
         "Throw / Aggressiveness (J/K, real NFL Next Gen Stats) are CONTEXT ONLY -- not part "
-        "of the weighted composite in Section 5 (see this tab's closing note for why).",
+        "of the weighted composite in Section 5 (see this tab's closing note for why). "
+        "Y/A (L) is a SEPARATE, PURE Yards/Attempt metric for Player Prop Projections' own "
+        "volume-projection use -- also never part of the weighted composite (weight 0, "
+        "Model Assumptions C181); ANY/A (G) remains QB Index Score's own skill metric.",
     )
     _header_row(
         ws, 4,
         ["Player Name", "Player ID", "Team", "Season", "EPA/Play", "CPOE", "ANY/A",
          "Is Rookie Season", "Role", "Avg Time to Throw\n(context only)",
-         "Aggressiveness\n(context only)"],
+         "Aggressiveness\n(context only)", "Y/A\n(volume-proj. only)"],
     )
     for i, r in enumerate(stats.to_dict("records")):
         row = sec1_first_row + i
@@ -348,6 +381,11 @@ def build(workbook_path: str) -> dict:
         agg_cell.font = INPUT_FONT
         ttt_cell.number_format = "0.00"
         agg_cell.number_format = "0.00%"
+
+        ya_v = float(r["Y/A"]) if pd.notna(r.get("Y/A")) else None
+        ya_cell = ws.cell(row=row, column=12, value=ya_v)
+        ya_cell.font = INPUT_FONT
+        ya_cell.number_format = "0.00"
 
     id_range = f"$B${sec1_first_row}:$B${sec1_last_row}"
     season_range = f"$D${sec1_first_row}:$D${sec1_last_row}"
@@ -630,7 +668,7 @@ def build(workbook_path: str) -> dict:
     std_cell_ref = {
         m["key"]: f"${get_column_letter(2 + j)}${std_row}" for j, m in enumerate(METRICS)
     }
-    weight_cells = {"epa": "$C$34", "cpoe": "$C$35", "anya": "$C$36"}
+    weight_cells = {"epa": "$C$34", "cpoe": "$C$35", "anya": "$C$36", "ya": "$C$181"}
 
     for i in range(n_qb):
         sec3_row = sec3_first_row + i

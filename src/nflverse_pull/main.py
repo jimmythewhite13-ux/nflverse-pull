@@ -16,11 +16,11 @@ Two stages:
      Rating wiring / Explosive Play Matchup / the Explosive Play Matchup wiring / Turnover &
      Red-Zone Regression / Team-Specific HFA / the Game Environment Upgrades Season
      Matchups wiring / Coaching Index / Market Comparison & Confidence / Season Win Totals /
-     Player Prop Projections -- fully REBUILT from scratch each run (not a Section-1-only
-     value refresh), because their row counts are inherently dynamic: which players
-     currently qualify as a Starter/Backup, how many games have been played this season,
-     etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced Efficiency Metrics'
-     yet (run scripts/build_efficiency_engine.py once first).
+     Player Prop Projections / Simple Summary Page -- fully REBUILT from scratch each run
+     (not a Section-1-only value refresh), because their row counts are inherently dynamic:
+     which players currently qualify as a Starter/Backup, how many games have been played
+     this season, etc. Skipped, non-fatally, on a workbook that doesn't have 'Advanced
+     Efficiency Metrics' yet (run scripts/build_efficiency_engine.py once first).
 
      claude_code_spec_full_season_matchups.md replaced the old hardcoded 16-game "Week 1
      Matchups" tab with "Season Matchups" (one long-format row per real game across all 18
@@ -102,6 +102,7 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     import build_season_matchups
     import build_season_win_totals
     import build_secondary_index
+    import build_simple_summary_page
     import build_special_teams_index
     import build_special_teams_player_index
     import build_team_specific_hfa
@@ -307,6 +308,14 @@ def _rebuild_qb_and_availability(workbook_path: str) -> None:
     # append_term_once implications -- placed last since it's the newest, most-downstream
     # consumer of everything else in this pipeline.
     build_player_prop_projections.build(workbook_path)
+
+    # claude_code_spec_simple_summary_page.md. Requires Season Matchups, Market Comparison &
+    # Confidence, and Player Prop Projections (all already built above) -- pure presentation/
+    # formatting over their own already-computed outputs, zero new computation, no writes
+    # into Team Ratings or Season Matchups' own Z/AA formulas, so no N-ownership or
+    # append_term_once implications -- placed last since it's the most-downstream consumer
+    # of everything else in this pipeline (including Player Prop Projections itself).
+    build_simple_summary_page.build(workbook_path)
 
 
 def run(workbook_path: str, years: list[int] | None = None) -> None:

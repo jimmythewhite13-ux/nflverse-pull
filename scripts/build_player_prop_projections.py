@@ -29,7 +29,15 @@ Main table columns, one row per (player, real game):
   and the real Home/Away flag in PYTHON rather than an Excel multi-criteria array match,
   keeping every downstream lookup on this ~3,264-row tab a single-criterion MATCH, the same
   design choice that avoided the "unwrapped multi-criteria array MATCH" bug class already
-  caught once this project, Explosive Play Matchup Explanation Engine).
+  caught once this project, Explosive Play Matchup Explanation Engine). The final column,
+  Team|Position|Role|Week (helper), is the same idea applied one level further --
+  claude_code_spec_simple_summary_page.md's own Top 3 Player Props section needs to find
+  "this specific team's WR1, in this specific real week" from a fixed, known (Team, Role)
+  slot, without a 4-criteria array match; added when that spec was built, appended past
+  every other column so no existing formula's column reference shifts. Position is part of
+  the key (not just Team|Role|Week) because QB and RB share the identical Role label
+  "Starter" (current_roster.POSITION_ROLE_LABELS) -- caught live before this shipped: a
+  Team|Role|Week key alone is ambiguous between a team's own QB Starter and RB Starter.
 
   Part A -- Expected Volume:
     Team Pace (Att/Gm, blended) -- this tab's own Section 3 blended value, Pass Attempts/Game
@@ -171,6 +179,7 @@ COLUMNS = [
     "Sportsbook Yards\nLine", "Yards Edge\n(Proj-Line)", "Yards Recommended\nPlay",
     "Sportsbook Receptions\nLine", "Receptions Edge\n(Proj-Line)",
     "Receptions Recommended\nPlay",
+    "Team|Position|Role|Week\n(helper)",
 ]
 COL = {name: i + 1 for i, name in enumerate(COLUMNS)}
 LET = {name: get_column_letter(i + 1) for i, name in enumerate(COLUMNS)}
@@ -661,11 +670,13 @@ def build(workbook_path: str) -> dict:
             "rec_edge": L("Receptions Edge\n(Proj-Line)", row),
         }
 
+        team_pos_role_week_key = f"{rec['Team']}|{position}|{rec['Role']}|{week}"
         for name, val in (
             ("Player Name", rec["Player Name"]), ("Player ID", rec["Player ID"]),
             ("Position", position), ("Team", rec["Team"]), ("Role", rec["Role"]),
             ("Week", week), ("Opponent", rec["Opponent"]), ("Home/Away", home_away),
             ("Game Key\n(helper)", rec["Game Key"]),
+            ("Team|Position|Role|Week\n(helper)", team_pos_role_week_key),
         ):
             cell = ws.cell(row=row, column=COL[name], value=val)
             cell.font = INPUT_FONT

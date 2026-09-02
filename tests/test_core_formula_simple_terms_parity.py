@@ -27,6 +27,7 @@ from prediction_audit.engine.core_formula_simple_terms import (  # noqa: E402
     qb_replacement_adj,
     rest_effect,
     road_fatigue_adj,
+    travel_direction_adj,
     travel_effect,
     weather_adj,
 )
@@ -38,6 +39,10 @@ GROUND_TRUTH_PATH = (
 HFA_TRAVEL_FATIGUE_GROUND_TRUTH_PATH = (
     Path(__file__).resolve().parent.parent / "prediction_audit" / "manifests"
     / "v35_hfa_delta_travel_fatigue_ground_truth.json"
+)
+TRAVEL_DIRECTION_GROUND_TRUTH_PATH = (
+    Path(__file__).resolve().parent.parent / "prediction_audit" / "manifests"
+    / "v35_travel_direction_ground_truth.json"
 )
 
 
@@ -51,8 +56,14 @@ def _load_hfa_travel_fatigue_ground_truth() -> dict:
         return json.load(f)
 
 
+def _load_travel_direction_ground_truth() -> dict:
+    with open(TRAVEL_DIRECTION_GROUND_TRUTH_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
 GROUND_TRUTH = _load_ground_truth()
 HFA_TRAVEL_FATIGUE_GROUND_TRUTH = _load_hfa_travel_fatigue_ground_truth()
+TRAVEL_DIRECTION_GROUND_TRUTH = _load_travel_direction_ground_truth()
 
 
 def _rest_constants() -> RestEffectConstants:
@@ -258,3 +269,20 @@ def test_injury_adj_parity(game):
     result = injury_adj()
     assert result == pytest.approx(game["excel_home_injury_adj"], abs=1e-6)
     assert result == pytest.approx(game["excel_away_injury_adj"], abs=1e-6)
+
+
+def test_travel_direction_ground_truth_has_all_272_games():
+    assert len(TRAVEL_DIRECTION_GROUND_TRUTH["games"]) == 272
+
+
+@pytest.mark.parametrize(
+    "game", TRAVEL_DIRECTION_GROUND_TRUTH["games"],
+    ids=[_game_id(g) for g in TRAVEL_DIRECTION_GROUND_TRUTH["games"]],
+)
+def test_travel_direction_adj_parity(game):
+    penalty = TRAVEL_DIRECTION_GROUND_TRUTH["constants"]["west_to_east_penalty"]
+    result = travel_direction_adj(game["home_utc_offset"], game["away_utc_offset"], penalty)
+    assert result == pytest.approx(game["excel_da_travel_direction_adj"], abs=1e-6), (
+        f"{_game_id(game)} Travel Direction Adj mismatch: Python={result}, "
+        f"Excel={game['excel_da_travel_direction_adj']}"
+    )

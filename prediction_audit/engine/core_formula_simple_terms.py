@@ -48,6 +48,11 @@ Real formulas confirmed live in the recalculated v35 copy (row 3, generalized to
     workbook (no dynamic injury-point logic exists here at all, unlike QB/RB Replacement Value
     which are real). Modeled here as a function that always returns 0.0, with that limitation
     stated explicitly rather than silently treated as "0 because no injuries this week."
+    Travel Direction Adj (CZ/DA, away side only -- AA05, confirmed no home-side mirror exists),
+    where CX/CY are pre-computed real Stadium UTC Offset lookups (static per-team reference
+    data from Team-Specific HFA's own real Section 4 table, taken as given):
+        CZ =IF(OR(CX3="",CY3=""),"",CX3-CY3)
+        DA =IF(CZ3="",0,IF(CZ3>0,C157,0))
 
 Ground truth was extracted across all 272 real Season Matchups rows. In that real snapshot,
 every game's real Snow/Precipitation flags are "N", every real Backup-In flag is "Starter In",
@@ -172,3 +177,16 @@ def injury_adj() -> float:
     literal constant 0 for every real row -- a documented non-functional placeholder in the
     live workbook, not a computed value. See module docstring."""
     return 0.0
+
+
+def travel_direction_adj(
+    home_utc_offset: float | None, away_utc_offset: float | None,
+    west_to_east_penalty: float,
+) -> float:
+    """Away side only -- confirmed no home-side mirror exists. home_utc_offset/away_utc_offset
+    are already-resolved real per-team static UTC-offset lookups (from Team-Specific HFA's own
+    Section 4 table); None/"" mirrors Excel's own blank guard."""
+    if home_utc_offset in (None, "") or away_utc_offset in (None, ""):
+        return 0.0
+    delta = home_utc_offset - away_utc_offset
+    return west_to_east_penalty if delta > 0 else 0.0

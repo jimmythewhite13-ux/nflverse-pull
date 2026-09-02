@@ -66,22 +66,17 @@ PASS_DEFENSE_SHEET = "Pass Defense Matchup"
 RUN_DEFENSE_SHEET = "Run Defense Matchup"
 MATCHUPS_SHEET = "Season Matchups"
 
-# Real Section 5 ranges on each source tab, verified against the live workbook before
-# writing this (each tab's own build script already fixes these; documented here since this
-# script reads them, not writes them). Score column + Team|Role (or Team) key column.
-QB_SEC5_RANGE = (245, 308)
+# Score column + Team|Role (or Team) key column on each source tab's own Section 5 -- the
+# ROW range itself is discovered dynamically per build (see _find_section5_range's own
+# docstring for why: it used to be hardcoded here and silently drifted stale).
 QB_SCORE_COL, QB_KEY_COL = "I", "K"
-# RB Index's own Score/Team|Role-key columns shift with METRICS' length (each metric adds a
+# RB Index's own Score/Team|Role-key COLUMNS shift with METRICS' length (each metric adds a
 # 7-column Section 3 block and a 1-column Section 5 Z block) -- these were J/L when RB Index
 # had 4 METRICS; claude_code_spec_route_redzone_usage.md added Red-Zone Carry Share as a 5th
 # (weight defaults to 0, but it's still a real METRICS entry, so it still shifts the layout),
-# moving them to K/M. Row range is unaffected -- adding a metric only changes COLUMN width,
-# not row counts (verified against build_rb_index.py's own row math).
-RB_SEC5_RANGE = (335, 398)
+# moving them to K/M.
 RB_SCORE_COL, RB_KEY_COL = "K", "M"
-PASS_DEF_SEC5_RANGE = (150, 181)
 PASS_DEF_SCORE_COL, PASS_DEF_TEAM_COL = "H", "A"
-RUN_DEF_SEC5_RANGE = (150, 181)
 RUN_DEF_SCORE_COL, RUN_DEF_TEAM_COL = "H", "A"
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
@@ -94,6 +89,32 @@ FORMULA_FONT = Font(name="Arial", size=10, color="FF000000")
 LINK_FONT = Font(name="Arial", size=10, color="FF008000")
 NOTE_FONT = Font(name="Arial", size=9, color="FF808080")
 ASSUMPTION_FILL = PatternFill("solid", fgColor="FFFFFF00")
+
+
+def _find_section5_range(ws) -> tuple[int, int]:
+    """
+    claude_code_spec_hfa_wiring_fix.md's own bug report (Root Cause 2): the module-level
+    QB_SEC5_RANGE/RB_SEC5_RANGE constants used to be hand-verified against the live workbook
+    once, then hardcoded -- but a player-level tab's Section 5 row count tracks its own
+    CURRENT real-roster population (current_roster.py's live depth-chart pull), which drifts
+    over time with real roster churn, independent of any code change. Caught live: RB Value
+    Index's Section 5 had grown by 2 real rows (337-400) since RB_SEC5_RANGE=(335,398) was
+    set, silently excluding the real LAST 2 players from every INDEX/MATCH search over that
+    range -- including Jacory Croskey-Merritt, a real Washington Commanders RB starter with
+    real volume, whose Matchup Differential came back blank not because his data was missing
+    but because his own real Section 5 row (399) fell outside the stale hardcoded range.
+    Discovers the real (first_row, last_row) fresh every build instead, so this can't drift
+    stale again.
+    """
+    for r in range(1, ws.max_row + 1):
+        v = ws.cell(row=r, column=1).value
+        if isinstance(v, str) and v.strip().startswith("Section 5"):
+            first_row = r + 2
+            last_row = first_row
+            while ws.cell(row=last_row + 1, column=1).value is not None:
+                last_row += 1
+            return first_row, last_row
+    raise ValueError(f"Could not find a 'Section 5' title row in '{ws.title}'.")
 
 
 def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
@@ -153,33 +174,30 @@ def build(workbook_path: str) -> dict:
         game_rows.append(row)
         row += 1
 
-    qb_score_range = (
-        f"'{QB_INDEX_SHEET}'!${QB_SCORE_COL}${QB_SEC5_RANGE[0]}:${QB_SCORE_COL}${QB_SEC5_RANGE[1]}"
-    )
-    qb_key_range = (
-        f"'{QB_INDEX_SHEET}'!${QB_KEY_COL}${QB_SEC5_RANGE[0]}:${QB_KEY_COL}${QB_SEC5_RANGE[1]}"
-    )
-    rb_score_range = (
-        f"'{RB_INDEX_SHEET}'!${RB_SCORE_COL}${RB_SEC5_RANGE[0]}:${RB_SCORE_COL}${RB_SEC5_RANGE[1]}"
-    )
-    rb_key_range = (
-        f"'{RB_INDEX_SHEET}'!${RB_KEY_COL}${RB_SEC5_RANGE[0]}:${RB_KEY_COL}${RB_SEC5_RANGE[1]}"
-    )
+    qb_sec5 = _find_section5_range(wb[QB_INDEX_SHEET])
+    rb_sec5 = _find_section5_range(wb[RB_INDEX_SHEET])
+    pass_def_sec5 = _find_section5_range(wb[PASS_DEFENSE_SHEET])
+    run_def_sec5 = _find_section5_range(wb[RUN_DEFENSE_SHEET])
+
+    qb_score_range = f"'{QB_INDEX_SHEET}'!${QB_SCORE_COL}${qb_sec5[0]}:${QB_SCORE_COL}${qb_sec5[1]}"
+    qb_key_range = f"'{QB_INDEX_SHEET}'!${QB_KEY_COL}${qb_sec5[0]}:${QB_KEY_COL}${qb_sec5[1]}"
+    rb_score_range = f"'{RB_INDEX_SHEET}'!${RB_SCORE_COL}${rb_sec5[0]}:${RB_SCORE_COL}${rb_sec5[1]}"
+    rb_key_range = f"'{RB_INDEX_SHEET}'!${RB_KEY_COL}${rb_sec5[0]}:${RB_KEY_COL}${rb_sec5[1]}"
     pass_def_score_range = (
-        f"'{PASS_DEFENSE_SHEET}'!${PASS_DEF_SCORE_COL}${PASS_DEF_SEC5_RANGE[0]}:"
-        f"${PASS_DEF_SCORE_COL}${PASS_DEF_SEC5_RANGE[1]}"
+        f"'{PASS_DEFENSE_SHEET}'!${PASS_DEF_SCORE_COL}${pass_def_sec5[0]}:"
+        f"${PASS_DEF_SCORE_COL}${pass_def_sec5[1]}"
     )
     pass_def_team_range = (
-        f"'{PASS_DEFENSE_SHEET}'!${PASS_DEF_TEAM_COL}${PASS_DEF_SEC5_RANGE[0]}:"
-        f"${PASS_DEF_TEAM_COL}${PASS_DEF_SEC5_RANGE[1]}"
+        f"'{PASS_DEFENSE_SHEET}'!${PASS_DEF_TEAM_COL}${pass_def_sec5[0]}:"
+        f"${PASS_DEF_TEAM_COL}${pass_def_sec5[1]}"
     )
     run_def_score_range = (
-        f"'{RUN_DEFENSE_SHEET}'!${RUN_DEF_SCORE_COL}${RUN_DEF_SEC5_RANGE[0]}:"
-        f"${RUN_DEF_SCORE_COL}${RUN_DEF_SEC5_RANGE[1]}"
+        f"'{RUN_DEFENSE_SHEET}'!${RUN_DEF_SCORE_COL}${run_def_sec5[0]}:"
+        f"${RUN_DEF_SCORE_COL}${run_def_sec5[1]}"
     )
     run_def_team_range = (
-        f"'{RUN_DEFENSE_SHEET}'!${RUN_DEF_TEAM_COL}${RUN_DEF_SEC5_RANGE[0]}:"
-        f"${RUN_DEF_TEAM_COL}${RUN_DEF_SEC5_RANGE[1]}"
+        f"'{RUN_DEFENSE_SHEET}'!${RUN_DEF_TEAM_COL}${run_def_sec5[0]}:"
+        f"${RUN_DEF_TEAM_COL}${run_def_sec5[1]}"
     )
 
     headers = [

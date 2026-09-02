@@ -322,15 +322,42 @@ def build(workbook_path: str) -> dict:
         y.font = FORMULA_FONT
         y.number_format = "0.00;(0.00)"
 
-        # ---- Z/AA: CLEAN base Model Home/Away Score -- no wiring terms baked in. The 5
-        # existing wiring scripts append their own real terms back on via append_term_once
-        # when the pipeline re-runs them against this tab, in the SAME order as always.
+        # ---- Z/AA: CLEAN base Model Home/Away Score -- no wiring terms baked in (beyond
+        # the one deliberate exception below). The 6 existing wiring scripts append their
+        # own real terms back on via append_term_once when the pipeline re-runs them against
+        # this tab, in the SAME order as always.
+        #
+        # claude_code_spec_hfa_wiring_fix.md: the HFA term looks up each row's own real Home
+        # Team in 'Team-Specific HFA' (3-Yr decay-weighted, regressed real home/away margin
+        # data) directly, falling back to the flat 'Model Assumptions'!$C$3 only if that
+        # lookup ever fails (e.g. a team genuinely missing from that tab -- never happens for
+        # a real current team, this is a defensive default only). This IS a deliberate,
+        # knowing exception to "never directly rewrite Z/AA's base formula, only append" --
+        # confirmed with the user first. The prior version kept the base formula's flat
+        # +-C3/2 term completely untouched and had build_game_environment_wiring.py append a
+        # separate +-CR/CS delta term that algebraically canceled it down to the exact same
+        # net CQ/2 value (verified with real recalculated numbers: Bears +2.92 pts / Ravens
+        # -0.69 pts vs. the flat-only baseline) -- mathematically identical, but left a bare
+        # $C$3 reference sitting in the formula text with nothing nearby to show it was being
+        # canceled, which repeatedly read as "still using the flat constant" even after being
+        # shown the real numbers proving otherwise. This version makes the real team-specific
+        # source of the value visible directly in the formula instead of relying on a
+        # separately-computed delta column to net it out. build_game_environment_wiring.py's
+        # own +-CR/CS append (see that script) was removed to avoid double-counting -- the
+        # CQ/CR/CS columns themselves are UNCHANGED and still real, since Market Comparison &
+        # Confidence's own Explanation Engine (col AB, "HFA Delta Net Home Adv.") reads CR/CS
+        # directly for its own factor-attribution ranking, independent of Z/AA.
+        hfa_lookup = (
+            "IFERROR(INDEX('Team-Specific HFA'!$H$110:$H$141,MATCH(D{r},"
+            "'Team-Specific HFA'!$A$110:$A$141,0)),'Model Assumptions'!$C$3)"
+        )
+        hfa_term = hfa_lookup.format(r=row)
         z = ws.cell(row=row, column=26, value=(
-            f"=(I{row}+L{row})/2+'Model Assumptions'!$C$3/2+O{row}/2+U{row}/2+V{row}+"
+            f"=(I{row}+L{row})/2+{hfa_term}/2+O{row}/2+U{row}/2+V{row}+"
             f"Y{row}/2"
         ))
         aa = ws.cell(row=row, column=27, value=(
-            f"=(K{row}+J{row})/2-'Model Assumptions'!$C$3/2-O{row}/2+Q{row}+U{row}/2+"
+            f"=(K{row}+J{row})/2-{hfa_term}/2-O{row}/2+Q{row}+U{row}/2+"
             f"W{row}+Y{row}/2"
         ))
         z.font = FORMULA_FONT

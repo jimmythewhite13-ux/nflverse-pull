@@ -261,13 +261,13 @@ def build(workbook_path: str) -> dict:
         cq.font = LINK_FONT
         cq.number_format = "0.00;(0.00)"
 
-        # Defaults to 0 (not "") when CQ is blank -- Z appends +CR{r} directly with no
-        # IF(CR{r}="",0,...) guard at the append site, unlike every other term appended into
-        # Z/AA elsewhere in this project. 0 is also the semantically correct fallback: no
-        # team-specific data means no delta from the flat 'Model Assumptions'!$C$3 baseline
-        # Z/AA's own base formula already applies. Never triggers today (all 32 real teams
-        # are always present in Team-Specific HFA's Section 3) but keeps this robust against
-        # a future data gap instead of silently depending on that always being true.
+        # claude_code_spec_hfa_wiring_fix.md: CQ/CR/CS are no longer appended into Z/AA --
+        # build_season_matchups.py's own base Z/AA formula now looks up CQ directly (with the
+        # same 'Model Assumptions'!$C$3 fallback), so appending +-CR/CS here on top would
+        # double-count the exact same value. CR/CS are kept, computed exactly as before, ONLY
+        # because Market Comparison & Confidence's own Explanation Engine (col AB, "HFA Delta
+        # Net Home Adv.") reads them directly for its own real factor-attribution ranking --
+        # a genuinely different, isolated-marginal-contribution use, unrelated to Z/AA.
         cr = wm.cell(row=r, column=96, value=(
             f'=IF(CQ{r}="",0,(CQ{r}-\'Model Assumptions\'!$C$3)/2)'
         ))
@@ -351,12 +351,13 @@ def build(workbook_path: str) -> dict:
 
         # ---- Append the new additive terms to the existing Model Home/Away Score formulas
         # (Z/AA) -- idempotent, never touches the base formula text. O/U are overwritten in
-        # place above and need no append (Z/AA already reference them by cell address).
+        # place above and need no append (Z/AA already reference them by cell address). CR/CS
+        # (HFA Delta) are deliberately NOT appended here -- build_season_matchups.py's own
+        # base formula already looks up the real Team-Specific HFA value directly (see that
+        # script's own docstring), so appending the delta here on top would double-count it.
         z_cell = wm.cell(row=r, column=26)  # Z
         aa_cell = wm.cell(row=r, column=27)  # AA
-        z_cell.value = append_term_once(z_cell.value, f"+CR{r}")
         z_cell.value = append_term_once(z_cell.value, f"+CV{r}")
-        aa_cell.value = append_term_once(aa_cell.value, f"+CS{r}")
         aa_cell.value = append_term_once(aa_cell.value, f"+CW{r}")
         aa_cell.value = append_term_once(aa_cell.value, f"+DA{r}")
 

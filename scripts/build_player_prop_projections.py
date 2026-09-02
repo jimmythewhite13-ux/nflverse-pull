@@ -92,6 +92,15 @@ Main table columns, one row per (player, real game):
     Sportsbook Receptions Line | Receptions Edge (Proj-Line) | Receptions Recommended Play
       (WR/TE rows only, Model Assumptions C188).
 
+  1H/2H Projected Yards (appended past every other column, not next to Projected Yards where
+  it would read more naturally -- Simple Summary Page's own build script references this
+  tab's columns by hardcoded letter, so a mid-list insertion would silently shift them): a
+  real, historical-2023-2025-pbp-derived first/second-half yardage split (Model Assumptions
+  C191 Pass/Receiving, C192 Rushing -- genuinely different real splits, not one shared
+  assumed round number), guarded against a blank Projected Yards the same way every other
+  formula on this tab guards against a blank upstream input. 2H is 1-1H, not a separately
+  tuned constant, so the two always sum to exactly the real Projected Yards total.
+
 No Team Ratings / Net Power Rating (N) involvement -- this is a pure downstream consolidation
 tab, reading from Season Matchups, QB Index, RB Value Index, and WR-TE Value Index (all
 already built earlier in the pipeline) via real INDEX/MATCH references, never writing back
@@ -180,6 +189,12 @@ COLUMNS = [
     "Sportsbook Receptions\nLine", "Receptions Edge\n(Proj-Line)",
     "Receptions Recommended\nPlay",
     "Team|Position|Role|Week\n(helper)",
+    # Appended here, NOT next to "Projected Yards"/"Projected Receptions" where they'd read
+    # more naturally -- Simple Summary Page's own build script references this tab's columns
+    # by HARDCODED letter (S, T, U, V, X, Y, AA), not by name, so inserting mid-list would
+    # silently shift every one of those references. Append-only, same convention as every
+    # other addition to an already-wired tab in this project.
+    "1H Projected Yards", "2H Projected Yards",
 ]
 COL = {name: i + 1 for i, name in enumerate(COLUMNS)}
 LET = {name: get_column_letter(i + 1) for i, name in enumerate(COLUMNS)}
@@ -258,13 +273,28 @@ def add_model_assumptions_weights(wb: openpyxl.Workbook) -> None:
          0.5,
          "Same threshold-based Recommended Play pattern as C187, in receptions rather than "
          "yards -- WR/TE rows only."),
+        (191, "Pass/Receiving 1st-Half Yardage Share", 0.501,
+         "1H/2H bug-fix follow-up: NOT an assumed round number -- the real 2023-2025 REG "
+         "season split of real passing_yards/receiving_yards by half (qtr 1-2 vs 3-4/OT), "
+         "computed directly from play-by-play (0.5012 for Passing, 0.5011 for Receiving -- "
+         "close enough to share one constant; genuinely different from Rushing's own real "
+         "split, see C192). 2H share is 1-this, not a separately-tuned constant, so the two "
+         "always sum to exactly the real total -- see 1H/2H Projected Yards on 'Player Prop "
+         "Projections'."),
+        (192, "Rushing 1st-Half Yardage Share", 0.490,
+         "Same real 2023-2025 pbp-derived split as C191, computed separately for Rushing -- "
+         "genuinely different (0.4901): real rushing yardage skews slightly toward the "
+         "SECOND half (more clock-control rushing late when leading, and more scramble/"
+         "garbage-time passing rather than called runs early), unlike Pass/Receiving's "
+         "near-exact 50/50 split."),
     ]
+    three_decimal_rows = {191, 192}
     for row, label, value, note in rows:
         ws.cell(row=row, column=2, value=label)
         c = ws.cell(row=row, column=3, value=value)
         c.font = INPUT_FONT
         c.fill = ASSUMPTION_FILL
-        c.number_format = "0.00"
+        c.number_format = "0.000" if row in three_decimal_rows else "0.00"
         n = ws.cell(row=row, column=4, value=note)
         n.font = NOTE_FONT
         n.alignment = Alignment(wrap_text=True, vertical="top")
@@ -770,6 +800,24 @@ def build(workbook_path: str) -> dict:
         ))
         yards_c.font = FORMULA_FONT
         yards_c.number_format = "0.0;(0.0)"
+
+        # 1H/2H bug-fix follow-up: real historical 2023-2025 pbp-derived split (Model
+        # Assumptions C191 Pass/Receiving, C192 Rushing -- NOT the assumed 51/49 round number
+        # this fix replaces), guarded against blank Projected Yards the same way every other
+        # formula on this tab already guards against a blank upstream input.
+        half_share_cell = "'Model Assumptions'!$C$192" if position == "RB" else (
+            "'Model Assumptions'!$C$191"
+        )
+        h1_c = ws.cell(row=row, column=COL["1H Projected Yards"], value=(
+            f'=IF({ref["proj_yards"]}="","",{ref["proj_yards"]}*{half_share_cell})'
+        ))
+        h2_c = ws.cell(row=row, column=COL["2H Projected Yards"], value=(
+            f'=IF({ref["proj_yards"]}="","",{ref["proj_yards"]}*(1-{half_share_cell}))'
+        ))
+        h1_c.font = FORMULA_FONT
+        h2_c.font = FORMULA_FONT
+        h1_c.number_format = "0.0;(0.0)"
+        h2_c.number_format = "0.0;(0.0)"
 
         is_receiver = position in ("WR", "TE")
         if is_receiver:

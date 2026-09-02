@@ -105,3 +105,24 @@ def compute_qb_index(history: QBHistory, constants: QBIndexConstants) -> QBIndex
         proj_baseline=pb, blend_weight=bw, blended=blended, z_scores=z_scores,
         weighted_zsum=weighted_zsum, score=score,
     )
+
+
+def replacement_value_index_points(
+    starter_score: float | None, backup_score: float | None,
+) -> float | None:
+    """QB Index Section 6, column F: Starter QB Index Score minus Backup QB Index Score, per
+    team. Real formula: =IF(OR(C="",E=""),"",C-E) -- a team whose Starter or Backup never
+    reached the real qualifying dropback threshold shows blank rather than a misleading 0."""
+    if starter_score in (None, "") or backup_score in (None, ""):
+        return None
+    return starter_score - backup_score
+
+
+def replacement_value_game_points(
+    rv_index_points: float | None, conversion: float,
+) -> float | None:
+    """QB Index Section 6, column G: applies the real Points-to-Game-Points Conversion
+    (Model Assumptions C39). Real formula: =IF(F="","",F*C39)."""
+    if rv_index_points in (None, ""):
+        return None
+    return rv_index_points * conversion

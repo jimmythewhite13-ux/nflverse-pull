@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-02
+**Last updated**: 2026-09-02 (zero-Excel-dependency reconstruction + Market Comparison & Confidence)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **Unblocked, not yet run** — the Python Model Engine can now reproduce a full real game prediction end to end (see milestone below); walk-forward reconstruction across historical seasons is the next real increment |
+| 6 | Historical reconstruction 2021-2025 | **Unblocked, not yet run** — the Python Model Engine now reproduces a full real game prediction end to end with zero Excel dependency (see milestone below); walk-forward reconstruction across historical seasons is the next real increment |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -73,14 +73,31 @@ the real `spread_line` field uses "positive = home favored," the same convention
 project's own `projected_margin` (home − away) already uses — no sign flip needed when
 comparing them directly.
 
-## MILESTONE — the real Z/AA formula is now fully reproduced in Python
+## MILESTONE — the real Z/AA formula is fully reproduced in Python, zero Excel dependency
 
 `prediction_audit/engine/season_matchups.py`'s `compute_model_home_away_score()` composes
 every real term of Season Matchups' own Z (Model Home Score) / AA (Model Away Score) formula
 and, checked against all **272 real 2026 games**, reproduces the real Excel value **exactly**
-(`abs=1e-6`) end to end. Every term is recomputed fresh from real per-team/per-game ground
-truth through the already-ported engine functions — not read pre-summed from Excel. This is
-the concrete deliverable Step 6 has been waiting on.
+(`abs=1e-6`) end to end.
+
+That first pass (`test_season_matchups_full_reconstruction.py`) still took Phase Matchup Adj,
+OL Pressure Adj, and QB Replacement Adj's real differentials as given ground-truth inputs. A
+second pass (`test_season_matchups_zero_excel_reconstruction.py`) closes that gap: those
+differentials are now recomputed fully from their own already-ported source engines -- QB
+Index, RB Value Index, QB Environment Model, Effective QB Rating, Offensive Line Index, Pass
+Defense Matchup, Run Defense Matchup, Pass Rush Generation Index -- composed together for the
+first time, and checked against the same real *intermediate* Excel values (not just the final
+adjustment). Real finding along the way: Washington Commanders' own real RB Value Index
+Section 5 rows sit 2 rows past Season Matchups' own stale hardcoded lookup range in the frozen
+v35 baseline -- the same "RB Section 5 stale-range bug" already documented and fixed in v36,
+surfacing here in a different real lookup. Expected, documented, not a bug in this
+reconstruction (see the findings list below).
+
+The only real inputs still taken as given are genuine roster/data-resolution facts, not Z/AA
+arithmetic: which QB/RB is the real Starter vs Backup, the real Backup-In flag, per-team real
+Consecutive Road Games counts and UTC offsets (both confirmed to be real static/externally-
+computed reference facts in v35 itself, not live formulas -- see below), and a real team
+pass-rate share. This is the concrete deliverable Step 6 has been waiting on.
 
 ## The Python Model Engine (`prediction_audit/engine/`)
 
@@ -117,6 +134,7 @@ real ground truth. 1e-6 floating-point tolerance throughout.
 | 15 | Special Teams Player Index | Player, no blend, per-slot-type baseline | 169 players | 170/170 |
 | 16 | Pass Rush Generation Index | Team, no blend, no points-scale conversion | 32 teams | 33/33 |
 | 17 | Team-Specific HFA | Team, single metric, no Z-scoring at all | 32 teams | 34/34 |
+| 18 | QB Environment Model | Player, no blend, composes with QB Index's own Z-scores | 64 QBs | 66/66 |
 
 **Shared engine** (`decay_baseline.py`): 6 generic pure functions (decay-weighted average,
 team history, projected baseline, current-season blend weight, blended value, Z-score) plus
@@ -153,36 +171,37 @@ real nonzero case in the current snapshot).
 composed via `season_matchups.compute_model_home_away_score()`, checked against the real
 Model Home/Away Score for all 272 real games.
 
-### Not yet fully re-derived from source (deliberately scoped, not a gap)
+### Phase Matchup Adj, OL Pressure Adj, QB Replacement Adj -- now fully re-derived from source
+
+Previously documented here as "not yet fully re-derived" -- closed in the zero-Excel-dependency
+milestone above. `effective_qb_rating.py` composes QB Environment Model's own Adjusted Baseline
+with an OL-Pressure-scaled modifier (reusing the same BK/BN differential Z09/AA's own OL
+Pressure Adj uses directly -- read twice for two different purposes, not circular) and a
+Weather-on-Passing modifier; `qb_index.py`'s own `replacement_value_index_points()`/
+`replacement_value_game_points()` compute QB Replacement Value from QB Index's own real
+Starter/Backup scores. All composed and checked against the real intermediate Excel values for
+all 272 games in `test_season_matchups_zero_excel_reconstruction.py`.
+
+### Still taken as given real inputs (confirmed genuinely out of "arithmetic" scope, not a gap)
 
 Per this project's consistent "arithmetic only, not data sourcing" scoping (used throughout
 every tab above too — e.g. every index tab's own league_avg/league_std, every RYOE/Att
-rookie-substitution, this formula's own league_baseline_off/def_y1 inputs), a handful of
-upstream real differentials are taken as **given real inputs** rather than re-derived by
-chaining other already-ported engines:
+rookie-substitution, this formula's own league_baseline_off/def_y1 inputs):
 
-- **Phase Matchup Adj's real differential is bigger than first documented.** Re-investigated
-  while scoping this section further: "Home/Away Starter QB Index Score" (AU/AX) is NOT simply
-  QB Index's own Score for the starter -- it's a real, separate "Effective QB Rating" composite
-  (Season Matchups CA/CB) = **QB Environment Model's own real Adjusted Baseline** (BY/BZ, a
-  real per-starter lookup) **+ an OL-Pressure-scaled modifier** (BU/BV, itself derived from the
-  same BK/BN OL Pressure differential used directly in Z09/AA's own OL Pressure Adj -- read
-  twice for two different purposes, not circular) **+ a Weather-on-Passing modifier** (BW/BX,
-  scaling the already-ported Weather Adj by a real team pass-rate share pulled via SUMIFS over
-  QB Environment Model + RB Value Index). The Run side (BA/BD, Starter RB Index Score) IS a
-  direct RB Value Index Section 5 lookup, as originally documented. OL Pressure Adj's own real
-  differential (BI/BJ, OL Index Pass Protection Z minus Pass Rush Generation Index Score) is
-  unaffected by this correction.
-- QB Replacement Value itself (QB Index Section 6's own Starter-Backup differential) — not yet
-  built as a QB Index engine output.
-- Consecutive Road Games count and per-team UTC offset — sourced from the not-yet-ported
-  Availability Index and Team-Specific HFA's own Section 4 reference table respectively.
-
-Closing these is the natural next increment toward a **zero-Excel-dependency** walk-forward
-reconstruction (needed for Step 6 across historical seasons where Excel isn't available at
-all) — today's milestone proves the arithmetic; that next piece proves the full data lineage.
-Given the Effective QB Rating finding above, this next increment is now known to include a
-real QB Environment Model port (see correction below), not just lookup-wiring.
+- Which QB/RB is the real Starter vs Backup for each team, and the real Backup-In flag --
+  roster/depth-chart facts, not Z/AA arithmetic.
+- **Consecutive Road Games count and per-team UTC offset -- confirmed to be real static/
+  externally-computed reference facts, not live Excel formulas at all.** Investigated while
+  scoping this section further: Availability Index's own real Section 2b header states
+  Consecutive Road Games is "a real, Python-computed count... not a live formula (no clean
+  single-cell Excel formula exists for 'the N most recent rows')" -- it's pasted in as a value
+  by that tab's own build script, not derived from a cell formula. Team-Specific HFA's own
+  Section 4 UTC Offset table is explicitly labeled "public, unchanging facts." Neither has any
+  further Z/AA arithmetic to port; both are correctly scoped as given inputs, same as every
+  other tab's own league_baseline_y1.
+- The real team pass-rate share Effective QB Rating's Weather-on-Passing modifier needs -- a
+  real data-aggregation ratio (SUMIFS over QB Environment Model + RB Value Index), not Z/AA
+  arithmetic.
 
 ### One reference-only tab; one previously-mis-scoped tab, now corrected
 
@@ -197,6 +216,46 @@ real QB Environment Model port (see correction below), not just lookup-wiring.
   chain. It does NOT feed QB Index Score itself (that half of the original claim holds) — the
   error was claiming it doesn't reach Z/AA at all. Left here as a direct correction rather than
   silently editing the earlier claim away.
+
+## Market Comparison & Confidence -- Parts A and B fully ported
+
+With the real Model Home/Away Score fully reproducible, this tab converts that into what a
+user actually looks at: a win probability and a confidence read.
+
+- **Win Probability (Home)** (`market_comparison.win_probability_home()`) -- a real standard
+  logistic transform of the real Model Margin, with a real tunable calibration constant
+  (C171 = 10.5 pts per logit in v35). 272/272 real games, exact match.
+- **Confidence Composite** (`confidence_composite.py`) -- 4 real components (Sample Size,
+  QB/Override Certainty, OL Center Continuity, Matchup Agreement), weighted-summed into a real
+  0-1 composite and bucketed into a real tier. Matchup Agreement compares 3 real Net Home
+  Advantage differentials against the overall Model Spread's real sign, replicating Excel's own
+  `SIGN()` semantics exactly. The other 3 components read real roster facts (games played,
+  Backup-In status, QB Index's own real Manual Roster Override table -- currently empty for
+  every team, OL Index's own real starting-Center rookie status -- genuinely true for 2 of 32
+  real teams). 272/272 real games, exact match (tier is an exact string match too).
+- **Net Home Advantage columns** (`net_home_advantage.py`) -- Rest/Injury/QB-Repl/HFA-Delta/
+  Road-Fatigue/Travel-Direction, each a real subtraction or negation of a term already proven
+  correct elsewhere (Phase/OL-Pressure/Explosive-Play's own Net Home Advantage are the same
+  family and already covered by Confidence Composite's own inputs). 272/272 real games.
+- **Model WP -> ML** (`market_comparison.model_win_probability_to_moneyline()`) -- the real
+  American-odds conversion of the model's own real win probability. 272/272 real games.
+
+**Deliberately not ported, and why (a real stopping point, not an oversight):**
+- **Moneyline Edge system** (Raw/De-Vigged Implied Probability, Moneyline Edge) -- Season
+  Matchups' own real Home/Away Moneyline input cells are confirmed **blank for every one of
+  the 272 real 2026 games** (no manual entry was ever made). Unlike several earlier terms with
+  a documented zero-coverage *branch*, this whole system has zero real Excel-computed value at
+  any level to verify against -- porting it would mean building untestable machinery, not
+  closing a gap.
+- **Kalshi/Polymarket contract prices and edges** -- confirmed blank for the same reason
+  (manual entry only, never filled in), and separately carry a real, active legal-availability
+  caveat per this tab's own opening disclaimer (event-contract sports markets under unresolved
+  dispute in multiple US states as of mid-2026).
+- **The Explanation Engine's own Primary/Secondary/Risk text-label selection** (Same-Side/
+  Opposite-Side classification feeding a ranked, formatted string like `"Rest: +2.3 pts"`) --
+  real and tractable, but a labeling/ranking system over already-computed values, not new
+  predictive arithmetic. Lower value relative to the effort remaining, given everything above
+  it is now complete.
 
 ## Real bugs / findings caught along the way
 
@@ -232,32 +291,41 @@ real QB Environment Model port (see correction below), not just lookup-wiring.
   "no Z-scoring at all" shape; Base Team Quality's reuse of the YoY Baseline Engine's own
   decay chain feeding a *second* current-season blend step in Team Ratings; Explosive Play
   Matchup's genuinely asymmetric Pass/Run Prevention composites (one is a real 3-term
-  weighted blend referencing another tab's Z-score, the other is a bare passthrough).
+  weighted blend referencing another tab's Z-score, the other is a bare passthrough);
+  QB Environment Model's own Talent Score blending 2 locally-computed Z-scores with 3
+  live-referenced from QB Index; Confidence Composite's Matchup Agreement replicating Excel's
+  own real `SIGN()` semantics (`SIGN(0)=0`) rather than a naive `>0` check.
+- **Washington Commanders' real Starter RB lookup hits the same "RB Section 5 stale-range
+  bug" already fixed in v36** -- their real RB Value Index Section 5 rows sit 2 rows past
+  Season Matchups' own stale hardcoded lookup range, in all 17 of their real 2026 games. v35 is
+  deliberately frozen for this whole audit, so this is an expected, already-documented
+  limitation of the baseline, confirmed again in a new real lookup while building the
+  zero-Excel-dependency reconstruction -- not a bug in that reconstruction, which correctly
+  computes Washington's own real (non-blank) value using RB Value Index's real, wider range.
+- **v35's own "Market Spread (DK, Home)" column is a flat placeholder**, and its real
+  Home/Away Moneyline input cells are blank for every one of the 272 real 2026 games -- neither
+  was ever really populated with per-game manual entry, confirmed while sourcing Step 5's real
+  external market data and porting Market Comparison & Confidence's own Moneyline system.
 
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **5584 tests pass, 0 failures.**
+Current total: **10049 tests pass, 0 failures.**
 
 ## Suggested next step
 
-Three real options, all concrete:
+Two real options, both concrete:
 
 1. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Deepen the reconstruction** — larger than first scoped (see the Effective QB Rating
-   correction above): OL Pressure Adj and QB Replacement Value are still straightforward
-   lookup-wiring from already-ported tabs, but Phase Matchup Adj's pass-side differential now
-   requires a real QB Environment Model port (its own decay/blend/Z-score chain, not yet
-   investigated) plus the OL-Pressure-modifier and Weather-on-Passing-modifier composites —
-   effectively one more full tab port, not just plumbing. Port Availability Index (Consecutive
-   Road Games) too — removing every remaining Excel dependency from a single game's full
-   prediction.
-3. **Start Step 6 for real** — this is the large remaining lift: re-deriving each historical
+2. **Start Step 6 for real** — this is the large remaining lift: re-deriving each historical
    week's real 3-year decay-baseline inputs from real nflverse pbp data as of that week (the
    Python Model Engine's own functions were deliberately scoped to "arithmetic only, not data
    sourcing," so this needs a genuinely new historical data-resolution layer, not just more
    arithmetic), running it through the completed engine, and comparing against the real
    historical closing lines Step 5 now provides (no future information, real walk-forward).
+   With the zero-Excel-dependency reconstruction and Market Comparison & Confidence both done,
+   this is now the one substantial piece of real engineering left before Steps 7-9 (backtest,
+   walk-forward validation, ablation) become meaningful.

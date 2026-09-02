@@ -1,4 +1,7 @@
 {
+  "constants": {
+    "win_prob_logistic_slope": 10.5
+  },
   "games": [
     {
       "week": 1,

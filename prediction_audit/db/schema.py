@@ -1,0 +1,205 @@
+"""
+Step 2 of the NFL Model v35 Validation/Audit master spec: the permanent Prediction Audit
+database. Every future model prediction creates an immutable audit record here -- rows are
+INSERT-only; re-running the model for a game that already has a prediction creates a NEW
+`prediction_runs` row (new run_id), never an UPDATE to an existing one. This is the
+foundation the spec's own Steps 3-14 build on (state snapshots, component attribution,
+market/CLV, ablation, calibration).
+
+Design choices, and why:
+- SQLite, not the Excel workbook itself -- tracking thousands of historical predictions with
+  full component/state breakdowns doesn't fit a spreadsheet, and the spec's own Step 6
+  (walk-forward reconstruction) needs to run this programmatically at scale.
+- Normalized `component_contributions` (one row per named term per prediction) rather than
+  ~80 individual columns -- matches Step 4's own example ("Base Team Rating = -2.4, QB =
+  -0.8, ...") directly: querying "every game's HFA Delta contribution" is one WHERE clause,
+  not 80 hardcoded column names, and adding a new component later needs no schema migration.
+- `state_snapshot_json` (one JSON blob per prediction, covering every category Step 3 lists:
+  team strength, QB, OL, RB, WR/TE, defense, matchups, environment, regression, injuries) --
+  the spec's own field list runs to 80+ fields, most of which are already exactly what this
+  project's own Excel tabs compute per player/team; storing them as one real structured
+  snapshot per prediction avoids either an 80-column table (mostly NULL for any given game)
+  or hand-picking which subset to normalize. Queryable at the top level via SQLite's own
+  JSON1 functions when a specific field is needed for analysis.
+- `market_lines` carries a `market_data_status` column (VERIFIED / UNVERIFIED / MISSING) per
+  the spec's own explicit instruction -- this project has never sourced verified historical
+  odds with real timestamps, so every row inserted for a pre-existing game defaults to
+  MISSING rather than a fabricated line ("Do not fabricate historical betting lines").
+- `errors` and `clv` are NOT separate stored tables -- both are pure functions of
+  predictions+results (error) and predictions+market_lines (CLV), which would otherwise risk
+  drifting stale if results/market data is corrected after being entered. Exposed as SQL VIEWs
+  instead (see VIEWS_SQL below), computed fresh on every query.
+- No fabricated data anywhere: every INSERT helper takes real values as arguments; there is
+  no "if missing, invent a plausible value" branch anywhere in this module.
+"""
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+DEFAULT_DB_PATH = Path(__file__).resolve().parent / "prediction_audit.sqlite3"
+
+SCHEMA_SQL = """
+-- ==== Models: one row per real model version this audit ever scored a prediction with =====
+CREATE TABLE IF NOT EXISTS models (
+    model_version   TEXT PRIMARY KEY,      -- e.g. 'v35.0', 'v36.0'
+    description     TEXT NOT NULL,
+    workbook_sha256 TEXT,                  -- real checksum of the frozen .xlsx, if Excel-based
+    frozen_at       TEXT NOT NULL,         -- ISO8601 -- when this version became immutable
+    notes           TEXT
+);
+
+-- ==== Games: one row per real NFL game (any season) ========================================
+CREATE TABLE IF NOT EXISTS games (
+    game_id         TEXT PRIMARY KEY,      -- real nflverse game_id where available
+    season          INTEGER NOT NULL,
+    week            INTEGER NOT NULL,
+    game_date       TEXT,                  -- ISO8601 date
+    kickoff_time    TEXT,                  -- ISO8601 datetime, real, if known
+    away_team       TEXT NOT NULL,
+    home_team       TEXT NOT NULL,
+    neutral_site    INTEGER NOT NULL DEFAULT 0,
+    stadium         TEXT,
+    surface         TEXT,
+    timezone        TEXT
+);
+
+-- ==== Prediction runs: one row per (model_version, game, real prediction timestamp) ========
+-- Immutable -- a re-run of the same model against the same game creates a NEW row, never an
+-- UPDATE. run_id is the join key every other table below hangs off of.
+CREATE TABLE IF NOT EXISTS prediction_runs (
+    run_id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_version         TEXT NOT NULL REFERENCES models(model_version),
+    game_id               TEXT NOT NULL REFERENCES games(game_id),
+    prediction_timestamp  TEXT NOT NULL,   -- ISO8601 -- when this specific run was made
+    data_cutoff_timestamp TEXT,            -- ISO8601 -- latest real info this run could use
+    data_version          TEXT,            -- free-text id for the real data pull this run used
+    model_status          TEXT NOT NULL DEFAULT 'ACTIVE'  -- ACTIVE / SUPERSEDED / VOID
+);
+
+-- ==== Predictions: the model's real output for one run ======================================
+CREATE TABLE IF NOT EXISTS predictions (
+    run_id                INTEGER PRIMARY KEY REFERENCES prediction_runs(run_id),
+    away_projected_points REAL NOT NULL,
+    home_projected_points REAL NOT NULL,
+    projected_margin      REAL NOT NULL,   -- home - away, matches this project's convention
+    projected_total       REAL NOT NULL,
+    home_win_probability  REAL NOT NULL,
+    away_win_probability  REAL NOT NULL,
+    confidence            REAL             -- real Confidence Composite (0-1), if computed
+);
+
+-- ==== Component contributions: one row per named term per run (Step 4) =====================
+CREATE TABLE IF NOT EXISTS component_contributions (
+    run_id             INTEGER NOT NULL REFERENCES prediction_runs(run_id),
+    component_name     TEXT NOT NULL,   -- e.g. 'HFA Delta (Home)', matches
+                                         -- v35_core_formula_components.csv's Component_Name
+    contribution_value REAL NOT NULL,   -- real points contributed, signed
+    side               TEXT NOT NULL,   -- 'HOME' or 'AWAY'
+    PRIMARY KEY (run_id, component_name, side)
+);
+
+-- ==== Full model-state snapshot (Step 3) -- one row per run, one JSON blob covering every ==
+-- category the spec lists (team strength, QB, OL, RB, WR/TE, defense, matchups, environment,
+-- regression, injuries). See this module's own docstring for why JSON, not 80 columns.
+CREATE TABLE IF NOT EXISTS state_snapshots (
+    run_id              INTEGER PRIMARY KEY REFERENCES prediction_runs(run_id),
+    state_snapshot_json TEXT NOT NULL   -- real JSON object, see snapshot.py for the real schema
+);
+
+-- ==== Market lines: real sportsbook data, honestly labeled when unverified/missing =========
+CREATE TABLE IF NOT EXISTS market_lines (
+    line_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id             INTEGER NOT NULL REFERENCES prediction_runs(run_id),
+    sportsbook         TEXT NOT NULL,
+    market_type        TEXT NOT NULL,   -- 'spread' / 'total' / 'moneyline'
+    line_stage         TEXT NOT NULL,   -- 'opening' / 'prediction_time' / 'closing'
+    line_value         REAL,            -- NULL if genuinely not captured
+    odds               REAL,
+    line_timestamp     TEXT,            -- ISO8601, real, if known
+    source             TEXT,
+    market_data_status TEXT NOT NULL DEFAULT 'MISSING'
+                        CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING'))
+);
+
+-- ==== Results: real final outcomes, once known =============================================
+CREATE TABLE IF NOT EXISTS results (
+    game_id          TEXT PRIMARY KEY REFERENCES games(game_id),
+    away_final_score INTEGER NOT NULL,
+    home_final_score INTEGER NOT NULL
+);
+
+-- ==== Data quality flags per run =============================================================
+CREATE TABLE IF NOT EXISTS data_quality (
+    run_id                INTEGER PRIMARY KEY REFERENCES prediction_runs(run_id),
+    missing_data_flag     INTEGER NOT NULL DEFAULT 0,
+    data_quality_score    REAL,
+    data_quality_status   TEXT,
+    future_data_leak_flag INTEGER NOT NULL DEFAULT 0,
+    timestamp_validation  TEXT,
+    duplicate_flag        INTEGER NOT NULL DEFAULT 0,
+    source_conflict_flag  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_game ON prediction_runs(game_id);
+CREATE INDEX IF NOT EXISTS idx_runs_model ON prediction_runs(model_version);
+CREATE INDEX IF NOT EXISTS idx_contrib_run ON component_contributions(run_id);
+CREATE INDEX IF NOT EXISTS idx_market_run ON market_lines(run_id);
+"""
+
+VIEWS_SQL = """
+-- Real margin/total error -- a pure function of predictions+results, computed fresh every
+-- query rather than stored, so a later results correction can never leave a stale cached
+-- error value behind.
+CREATE VIEW IF NOT EXISTS v_prediction_errors AS
+SELECT
+    p.run_id,
+    pr.game_id,
+    p.projected_margin,
+    (r.home_final_score - r.away_final_score) AS actual_margin,
+    p.projected_margin - (r.home_final_score - r.away_final_score) AS margin_error,
+    ABS(p.projected_margin - (r.home_final_score - r.away_final_score)) AS absolute_margin_error,
+    p.projected_total,
+    (r.home_final_score + r.away_final_score) AS actual_total,
+    p.projected_total - (r.home_final_score + r.away_final_score) AS total_error,
+    ABS(p.projected_total - (r.home_final_score + r.away_final_score)) AS absolute_total_error,
+    CASE WHEN (p.projected_margin > 0) = (r.home_final_score > r.away_final_score)
+         THEN 1 ELSE 0 END AS winner_correct
+FROM predictions p
+JOIN prediction_runs pr ON pr.run_id = p.run_id
+JOIN results r ON r.game_id = pr.game_id;
+
+-- Real closing-line value -- only ever computed where a real closing line has actually been
+-- entered (market_data_status='VERIFIED'); returns no row otherwise rather than a fabricated
+-- CLV number.
+CREATE VIEW IF NOT EXISTS v_clv AS
+SELECT
+    open_line.run_id,
+    open_line.market_type,
+    open_line.line_value AS prediction_time_line,
+    close_line.line_value AS closing_line,
+    close_line.line_value - open_line.line_value AS clv_movement
+FROM market_lines open_line
+JOIN market_lines close_line
+    ON close_line.run_id = open_line.run_id
+   AND close_line.market_type = open_line.market_type
+   AND close_line.line_stage = 'closing'
+   AND close_line.market_data_status = 'VERIFIED'
+WHERE open_line.line_stage = 'prediction_time'
+  AND open_line.market_data_status = 'VERIFIED';
+"""
+
+
+def create_database(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:
+    """
+    Idempotent -- safe to call against an existing database (CREATE TABLE/VIEW IF NOT EXISTS
+    throughout). Returns an open connection with foreign_keys enforcement on (off by default
+    in SQLite -- this project wants a real referential-integrity guarantee, not a silent
+    orphaned row).
+    """
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.executescript(SCHEMA_SQL)
+    conn.executescript(VIEWS_SQL)
+    conn.commit()
+    return conn

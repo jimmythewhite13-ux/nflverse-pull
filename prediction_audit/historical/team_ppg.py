@@ -18,6 +18,18 @@ import pandas as pd
 
 from nflverse_pull.pull import REQUIRED_SCHED_COLS, TEAM_NAMES
 
+# Real franchise-relocation abbreviations nflverse's real historical schedule data uses for
+# seasons before each real move -- extends (never replaces) the live pipeline's own TEAM_NAMES,
+# kept local to this historical package so the live 2026 pipeline's own mapping is untouched.
+# Mapped to the CURRENT franchise name (real continuity: same franchise, not a new team),
+# matching how this project already treats team identity everywhere else.
+_HISTORICAL_RELOCATIONS: dict[str, str] = {
+    "OAK": "Las Vegas Raiders",       # Oakland Raiders, through the real 2019 season
+    "SD": "Los Angeles Chargers",      # San Diego Chargers, through the real 2016 season
+    "STL": "Los Angeles Rams",         # St. Louis Rams, through the real 2015 season
+}
+HISTORICAL_TEAM_NAMES: dict[str, str] = {**TEAM_NAMES, **_HISTORICAL_RELOCATIONS}
+
 
 def team_season_ppg(
     sched: pd.DataFrame, season: int, through_week: int | None = None,
@@ -58,11 +70,11 @@ def team_season_ppg(
         .reset_index()
     )
 
-    unmapped = sorted(set(team_stats["team_abbr"]) - set(TEAM_NAMES))
+    unmapped = sorted(set(team_stats["team_abbr"]) - set(HISTORICAL_TEAM_NAMES))
     if unmapped:
         raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
 
-    team_stats["Team"] = team_stats["team_abbr"].map(TEAM_NAMES)
+    team_stats["Team"] = team_stats["team_abbr"].map(HISTORICAL_TEAM_NAMES)
     team_stats["Off PPG"] = team_stats["off_ppg"].round(1)
     team_stats["Def PPG"] = team_stats["def_ppg"].round(1)
     out = team_stats[["Team", "Off PPG", "Def PPG", "games_played"]].rename(

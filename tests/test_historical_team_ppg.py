@@ -101,3 +101,23 @@ def test_league_average_ppg_raises_on_empty_input():
     empty = team_season_ppg(_fake_schedule(), season=2023, through_week=1)
     with pytest.raises(ValueError):
         league_average_ppg(empty)
+
+
+def test_historical_relocated_franchise_abbreviations_resolve_to_current_name():
+    # Real historical abbreviations nflverse's own schedule data uses for seasons before each
+    # real franchise relocation -- must resolve to the CURRENT franchise name (real continuity),
+    # not raise "no mapping" the way an unmapped abbreviation correctly does elsewhere.
+    sched = pd.DataFrame([
+        {"season": 2019, "game_type": "REG", "week": 1, "home_team": "OAK", "away_team": "DEN",
+         "home_score": 24, "away_score": 16},
+        {"season": 2016, "game_type": "REG", "week": 1, "home_team": "SD", "away_team": "KC",
+         "home_score": 27, "away_score": 24},
+        {"season": 2015, "game_type": "REG", "week": 1, "home_team": "STL", "away_team": "SEA",
+         "home_score": 34, "away_score": 31},
+    ])
+    oak = team_season_ppg(sched, season=2019)
+    assert "Las Vegas Raiders" in set(oak["Team"])
+    sd = team_season_ppg(sched, season=2016)
+    assert "Los Angeles Chargers" in set(sd["Team"])
+    stl = team_season_ppg(sched, season=2015)
+    assert "Los Angeles Rams" in set(stl["Team"])

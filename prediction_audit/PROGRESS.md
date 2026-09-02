@@ -16,7 +16,7 @@ planned.
 | 2 | Prediction Audit database | **Done** |
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
-| 5 | Market & CLV infrastructure | **Blocked** — no real historical odds source with verified timestamps (see below) |
+| 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Unblocked, not yet run** — the Python Model Engine can now reproduce a full real game prediction end to end (see milestone below); walk-forward reconstruction across historical seasons is the next real increment |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
@@ -28,15 +28,50 @@ planned.
 | 14 | Prop tracking schema | Not started |
 | 15 | Final validated spec document | Not started |
 
-## Step 5 — why it's blocked
+## Step 5 — real solution found and implemented
 
-This project has only ever used **manual, current-week** sportsbook entry. There is no
-archive anywhere in it of real historical opening/closing lines with real timestamps. Per the
-spec's own principle ("do not fabricate historical betting lines"), this is not being
-invented. Unblocking Step 5 (and the ATS/ROI/CLV portions of Steps 6-7, and all of Step 14)
-requires either a paid historical odds API (Odds API, SportsDataIO, Unabated, etc.) or
-accepting a forward-only start: begin collecting real CLV data from now on rather than
-reconstructing the past.
+Previously documented as blocked: this project has only ever used manual, current-week
+sportsbook entry, with no archive of real historical opening/closing lines with real
+timestamps, and the spec's own "do not fabricate historical betting lines" principle ruled out
+inventing one.
+
+**Real unblock**: `nfl_data_py.import_schedules()` — already a project dependency, wrapped by
+`src/nflverse_pull/pull.py`'s own `fetch_schedules()` — pulls `http://www.habitatring.com/games.csv`,
+the free, publicly-documented historical NFL odds dataset maintained by the nflverse community
+(originally Lee Sharpe's `nfldata` repo), used throughout the public NFL-analytics ecosystem.
+Verified live: real `spread_line`/`total_line` are 0% null for every regular-season game,
+every season 1999-2025; real moneylines are 0% null from 2010 on. The in-progress 2026 season
+already carries real lines for its near-term weeks (future weeks correctly null — not a gap).
+
+Built `prediction_audit/market_data.py` (fetch + pure-transform, same split convention as
+`pull.py`) and `prediction_audit/ingest_step5_market_lines.py`, which populated the real audit
+database with:
+- **272 real `prediction_runs`/`predictions`** (model_version=`v35.0`,
+  data_version=`python_model_engine_full_reconstruction_2026`) — the Python Model Engine's own
+  fully-verified real Model Home/Away Score (see the reconstruction milestone above) plus the
+  real Excel Win Probability, for every real 2026 game.
+- **224 real `market_lines` rows** (112 games × spread + total, `line_stage='prediction_time'`,
+  `market_data_status='VERIFIED'`, real source documented) for every game that currently has a
+  real posted line; the other 160 (future weeks) correctly have no row rather than a
+  fabricated placeholder.
+
+**What this does NOT solve**: true timestamped open-to-close CLV movement. This dataset
+carries one real line per game (the closing number, per its documented real-world usage), not
+a full bet-placement-to-close timestamp history. The `v_clv` view still requires a real
+`'closing'`-stage line to compute anything — this project can now capture that for real, going
+forward, by re-running the ingestion close to each game's kickoff (a paid odds API remains the
+only way to backfill true historical CLV for past seasons).
+
+**Real finding along the way**: v35's own manually-entered "Market Spread (DK, Home)" column
+(Market Comparison & Confidence) is confirmed to be a **flat placeholder** — literally `-2.5`
+for every real Week 1 game and `0` for every real Week 2 game, not real per-game DK data. The
+newly-ingested external source is real, per-game, and verified; this flags the workbook's own
+manual entry as unreliable for market comparison, not something to build further analysis on.
+
+**Sign convention verified** (for future work building a model-vs-market edge comparison):
+the real `spread_line` field uses "positive = home favored," the same convention this
+project's own `projected_margin` (home − away) already uses — no sign flip needed when
+comparing them directly.
 
 ## MILESTONE — the real Z/AA formula is now fully reproduced in Python
 
@@ -187,18 +222,24 @@ all) — today's milestone proves the arithmetic; that next piece proves the ful
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **5572 tests pass, 0 failures.**
+Current total: **5584 tests pass, 0 failures.**
 
 ## Suggested next step
 
-Two real options, both concrete:
+Three real options, all concrete:
 
-1. **Deepen the reconstruction** — wire Phase Matchup Adj / OL Pressure Adj / QB Replacement
+1. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
+   each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
+   returning real rows the first time a game has both a real `'prediction_time'` and a real
+   `'closing'` line captured.
+2. **Deepen the reconstruction** — wire Phase Matchup Adj / OL Pressure Adj / QB Replacement
    Value up from their own already-ported source tabs (QB/RB/OL/Pass-Defense/Run-Defense/
    Pass-Rush-Generation Index) instead of taking the differentials as given, and port
    Availability Index (Consecutive Road Games) — removing every remaining Excel dependency
    from a single game's full prediction.
-2. **Start Step 6 for real** — pull real nflverse data for a past season/week, run it through
-   the now-complete Python Model Engine, and compare the resulting Model Home/Away Score
-   against what v35 would have predicted at the time (no future information) — the first real
-   walk-forward data point.
+3. **Start Step 6 for real** — this is the large remaining lift: re-deriving each historical
+   week's real 3-year decay-baseline inputs from real nflverse pbp data as of that week (the
+   Python Model Engine's own functions were deliberately scoped to "arithmetic only, not data
+   sourcing," so this needs a genuinely new historical data-resolution layer, not just more
+   arithmetic), running it through the completed engine, and comparing against the real
+   historical closing lines Step 5 now provides (no future information, real walk-forward).

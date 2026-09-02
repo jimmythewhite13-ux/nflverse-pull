@@ -161,11 +161,18 @@ rookie-substitution, this formula's own league_baseline_off/def_y1 inputs), a ha
 upstream real differentials are taken as **given real inputs** rather than re-derived by
 chaining other already-ported engines:
 
-- Phase Matchup Adj's real differential (Home/Away Starter QB/RB Index Score minus opposing
-  Pass/Run Defense Matchup Score) — QB Index and RB Value Index ARE already ported, so wiring
-  this up fully is mostly plumbing, not new arithmetic.
-- OL Pressure Adj's real differential (OL Index Pass Protection Z minus Pass Rush Generation
-  Index Score) — same; both source tabs already ported.
+- **Phase Matchup Adj's real differential is bigger than first documented.** Re-investigated
+  while scoping this section further: "Home/Away Starter QB Index Score" (AU/AX) is NOT simply
+  QB Index's own Score for the starter -- it's a real, separate "Effective QB Rating" composite
+  (Season Matchups CA/CB) = **QB Environment Model's own real Adjusted Baseline** (BY/BZ, a
+  real per-starter lookup) **+ an OL-Pressure-scaled modifier** (BU/BV, itself derived from the
+  same BK/BN OL Pressure differential used directly in Z09/AA's own OL Pressure Adj -- read
+  twice for two different purposes, not circular) **+ a Weather-on-Passing modifier** (BW/BX,
+  scaling the already-ported Weather Adj by a real team pass-rate share pulled via SUMIFS over
+  QB Environment Model + RB Value Index). The Run side (BA/BD, Starter RB Index Score) IS a
+  direct RB Value Index Section 5 lookup, as originally documented. OL Pressure Adj's own real
+  differential (BI/BJ, OL Index Pass Protection Z minus Pass Rush Generation Index Score) is
+  unaffected by this correction.
 - QB Replacement Value itself (QB Index Section 6's own Starter-Backup differential) — not yet
   built as a QB Index engine output.
 - Consecutive Road Games count and per-team UTC offset — sourced from the not-yet-ported
@@ -174,14 +181,22 @@ chaining other already-ported engines:
 Closing these is the natural next increment toward a **zero-Excel-dependency** walk-forward
 reconstruction (needed for Step 6 across historical seasons where Excel isn't available at
 all) — today's milestone proves the arithmetic; that next piece proves the full data lineage.
+Given the Effective QB Rating finding above, this next increment is now known to include a
+real QB Environment Model port (see correction below), not just lookup-wiring.
 
-### Two reference-only tabs, confirmed out of scope for Z/AA
+### One reference-only tab; one previously-mis-scoped tab, now corrected
 
-- **QB Environment Model** — a reference-only composite ("Raw QB Talent Score") that
-  explicitly does not feed QB Index Score or Z/AA.
 - **Advanced Efficiency Metrics** — feeds Team Ratings' separate "Net Power Rating" display
   composite (confirmed via real formula text that Z/AA never references Net Power Rating at
-  all, only Team Ratings' own Blended Off/Def PPG) — not on the Z/AA critical path.
+  all, only Team Ratings' own Blended Off/Def PPG) — not on the Z/AA critical path. Confirmed
+  genuinely out of scope.
+- **QB Environment Model — CORRECTION, this tab is NOT out of scope.** Earlier documented here
+  as "reference-only... does not feed QB Index Score or Z/AA." That was wrong, caught while
+  investigating the Phase Matchup Adj differential more closely (see above): QB Environment
+  Model's own real Adjusted Baseline output DOES feed Z/AA, via the real Effective QB Rating
+  chain. It does NOT feed QB Index Score itself (that half of the original claim holds) — the
+  error was claiming it doesn't reach Z/AA at all. Left here as a direct correction rather than
+  silently editing the earlier claim away.
 
 ## Real bugs / findings caught along the way
 
@@ -232,11 +247,14 @@ Three real options, all concrete:
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Deepen the reconstruction** — wire Phase Matchup Adj / OL Pressure Adj / QB Replacement
-   Value up from their own already-ported source tabs (QB/RB/OL/Pass-Defense/Run-Defense/
-   Pass-Rush-Generation Index) instead of taking the differentials as given, and port
-   Availability Index (Consecutive Road Games) — removing every remaining Excel dependency
-   from a single game's full prediction.
+2. **Deepen the reconstruction** — larger than first scoped (see the Effective QB Rating
+   correction above): OL Pressure Adj and QB Replacement Value are still straightforward
+   lookup-wiring from already-ported tabs, but Phase Matchup Adj's pass-side differential now
+   requires a real QB Environment Model port (its own decay/blend/Z-score chain, not yet
+   investigated) plus the OL-Pressure-modifier and Weather-on-Passing-modifier composites —
+   effectively one more full tab port, not just plumbing. Port Availability Index (Consecutive
+   Road Games) too — removing every remaining Excel dependency from a single game's full
+   prediction.
 3. **Start Step 6 for real** — this is the large remaining lift: re-deriving each historical
    week's real 3-year decay-baseline inputs from real nflverse pbp data as of that week (the
    Python Model Engine's own functions were deliberately scoped to "arithmetic only, not data

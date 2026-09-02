@@ -1,10 +1,11 @@
 """
 Parity test for prediction_audit/engine/core_formula_simple_terms.py against v35's own real
-recalculated Season Matchups values -- all 272 real games, six simple direct-arithmetic Z/AA
+recalculated Season Matchups values -- all 272 real games, ten simple direct-arithmetic Z/AA
 components (Rest Effect, Weather Adj, Division Adj, QB Replacement Value, Phase Matchup Adj,
-OL Pressure Adj). Unlike every other tab's parity test, these take already-resolved real
-differentials/flags as given inputs (per this project's "arithmetic only, not data sourcing"
-scoping) rather than chaining decay/blend/Z-score steps themselves.
+OL Pressure Adj, Travel Effect, HFA Delta, Road Fatigue Adj, Injury Adj). Unlike every other
+tab's parity test, these take already-resolved real differentials/flags as given inputs (per
+this project's "arithmetic only, not data sourcing" scoping) rather than chaining decay/blend/
+Z-score steps themselves.
 """
 import json
 import sys
@@ -18,16 +19,25 @@ from prediction_audit.engine.core_formula_simple_terms import (  # noqa: E402
     RestEffectConstants,
     WeatherAdjConstants,
     division_adj,
+    hfa_delta_away,
+    hfa_delta_home,
+    injury_adj,
     ol_pressure_adj,
     phase_matchup_adj,
     qb_replacement_adj,
     rest_effect,
+    road_fatigue_adj,
+    travel_effect,
     weather_adj,
 )
 
 GROUND_TRUTH_PATH = (
     Path(__file__).resolve().parent.parent / "prediction_audit" / "manifests"
     / "v35_core_simple_terms_ground_truth.json"
+)
+HFA_TRAVEL_FATIGUE_GROUND_TRUTH_PATH = (
+    Path(__file__).resolve().parent.parent / "prediction_audit" / "manifests"
+    / "v35_hfa_delta_travel_fatigue_ground_truth.json"
 )
 
 
@@ -36,7 +46,13 @@ def _load_ground_truth() -> dict:
         return json.load(f)
 
 
+def _load_hfa_travel_fatigue_ground_truth() -> dict:
+    with open(HFA_TRAVEL_FATIGUE_GROUND_TRUTH_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
 GROUND_TRUTH = _load_ground_truth()
+HFA_TRAVEL_FATIGUE_GROUND_TRUTH = _load_hfa_travel_fatigue_ground_truth()
 
 
 def _rest_constants() -> RestEffectConstants:
@@ -168,3 +184,77 @@ def test_ol_pressure_adj_parity(game):
         f"{_game_id(game)} away OL Pressure Adj mismatch: Python={away_result}, "
         f"Excel={game['excel_ol_press_away']}"
     )
+
+
+def test_hfa_travel_fatigue_ground_truth_has_all_272_games():
+    assert len(HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"]) == 272
+
+
+@pytest.mark.parametrize(
+    "game", HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"],
+    ids=[_game_id(g) for g in HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"]],
+)
+def test_travel_effect_parity(game):
+    coeff = HFA_TRAVEL_FATIGUE_GROUND_TRUTH["constants"]["travel_coefficient"]
+    result = travel_effect(game["away_travel_miles"], coeff)
+    assert result == pytest.approx(game["excel_travel_effect"], abs=1e-6), (
+        f"{_game_id(game)} Travel Effect mismatch: Python={result}, "
+        f"Excel={game['excel_travel_effect']}"
+    )
+
+
+@pytest.mark.parametrize(
+    "game", HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"],
+    ids=[_game_id(g) for g in HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"]],
+)
+def test_hfa_delta_parity(game):
+    flat_hfa = HFA_TRAVEL_FATIGUE_GROUND_TRUTH["constants"]["hfa_flat"]
+    home_delta = hfa_delta_home(game["home_regressed_hfa_ref"], flat_hfa)
+    away_delta = hfa_delta_away(home_delta)
+    assert home_delta == pytest.approx(game["excel_home_hfa_delta"], abs=1e-6), (
+        f"{_game_id(game)} Home HFA Delta mismatch: Python={home_delta}, "
+        f"Excel={game['excel_home_hfa_delta']}"
+    )
+    assert away_delta == pytest.approx(game["excel_away_hfa_delta"], abs=1e-6), (
+        f"{_game_id(game)} Away HFA Delta mismatch: Python={away_delta}, "
+        f"Excel={game['excel_away_hfa_delta']}"
+    )
+
+
+@pytest.mark.parametrize(
+    "game", HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"],
+    ids=[_game_id(g) for g in HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"]],
+)
+def test_road_fatigue_adj_parity(game):
+    c = HFA_TRAVEL_FATIGUE_GROUND_TRUTH["constants"]
+    home_result = road_fatigue_adj(
+        game["home_consec_road_games"], c["road_games_threshold"], c["road_games_penalty"],
+    )
+    away_result = road_fatigue_adj(
+        game["away_consec_road_games"], c["road_games_threshold"], c["road_games_penalty"],
+    )
+    assert home_result == pytest.approx(game["excel_home_road_fatigue_adj"], abs=1e-6), (
+        f"{_game_id(game)} Home Road Fatigue Adj mismatch"
+    )
+    assert away_result == pytest.approx(game["excel_away_road_fatigue_adj"], abs=1e-6), (
+        f"{_game_id(game)} Away Road Fatigue Adj mismatch"
+    )
+
+
+def test_road_fatigue_adj_triggers_above_threshold():
+    # No real game in the current snapshot reaches the 3-game threshold (max observed: 2 --
+    # see module docstring), so this exercises the trigger branch directly against the real
+    # formula logic rather than a real ground-truth row.
+    assert road_fatigue_adj(3, 3, -1) == pytest.approx(-1.0, abs=1e-6)
+    assert road_fatigue_adj(4, 3, -1) == pytest.approx(-1.0, abs=1e-6)
+    assert road_fatigue_adj(2, 3, -1) == pytest.approx(0.0, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    "game", HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"],
+    ids=[_game_id(g) for g in HFA_TRAVEL_FATIGUE_GROUND_TRUTH["games"]],
+)
+def test_injury_adj_parity(game):
+    result = injury_adj()
+    assert result == pytest.approx(game["excel_home_injury_adj"], abs=1e-6)
+    assert result == pytest.approx(game["excel_away_injury_adj"], abs=1e-6)

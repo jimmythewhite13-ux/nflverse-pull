@@ -29,15 +29,35 @@ Real formulas confirmed live in the recalculated v35 copy (row 3, generalized to
     Index's own Pass Protection Z minus Away/Home Pass Rush Generation Index Score -- also
     already-ported outputs, taken as given):
         =IF(BK3="",0,BK3*C123)
+    Travel Effect (Q, away side only -- confirmed no home-side mirror exists):
+        =-(P3/1000)*C5
+    HFA Delta (CR/CS), where CQ is a pre-computed real input: the real Regressed Team-Specific
+    HFA looked up from the already-ported Team-Specific HFA tab (team_specific_hfa.py's own
+    regressed_hfa). This is the term that nets Z02/AA02's flat C3 HFA to the real team-specific
+    value -- the first direct composition of two ported engine pieces:
+        CR =IF(CQ3="",0,(CQ3-C3)/2)
+        CS =IF(CR3="",0,-CR3)
+    Road Fatigue Adj (CV/CW), where CT/CU are pre-computed real Consecutive Road Games counts
+    (sourced from the not-yet-ported Availability Index tab, taken as given per the established
+    scoping):
+        CV =IF(CT3>=C155,C156,0)
+        CW =IF(CU3>=C155,C156,0)
+    Injury Adj (V/W): confirmed the real formula is the literal constant 0 in both columns for
+    every real row -- this is a genuine real finding, not a gap in this extraction: v35's
+    Injury/Replacement Adjustment is a documented non-functional placeholder in the live
+    workbook (no dynamic injury-point logic exists here at all, unlike QB/RB Replacement Value
+    which are real). Modeled here as a function that always returns 0.0, with that limitation
+    stated explicitly rather than silently treated as "0 because no injuries this week."
 
 Ground truth was extracted across all 272 real Season Matchups rows. In that real snapshot,
 every game's real Snow/Precipitation flags are "N", every real Backup-In flag is "Starter In",
-and no game has a non-Dome nonzero Weather Adj or nonzero QB Replacement Value -- this reflects
-the workbook's real current/future-week live-entry state (weather/injury events for future
-weeks genuinely haven't happened yet), not a gap in this extraction. Per this project's
-anti-fabrication principle, no synthetic non-zero case is manufactured to pad coverage; the
-branch logic for those paths is implemented directly from the real formula text above and will
-be exercised for real the moment a real future week's data includes them.
+no game has a non-Dome nonzero Weather Adj or nonzero QB Replacement Value, and no real team
+has yet reached the 3-consecutive-road-games Road Fatigue threshold (max observed: 2) -- this
+reflects the workbook's real current/future-week live-entry state (weather/injury/schedule
+events for future weeks genuinely haven't happened yet), not a gap in this extraction. Per this
+project's anti-fabrication principle, no synthetic non-zero case is manufactured to pad
+coverage; the branch logic for those paths is implemented directly from the real formula text
+above and will be exercised for real the moment real data includes them.
 """
 from __future__ import annotations
 
@@ -122,3 +142,33 @@ def ol_pressure_adj(diff: float | None, conversion: float) -> float:
     """diff is an already-resolved real differential (Home/Away OL Index Pass Protection Z
     minus Away/Home Pass Rush Generation Index Score); None/"" mirrors Excel's own blank guard."""
     return 0.0 if diff in (None, "") else diff * conversion
+
+
+def travel_effect(away_travel_miles: float, travel_coefficient: float) -> float:
+    """Away side only -- confirmed no home-side mirror exists in the real formula."""
+    return -(away_travel_miles / 1000) * travel_coefficient
+
+
+def hfa_delta_home(regressed_team_hfa: float | None, flat_hfa: float) -> float:
+    """regressed_team_hfa is Team-Specific HFA's own real regressed_hfa output (an already-
+    ported engine result) for the home team; None/"" mirrors Excel's own blank guard."""
+    return 0.0 if regressed_team_hfa in (None, "") else (regressed_team_hfa - flat_hfa) / 2
+
+
+def hfa_delta_away(home_hfa_delta: float | None) -> float:
+    """Mirrors Excel's own real formula, which derives the away delta from the already-
+    computed home delta (CS =IF(CR="",0,-CR)) rather than recomputing independently."""
+    return 0.0 if home_hfa_delta in (None, "") else -home_hfa_delta
+
+
+def road_fatigue_adj(consecutive_road_games: float, threshold: float, penalty: float) -> float:
+    """consecutive_road_games is an already-resolved real count (sourced from the not-yet-
+    ported Availability Index tab, taken as given per the established scoping)."""
+    return penalty if consecutive_road_games >= threshold else 0.0
+
+
+def injury_adj() -> float:
+    """v35's real Injury/Replacement Adjustment (Season Matchups V/W) is confirmed to be the
+    literal constant 0 for every real row -- a documented non-functional placeholder in the
+    live workbook, not a computed value. See module docstring."""
+    return 0.0

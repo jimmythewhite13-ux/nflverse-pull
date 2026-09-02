@@ -1,0 +1,1911 @@
+{
+  "constants": {
+    "flat_hfa": 1.5
+  },
+  "games": [
+    {
+      "week": 1,
+      "away": "Arizona Cardinals",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 27.6741561554262,
+      "excel_AA_model_away_score": 20.0086110200969
+    },
+    {
+      "week": 1,
+      "away": "Atlanta Falcons",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 25.3693319825606,
+      "excel_AA_model_away_score": 21.5182254837572
+    },
+    {
+      "week": 1,
+      "away": "Baltimore Ravens",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 27.0022654080581,
+      "excel_AA_model_away_score": 23.8323338525678
+    },
+    {
+      "week": 1,
+      "away": "Buffalo Bills",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 25.2161315016961,
+      "excel_AA_model_away_score": 21.7235246516705
+    },
+    {
+      "week": 1,
+      "away": "Chicago Bears",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 24.6788338831073,
+      "excel_AA_model_away_score": 22.1616519334103
+    },
+    {
+      "week": 1,
+      "away": "Cleveland Browns",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 24.7734010802195,
+      "excel_AA_model_away_score": 15.6787739728571
+    },
+    {
+      "week": 1,
+      "away": "Dallas Cowboys",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 26.6183646672892,
+      "excel_AA_model_away_score": 23.671982304049
+    },
+    {
+      "week": 1,
+      "away": "Denver Broncos",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 22.1557672254462,
+      "excel_AA_model_away_score": 18.7408436612609
+    },
+    {
+      "week": 1,
+      "away": "Green Bay Packers",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 24.6569427594889,
+      "excel_AA_model_away_score": 19.1365438675337
+    },
+    {
+      "week": 1,
+      "away": "Miami Dolphins",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 24.6164241742773,
+      "excel_AA_model_away_score": 19.4718453637842
+    },
+    {
+      "week": 1,
+      "away": "New England Patriots",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 26.3887525520053,
+      "excel_AA_model_away_score": 21.2203334751472
+    },
+    {
+      "week": 1,
+      "away": "New Orleans Saints",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 28.662457484144,
+      "excel_AA_model_away_score": 17.3019063283096
+    },
+    {
+      "week": 1,
+      "away": "New York Jets",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 24.3494012971382,
+      "excel_AA_model_away_score": 20.086971714525
+    },
+    {
+      "week": 1,
+      "away": "San Francisco 49ers",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 28.3292680169382,
+      "excel_AA_model_away_score": 22.2214434916124
+    },
+    {
+      "week": 1,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 26.4129082641213,
+      "excel_AA_model_away_score": 23.7709543771271
+    },
+    {
+      "week": 1,
+      "away": "Washington Commanders",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 28.1171994640579,
+      "excel_AA_model_away_score": 18.4868833046417
+    },
+    {
+      "week": 2,
+      "away": "Carolina Panthers",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 26.1953230863378,
+      "excel_AA_model_away_score": 19.6205418146923
+    },
+    {
+      "week": 2,
+      "away": "Cincinnati Bengals",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 28.8830285259652,
+      "excel_AA_model_away_score": 19.3792591372457
+    },
+    {
+      "week": 2,
+      "away": "Cleveland Browns",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 22.9512483466904,
+      "excel_AA_model_away_score": 17.5829023878451
+    },
+    {
+      "week": 2,
+      "away": "Detroit Lions",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 28.884025049215,
+      "excel_AA_model_away_score": 23.6114162012502
+    },
+    {
+      "week": 2,
+      "away": "Green Bay Packers",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 22.7881833537015,
+      "excel_AA_model_away_score": 24.1913331425751
+    },
+    {
+      "week": 2,
+      "away": "Indianapolis Colts",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 26.4859666549906,
+      "excel_AA_model_away_score": 20.5792198013915
+    },
+    {
+      "week": 2,
+      "away": "Jacksonville Jaguars",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 25.9120640017335,
+      "excel_AA_model_away_score": 17.013641381188
+    },
+    {
+      "week": 2,
+      "away": "Las Vegas Raiders",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 24.9422166062022,
+      "excel_AA_model_away_score": 16.3013368811279
+    },
+    {
+      "week": 2,
+      "away": "Miami Dolphins",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 28.149505463479,
+      "excel_AA_model_away_score": 21.1787960076132
+    },
+    {
+      "week": 2,
+      "away": "Minnesota Vikings",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 24.4718213561513,
+      "excel_AA_model_away_score": 19.1577091974935
+    },
+    {
+      "week": 2,
+      "away": "New Orleans Saints",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 25.5114307412203,
+      "excel_AA_model_away_score": 19.9136803837458
+    },
+    {
+      "week": 2,
+      "away": "New York Giants",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 30.6642309309281,
+      "excel_AA_model_away_score": 18.1508866454546
+    },
+    {
+      "week": 2,
+      "away": "Philadelphia Eagles",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 20.3268666862001,
+      "excel_AA_model_away_score": 23.4067906100698
+    },
+    {
+      "week": 2,
+      "away": "Pittsburgh Steelers",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 27.0286523520043,
+      "excel_AA_model_away_score": 20.6824908064464
+    },
+    {
+      "week": 2,
+      "away": "Seattle Seahawks",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 21.8418770402664,
+      "excel_AA_model_away_score": 26.2010361521545
+    },
+    {
+      "week": 2,
+      "away": "Washington Commanders",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 28.4049979631771,
+      "excel_AA_model_away_score": 22.6979305027419
+    },
+    {
+      "week": 3,
+      "away": "Arizona Cardinals",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 28.2974443327483,
+      "excel_AA_model_away_score": 22.7961432435318
+    },
+    {
+      "week": 3,
+      "away": "Atlanta Falcons",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 27.5623141520297,
+      "excel_AA_model_away_score": 20.9604448515523
+    },
+    {
+      "week": 3,
+      "away": "Baltimore Ravens",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 25.9621179377371,
+      "excel_AA_model_away_score": 27.3854981851192
+    },
+    {
+      "week": 3,
+      "away": "Carolina Panthers",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 24.7140296732147,
+      "excel_AA_model_away_score": 15.9425405398673
+    },
+    {
+      "week": 3,
+      "away": "Cincinnati Bengals",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 27.7868663215056,
+      "excel_AA_model_away_score": 21.6895856315581
+    },
+    {
+      "week": 3,
+      "away": "Houston Texans",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 24.1803168417057,
+      "excel_AA_model_away_score": 20.404861531597
+    },
+    {
+      "week": 3,
+      "away": "Kansas City Chiefs",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 23.952680982248,
+      "excel_AA_model_away_score": 21.206847309624
+    },
+    {
+      "week": 3,
+      "away": "Las Vegas Raiders",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 24.083475152475,
+      "excel_AA_model_away_score": 16.1450497726368
+    },
+    {
+      "week": 3,
+      "away": "Los Angeles Chargers",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 27.9970031896389,
+      "excel_AA_model_away_score": 18.5561430324875
+    },
+    {
+      "week": 3,
+      "away": "Los Angeles Rams",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 26.0612860886041,
+      "excel_AA_model_away_score": 19.3696202729818
+    },
+    {
+      "week": 3,
+      "away": "Minnesota Vikings",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 22.3931889203528,
+      "excel_AA_model_away_score": 19.6590899676039
+    },
+    {
+      "week": 3,
+      "away": "New England Patriots",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 25.7165285400414,
+      "excel_AA_model_away_score": 21.5433803937771
+    },
+    {
+      "week": 3,
+      "away": "New York Jets",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 31.9928014882308,
+      "excel_AA_model_away_score": 17.0125026168357
+    },
+    {
+      "week": 3,
+      "away": "Philadelphia Eagles",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 25.2432828170158,
+      "excel_AA_model_away_score": 21.4280210503661
+    },
+    {
+      "week": 3,
+      "away": "Seattle Seahawks",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 22.8587414014636,
+      "excel_AA_model_away_score": 25.7148992102263
+    },
+    {
+      "week": 3,
+      "away": "Tennessee Titans",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 25.7367110487394,
+      "excel_AA_model_away_score": 19.4339671532466
+    },
+    {
+      "week": 4,
+      "away": "Arizona Cardinals",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 26.581958784331,
+      "excel_AA_model_away_score": 22.5074997556012
+    },
+    {
+      "week": 4,
+      "away": "Atlanta Falcons",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 22.8331459621374,
+      "excel_AA_model_away_score": 20.6042252800332
+    },
+    {
+      "week": 4,
+      "away": "Dallas Cowboys",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 28.9826097320725,
+      "excel_AA_model_away_score": 20.1734375658292
+    },
+    {
+      "week": 4,
+      "away": "Denver Broncos",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 22.716246907079,
+      "excel_AA_model_away_score": 23.7054951646938
+    },
+    {
+      "week": 4,
+      "away": "Detroit Lions",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 23.2549071581068,
+      "excel_AA_model_away_score": 25.679338346004
+    },
+    {
+      "week": 4,
+      "away": "Green Bay Packers",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 23.5888626517153,
+      "excel_AA_model_away_score": 23.2441468358864
+    },
+    {
+      "week": 4,
+      "away": "Indianapolis Colts",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 25.4296261640824,
+      "excel_AA_model_away_score": 25.4576869612758
+    },
+    {
+      "week": 4,
+      "away": "Jacksonville Jaguars",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 25.3311031318485,
+      "excel_AA_model_away_score": 24.7403271106562
+    },
+    {
+      "week": 4,
+      "away": "Kansas City Chiefs",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 21.3696300528453,
+      "excel_AA_model_away_score": 19.827847170168
+    },
+    {
+      "week": 4,
+      "away": "Los Angeles Chargers",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 25.4585158230691,
+      "excel_AA_model_away_score": 19.5378175414614
+    },
+    {
+      "week": 4,
+      "away": "Los Angeles Rams",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 25.3318984815168,
+      "excel_AA_model_away_score": 21.034403534318
+    },
+    {
+      "week": 4,
+      "away": "Miami Dolphins",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 27.2058901463698,
+      "excel_AA_model_away_score": 16.4812579854053
+    },
+    {
+      "week": 4,
+      "away": "New England Patriots",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 27.9272399185751,
+      "excel_AA_model_away_score": 22.0740089399014
+    },
+    {
+      "week": 4,
+      "away": "New York Jets",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 29.243703964526,
+      "excel_AA_model_away_score": 18.1383019028846
+    },
+    {
+      "week": 4,
+      "away": "Pittsburgh Steelers",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 22.259084482191,
+      "excel_AA_model_away_score": 17.6762011244023
+    },
+    {
+      "week": 4,
+      "away": "Tennessee Titans",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 28.1397513689977,
+      "excel_AA_model_away_score": 18.6075242748228
+    },
+    {
+      "week": 5,
+      "away": "Baltimore Ravens",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 24.5054415835749,
+      "excel_AA_model_away_score": 24.9848713612129
+    },
+    {
+      "week": 5,
+      "away": "Buffalo Bills",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 27.3855052281809,
+      "excel_AA_model_away_score": 23.641574483144
+    },
+    {
+      "week": 5,
+      "away": "Chicago Bears",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 28.0050099704447,
+      "excel_AA_model_away_score": 20.4199699486249
+    },
+    {
+      "week": 5,
+      "away": "Cincinnati Bengals",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 28.3255796403936,
+      "excel_AA_model_away_score": 23.0312746905858
+    },
+    {
+      "week": 5,
+      "away": "Cleveland Browns",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 21.0919233719998,
+      "excel_AA_model_away_score": 19.5937520967328
+    },
+    {
+      "week": 5,
+      "away": "Denver Broncos",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 21.0413153491347,
+      "excel_AA_model_away_score": 19.8852756284323
+    },
+    {
+      "week": 5,
+      "away": "Detroit Lions",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 25.1741974139467,
+      "excel_AA_model_away_score": 26.5950160328315
+    },
+    {
+      "week": 5,
+      "away": "Houston Texans",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 18.9318550482326,
+      "excel_AA_model_away_score": 22.667823315139
+    },
+    {
+      "week": 5,
+      "away": "Indianapolis Colts",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 26.0719377993596,
+      "excel_AA_model_away_score": 22.1878848637959
+    },
+    {
+      "week": 5,
+      "away": "Las Vegas Raiders",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 27.2275716181227,
+      "excel_AA_model_away_score": 16.880793610064
+    },
+    {
+      "week": 5,
+      "away": "Minnesota Vikings",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 21.3774972855862,
+      "excel_AA_model_away_score": 18.8578227853002
+    },
+    {
+      "week": 5,
+      "away": "New York Giants",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 25.0535185274081,
+      "excel_AA_model_away_score": 22.1585515580199
+    },
+    {
+      "week": 5,
+      "away": "Philadelphia Eagles",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 24.4868031147464,
+      "excel_AA_model_away_score": 20.283097922424
+    },
+    {
+      "week": 5,
+      "away": "San Francisco 49ers",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 27.5211686926639,
+      "excel_AA_model_away_score": 21.081353539542
+    },
+    {
+      "week": 5,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 26.5522800260381,
+      "excel_AA_model_away_score": 24.198782249901
+    },
+    {
+      "week": 6,
+      "away": "Arizona Cardinals",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 30.0884717264288,
+      "excel_AA_model_away_score": 20.5510994177118
+    },
+    {
+      "week": 6,
+      "away": "Baltimore Ravens",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 22.0085320531292,
+      "excel_AA_model_away_score": 20.4825869014822
+    },
+    {
+      "week": 6,
+      "away": "Buffalo Bills",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 22.5613965452986,
+      "excel_AA_model_away_score": 23.7077000655546
+    },
+    {
+      "week": 6,
+      "away": "Carolina Panthers",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 27.3642009413808,
+      "excel_AA_model_away_score": 17.5952292410609
+    },
+    {
+      "week": 6,
+      "away": "Chicago Bears",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 26.1806127786564,
+      "excel_AA_model_away_score": 21.7888858073139
+    },
+    {
+      "week": 6,
+      "away": "Dallas Cowboys",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 30.0794296970819,
+      "excel_AA_model_away_score": 22.4831034279368
+    },
+    {
+      "week": 6,
+      "away": "Houston Texans",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 23.1001206342479,
+      "excel_AA_model_away_score": 19.0124106274931
+    },
+    {
+      "week": 6,
+      "away": "Los Angeles Chargers",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 24.4151080720301,
+      "excel_AA_model_away_score": 17.0649774638223
+    },
+    {
+      "week": 6,
+      "away": "New Orleans Saints",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 23.1083856805037,
+      "excel_AA_model_away_score": 20.7422181223567
+    },
+    {
+      "week": 6,
+      "away": "New York Jets",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 28.3334170926731,
+      "excel_AA_model_away_score": 18.4154264296117
+    },
+    {
+      "week": 6,
+      "away": "Pittsburgh Steelers",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 24.8747899505868,
+      "excel_AA_model_away_score": 20.8481379997507
+    },
+    {
+      "week": 6,
+      "away": "Seattle Seahawks",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 24.3195005809781,
+      "excel_AA_model_away_score": 19.247216504263
+    },
+    {
+      "week": 6,
+      "away": "Tennessee Titans",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 28.8655483850655,
+      "excel_AA_model_away_score": 16.6152696162773
+    },
+    {
+      "week": 6,
+      "away": "Washington Commanders",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 28.5542451685979,
+      "excel_AA_model_away_score": 21.6612703591699
+    },
+    {
+      "week": 7,
+      "away": "Cincinnati Bengals",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 28.4386419498416,
+      "excel_AA_model_away_score": 23.6193032591536
+    },
+    {
+      "week": 7,
+      "away": "Cleveland Browns",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 20.5788798444542,
+      "excel_AA_model_away_score": 18.8672010611245
+    },
+    {
+      "week": 7,
+      "away": "Dallas Cowboys",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 28.9239103603366,
+      "excel_AA_model_away_score": 19.4303067129944
+    },
+    {
+      "week": 7,
+      "away": "Denver Broncos",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 21.5001541295856,
+      "excel_AA_model_away_score": 25.1273677630733
+    },
+    {
+      "week": 7,
+      "away": "Green Bay Packers",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 28.9165926112186,
+      "excel_AA_model_away_score": 20.5263869954442
+    },
+    {
+      "week": 7,
+      "away": "Indianapolis Colts",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 26.6046209357674,
+      "excel_AA_model_away_score": 18.5898327224508
+    },
+    {
+      "week": 7,
+      "away": "Kansas City Chiefs",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 26.3856394114532,
+      "excel_AA_model_away_score": 18.724391635687
+    },
+    {
+      "week": 7,
+      "away": "Los Angeles Rams",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 22.2358628968552,
+      "excel_AA_model_away_score": 23.9719498010369
+    },
+    {
+      "week": 7,
+      "away": "Miami Dolphins",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 23.8351841511486,
+      "excel_AA_model_away_score": 21.93488170893
+    },
+    {
+      "week": 7,
+      "away": "New England Patriots",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 26.4730082423108,
+      "excel_AA_model_away_score": 22.7059130800518
+    },
+    {
+      "week": 7,
+      "away": "New York Giants",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 27.9948572044434,
+      "excel_AA_model_away_score": 16.7718157027855
+    },
+    {
+      "week": 7,
+      "away": "Pittsburgh Steelers",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 23.3816910611171,
+      "excel_AA_model_away_score": 19.9240669690192
+    },
+    {
+      "week": 7,
+      "away": "San Francisco 49ers",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 25.9323170636746,
+      "excel_AA_model_away_score": 22.8424153809356
+    },
+    {
+      "week": 7,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 23.0938247763268,
+      "excel_AA_model_away_score": 21.5844506087229
+    },
+    {
+      "week": 8,
+      "away": "Arizona Cardinals",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 29.1481971273274,
+      "excel_AA_model_away_score": 24.330291168796
+    },
+    {
+      "week": 8,
+      "away": "Atlanta Falcons",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 24.3323918437377,
+      "excel_AA_model_away_score": 21.5133763107648
+    },
+    {
+      "week": 8,
+      "away": "Baltimore Ravens",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 29.132780579134,
+      "excel_AA_model_away_score": 22.8068767150071
+    },
+    {
+      "week": 8,
+      "away": "Carolina Panthers",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 29.019720278126,
+      "excel_AA_model_away_score": 18.3825459560033
+    },
+    {
+      "week": 8,
+      "away": "Chicago Bears",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 27.7694644076456,
+      "excel_AA_model_away_score": 20.0058639659204
+    },
+    {
+      "week": 8,
+      "away": "Cleveland Browns",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 22.9881884855134,
+      "excel_AA_model_away_score": 16.9470971210799
+    },
+    {
+      "week": 8,
+      "away": "Indianapolis Colts",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 26.8571503940657,
+      "excel_AA_model_away_score": 19.9973305585308
+    },
+    {
+      "week": 8,
+      "away": "Kansas City Chiefs",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 25.1950532445942,
+      "excel_AA_model_away_score": 16.2015576421128
+    },
+    {
+      "week": 8,
+      "away": "Las Vegas Raiders",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 23.7741697597893,
+      "excel_AA_model_away_score": 18.539187110057
+    },
+    {
+      "week": 8,
+      "away": "Los Angeles Chargers",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 25.7666151473434,
+      "excel_AA_model_away_score": 21.4107533794134
+    },
+    {
+      "week": 8,
+      "away": "Minnesota Vikings",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 26.7209188798562,
+      "excel_AA_model_away_score": 17.8922779725379
+    },
+    {
+      "week": 8,
+      "away": "New England Patriots",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 23.4693350619855,
+      "excel_AA_model_away_score": 24.0966606563265
+    },
+    {
+      "week": 8,
+      "away": "Philadelphia Eagles",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 22.6838684435306,
+      "excel_AA_model_away_score": 23.920214325169
+    },
+    {
+      "week": 8,
+      "away": "Tennessee Titans",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 28.1860291528277,
+      "excel_AA_model_away_score": 20.489078390091
+    },
+    {
+      "week": 9,
+      "away": "Arizona Cardinals",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 29.2803724021545,
+      "excel_AA_model_away_score": 19.2625407902664
+    },
+    {
+      "week": 9,
+      "away": "Buffalo Bills",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 25.1496144688956,
+      "excel_AA_model_away_score": 20.9739190046379
+    },
+    {
+      "week": 9,
+      "away": "Cincinnati Bengals",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 28.1554512991864,
+      "excel_AA_model_away_score": 23.2155208580423
+    },
+    {
+      "week": 9,
+      "away": "Cleveland Browns",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 22.4390605560683,
+      "excel_AA_model_away_score": 15.6755920419897
+    },
+    {
+      "week": 9,
+      "away": "Dallas Cowboys",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 30.7518563297768,
+      "excel_AA_model_away_score": 21.8789406589804
+    },
+    {
+      "week": 9,
+      "away": "Denver Broncos",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 20.6085444519469,
+      "excel_AA_model_away_score": 21.9284900762458
+    },
+    {
+      "week": 9,
+      "away": "Detroit Lions",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 24.913573748292,
+      "excel_AA_model_away_score": 25.0964860524511
+    },
+    {
+      "week": 9,
+      "away": "Green Bay Packers",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 25.7477855079553,
+      "excel_AA_model_away_score": 23.0456596425821
+    },
+    {
+      "week": 9,
+      "away": "Houston Texans",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 21.6427870396105,
+      "excel_AA_model_away_score": 20.5262518375254
+    },
+    {
+      "week": 9,
+      "away": "Jacksonville Jaguars",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 25.3073678927112,
+      "excel_AA_model_away_score": 22.9788396172669
+    },
+    {
+      "week": 9,
+      "away": "Las Vegas Raiders",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 27.0770919906896,
+      "excel_AA_model_away_score": 19.5962764173893
+    },
+    {
+      "week": 9,
+      "away": "Los Angeles Rams",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 23.9143472036769,
+      "excel_AA_model_away_score": 25.7724229789451
+    },
+    {
+      "week": 9,
+      "away": "New York Giants",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 27.4361578327075,
+      "excel_AA_model_away_score": 18.0015619234507
+    },
+    {
+      "week": 9,
+      "away": "New York Jets",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 28.1160405231815,
+      "excel_AA_model_away_score": 16.3254009170021
+    },
+    {
+      "week": 9,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 27.2687109911707,
+      "excel_AA_model_away_score": 20.0109180788193
+    },
+    {
+      "week": 10,
+      "away": "Buffalo Bills",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 22.2690626788733,
+      "excel_AA_model_away_score": 25.9105082796792
+    },
+    {
+      "week": 10,
+      "away": "Carolina Panthers",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 24.8209237172444,
+      "excel_AA_model_away_score": 17.4277263844842
+    },
+    {
+      "week": 10,
+      "away": "Houston Texans",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 20.1603494565848,
+      "excel_AA_model_away_score": 17.9131788844174
+    },
+    {
+      "week": 10,
+      "away": "Jacksonville Jaguars",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 20.7965412863543,
+      "excel_AA_model_away_score": 22.6068203720522
+    },
+    {
+      "week": 10,
+      "away": "Kansas City Chiefs",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 23.7967877824639,
+      "excel_AA_model_away_score": 21.3845734770805
+    },
+    {
+      "week": 10,
+      "away": "Los Angeles Chargers",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 25.1361540426189,
+      "excel_AA_model_away_score": 20.7585108999264
+    },
+    {
+      "week": 10,
+      "away": "Los Angeles Rams",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 24.0869312232674,
+      "excel_AA_model_away_score": 26.0526399208733
+    },
+    {
+      "week": 10,
+      "away": "Miami Dolphins",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 29.0404057283791,
+      "excel_AA_model_away_score": 20.0991552877653
+    },
+    {
+      "week": 10,
+      "away": "Minnesota Vikings",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 24.6231112286449,
+      "excel_AA_model_away_score": 19.1703753983778
+    },
+    {
+      "week": 10,
+      "away": "New England Patriots",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 28.7221057660156,
+      "excel_AA_model_away_score": 22.1029495115948
+    },
+    {
+      "week": 10,
+      "away": "Pittsburgh Steelers",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 25.0976196593359,
+      "excel_AA_model_away_score": 24.3788322937279
+    },
+    {
+      "week": 10,
+      "away": "San Francisco 49ers",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 27.3889934178368,
+      "excel_AA_model_away_score": 25.76627314821
+    },
+    {
+      "week": 10,
+      "away": "Seattle Seahawks",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 20.4940773892292,
+      "excel_AA_model_away_score": 23.6645860323181
+    },
+    {
+      "week": 10,
+      "away": "Washington Commanders",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 25.8157255857977,
+      "excel_AA_model_away_score": 21.3963444996303
+    },
+    {
+      "week": 11,
+      "away": "Arizona Cardinals",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 28.7369646511155,
+      "excel_AA_model_away_score": 18.4682436453923
+    },
+    {
+      "week": 11,
+      "away": "Baltimore Ravens",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 23.0036626880258,
+      "excel_AA_model_away_score": 25.4782251542996
+    },
+    {
+      "week": 11,
+      "away": "Cincinnati Bengals",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 27.2736498691686,
+      "excel_AA_model_away_score": 24.466387729038
+    },
+    {
+      "week": 11,
+      "away": "Indianapolis Colts",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 25.6681000038192,
+      "excel_AA_model_away_score": 19.4170783694835
+    },
+    {
+      "week": 11,
+      "away": "Jacksonville Jaguars",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 23.4036212414234,
+      "excel_AA_model_away_score": 23.3243802335788
+    },
+    {
+      "week": 11,
+      "away": "Las Vegas Raiders",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 27.3694338932369,
+      "excel_AA_model_away_score": 12.3046893678773
+    },
+    {
+      "week": 11,
+      "away": "Miami Dolphins",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 30.1709208994551,
+      "excel_AA_model_away_score": 18.9204074663104
+    },
+    {
+      "week": 11,
+      "away": "Minnesota Vikings",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 23.9046375964396,
+      "excel_AA_model_away_score": 21.6592786491228
+    },
+    {
+      "week": 11,
+      "away": "New Orleans Saints",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 26.9133599604391,
+      "excel_AA_model_away_score": 18.0454681879235
+    },
+    {
+      "week": 11,
+      "away": "New York Jets",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 27.050099011567,
+      "excel_AA_model_away_score": 16.5412242232476
+    },
+    {
+      "week": 11,
+      "away": "Pittsburgh Steelers",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 26.4491929221335,
+      "excel_AA_model_away_score": 18.7760098255958
+    },
+    {
+      "week": 11,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 29.0178085148755,
+      "excel_AA_model_away_score": 19.8269002427077
+    },
+    {
+      "week": 11,
+      "away": "Tennessee Titans",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 28.3254009147446,
+      "excel_AA_model_away_score": 21.2983870307942
+    },
+    {
+      "week": 12,
+      "away": "Atlanta Falcons",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 25.3971651591577,
+      "excel_AA_model_away_score": 18.3388933424121
+    },
+    {
+      "week": 12,
+      "away": "Baltimore Ravens",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 25.7330188103537,
+      "excel_AA_model_away_score": 20.5945446344867
+    },
+    {
+      "week": 12,
+      "away": "Carolina Panthers",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 25.789797969834,
+      "excel_AA_model_away_score": 18.8884774152157
+    },
+    {
+      "week": 12,
+      "away": "Chicago Bears",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 30.102817621656,
+      "excel_AA_model_away_score": 19.2369415673951
+    },
+    {
+      "week": 12,
+      "away": "Denver Broncos",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 21.7417383698152,
+      "excel_AA_model_away_score": 21.0006287236652
+    },
+    {
+      "week": 12,
+      "away": "Green Bay Packers",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 27.3913387214826,
+      "excel_AA_model_away_score": 22.2895993460399
+    },
+    {
+      "week": 12,
+      "away": "Kansas City Chiefs",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 27.924126778023,
+      "excel_AA_model_away_score": 19.4988574584231
+    },
+    {
+      "week": 12,
+      "away": "Las Vegas Raiders",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 23.9679584397728,
+      "excel_AA_model_away_score": 13.44710392802
+    },
+    {
+      "week": 12,
+      "away": "New England Patriots",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 23.7727098378753,
+      "excel_AA_model_away_score": 21.6231523106132
+    },
+    {
+      "week": 12,
+      "away": "New Orleans Saints",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 25.5575572333897,
+      "excel_AA_model_away_score": 21.7696515616513
+    },
+    {
+      "week": 12,
+      "away": "New York Giants",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 30.2641038021477,
+      "excel_AA_model_away_score": 19.0235995838007
+    },
+    {
+      "week": 12,
+      "away": "New York Jets",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 26.7456268478189,
+      "excel_AA_model_away_score": 19.0244390122598
+    },
+    {
+      "week": 12,
+      "away": "Philadelphia Eagles",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 24.0268518518833,
+      "excel_AA_model_away_score": 24.8273652214477
+    },
+    {
+      "week": 12,
+      "away": "Seattle Seahawks",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 22.5271586784309,
+      "excel_AA_model_away_score": 26.075363553775
+    },
+    {
+      "week": 12,
+      "away": "Tennessee Titans",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 27.7853521776078,
+      "excel_AA_model_away_score": 15.1180094807988
+    },
+    {
+      "week": 12,
+      "away": "Washington Commanders",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 27.8714192024866,
+      "excel_AA_model_away_score": 22.4612899600228
+    },
+    {
+      "week": 13,
+      "away": "Buffalo Bills",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 25.2376140787903,
+      "excel_AA_model_away_score": 24.7636347796862
+    },
+    {
+      "week": 13,
+      "away": "Carolina Panthers",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 27.3622940205145,
+      "excel_AA_model_away_score": 15.2397144468631
+    },
+    {
+      "week": 13,
+      "away": "Cincinnati Bengals",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 25.6566354462504,
+      "excel_AA_model_away_score": 18.6799595832173
+    },
+    {
+      "week": 13,
+      "away": "Dallas Cowboys",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 29.8438841342829,
+      "excel_AA_model_away_score": 21.3999974452323
+    },
+    {
+      "week": 13,
+      "away": "Detroit Lions",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 24.2566860536559,
+      "excel_AA_model_away_score": 25.7700522199077
+    },
+    {
+      "week": 13,
+      "away": "Green Bay Packers",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 22.6026215756914,
+      "excel_AA_model_away_score": 22.4071558051549
+    },
+    {
+      "week": 13,
+      "away": "Houston Texans",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 22.3149080395418,
+      "excel_AA_model_away_score": 20.9273649327583
+    },
+    {
+      "week": 13,
+      "away": "Jacksonville Jaguars",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 26.6869058588979,
+      "excel_AA_model_away_score": 20.4757708123484
+    },
+    {
+      "week": 13,
+      "away": "Kansas City Chiefs",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 26.6937387357276,
+      "excel_AA_model_away_score": 20.2650415877574
+    },
+    {
+      "week": 13,
+      "away": "Los Angeles Chargers",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 22.9641390775761,
+      "excel_AA_model_away_score": 20.275583717569
+    },
+    {
+      "week": 13,
+      "away": "Miami Dolphins",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 28.4418473660263,
+      "excel_AA_model_away_score": 15.7599468508981
+    },
+    {
+      "week": 13,
+      "away": "Philadelphia Eagles",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 22.9949357625601,
+      "excel_AA_model_away_score": 24.6273912670971
+    },
+    {
+      "week": 13,
+      "away": "San Francisco 49ers",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 24.8346784203529,
+      "excel_AA_model_away_score": 24.0029783983587
+    },
+    {
+      "week": 13,
+      "away": "Washington Commanders",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 24.7025868511158,
+      "excel_AA_model_away_score": 22.3112025459455
+    },
+    {
+      "week": 14,
+      "away": "Atlanta Falcons",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 23.2065523336289,
+      "excel_AA_model_away_score": 18.4816394354164
+    },
+    {
+      "week": 14,
+      "away": "Buffalo Bills",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 26.8129514667055,
+      "excel_AA_model_away_score": 24.1426305137781
+    },
+    {
+      "week": 14,
+      "away": "Chicago Bears",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 26.3484108944742,
+      "excel_AA_model_away_score": 21.5976796398574
+    },
+    {
+      "week": 14,
+      "away": "Denver Broncos",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 20.3201931334291,
+      "excel_AA_model_away_score": 22.1064458573615
+    },
+    {
+      "week": 14,
+      "away": "Houston Texans",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 22.3993771490058,
+      "excel_AA_model_away_score": 23.7298870302381
+    },
+    {
+      "week": 14,
+      "away": "Indianapolis Colts",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 26.1094006320834,
+      "excel_AA_model_away_score": 21.2205075166486
+    },
+    {
+      "week": 14,
+      "away": "Kansas City Chiefs",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 24.6140923747093,
+      "excel_AA_model_away_score": 24.1039233715811
+    },
+    {
+      "week": 14,
+      "away": "Los Angeles Chargers",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 21.4425064644612,
+      "excel_AA_model_away_score": 19.8010470228689
+    },
+    {
+      "week": 14,
+      "away": "Los Angeles Rams",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 24.2689441860569,
+      "excel_AA_model_away_score": 26.2817673224938
+    },
+    {
+      "week": 14,
+      "away": "Minnesota Vikings",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 24.5303798903012,
+      "excel_AA_model_away_score": 19.4124358478962
+    },
+    {
+      "week": 14,
+      "away": "New Orleans Saints",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 22.2384737455953,
+      "excel_AA_model_away_score": 19.5101763561333
+    },
+    {
+      "week": 14,
+      "away": "New York Giants",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 29.3561316066538,
+      "excel_AA_model_away_score": 17.6849221636376
+    },
+    {
+      "week": 14,
+      "away": "Pittsburgh Steelers",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 26.1969426841159,
+      "excel_AA_model_away_score": 19.420992867478
+    },
+    {
+      "week": 14,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 26.8712572132893,
+      "excel_AA_model_away_score": 21.5012268837378
+    },
+    {
+      "week": 14,
+      "away": "Tennessee Titans",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 31.290929403582,
+      "excel_AA_model_away_score": 16.0140865880439
+    },
+    {
+      "week": 15,
+      "away": "Atlanta Falcons",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 24.5116699700334,
+      "excel_AA_model_away_score": 24.3454675812371
+    },
+    {
+      "week": 15,
+      "away": "Baltimore Ravens",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 24.1368566058941,
+      "excel_AA_model_away_score": 23.5727321540456
+    },
+    {
+      "week": 15,
+      "away": "Chicago Bears",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 30.3079517742155,
+      "excel_AA_model_away_score": 20.0313297886565
+    },
+    {
+      "week": 15,
+      "away": "Cincinnati Bengals",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 26.6536724036373,
+      "excel_AA_model_away_score": 23.6015669841387
+    },
+    {
+      "week": 15,
+      "away": "Cleveland Browns",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 22.1988605919047,
+      "excel_AA_model_away_score": 19.7428882595224
+    },
+    {
+      "week": 15,
+      "away": "Dallas Cowboys",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 30.6519834585572,
+      "excel_AA_model_away_score": 22.5604873973027
+    },
+    {
+      "week": 15,
+      "away": "Denver Broncos",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 19.1831656178773,
+      "excel_AA_model_away_score": 20.9909576432369
+    },
+    {
+      "week": 15,
+      "away": "Detroit Lions",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 25.4168120003157,
+      "excel_AA_model_away_score": 19.6963848520784
+    },
+    {
+      "week": 15,
+      "away": "Indianapolis Colts",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 22.2095147551662,
+      "excel_AA_model_away_score": 23.7713032461767
+    },
+    {
+      "week": 15,
+      "away": "Jacksonville Jaguars",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 24.241375766382,
+      "excel_AA_model_away_score": 18.371155495359
+    },
+    {
+      "week": 15,
+      "away": "Miami Dolphins",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 28.8679790956843,
+      "excel_AA_model_away_score": 19.6296655372577
+    },
+    {
+      "week": 15,
+      "away": "New England Patriots",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 24.8453448009663,
+      "excel_AA_model_away_score": 21.4098305460778
+    },
+    {
+      "week": 15,
+      "away": "New Orleans Saints",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 23.3347275246406,
+      "excel_AA_model_away_score": 18.5707045135917
+    },
+    {
+      "week": 15,
+      "away": "New York Jets",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 28.010512819041,
+      "excel_AA_model_away_score": 20.3584286024916
+    },
+    {
+      "week": 15,
+      "away": "San Francisco 49ers",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 25.9250064217375,
+      "excel_AA_model_away_score": 21.6830870592184
+    },
+    {
+      "week": 15,
+      "away": "Seattle Seahawks",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 23.5901129738909,
+      "excel_AA_model_away_score": 20.9927997655992
+    },
+    {
+      "week": 16,
+      "away": "Arizona Cardinals",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 26.3157468420744,
+      "excel_AA_model_away_score": 19.4781575918456
+    },
+    {
+      "week": 16,
+      "away": "Buffalo Bills",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 26.3868197370475,
+      "excel_AA_model_away_score": 20.0902905374995
+    },
+    {
+      "week": 16,
+      "away": "Carolina Panthers",
+      "home": "Pittsburgh Steelers",
+      "excel_Z_model_home_score": 26.826738108657,
+      "excel_AA_model_away_score": 18.9946065882081
+    },
+    {
+      "week": 16,
+      "away": "Cincinnati Bengals",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 30.6522751236695,
+      "excel_AA_model_away_score": 22.1216022303968
+    },
+    {
+      "week": 16,
+      "away": "Cleveland Browns",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 24.1010631514822,
+      "excel_AA_model_away_score": 18.3900558031292
+    },
+    {
+      "week": 16,
+      "away": "Green Bay Packers",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 26.1674950875138,
+      "excel_AA_model_away_score": 22.2574848315558
+    },
+    {
+      "week": 16,
+      "away": "Houston Texans",
+      "home": "Philadelphia Eagles",
+      "excel_Z_model_home_score": 24.1023708722655,
+      "excel_AA_model_away_score": 18.231387585611
+    },
+    {
+      "week": 16,
+      "away": "Jacksonville Jaguars",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 25.4704748937654,
+      "excel_AA_model_away_score": 25.1102349834301
+    },
+    {
+      "week": 16,
+      "away": "Los Angeles Chargers",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 23.0283878329082,
+      "excel_AA_model_away_score": 21.3648643810596
+    },
+    {
+      "week": 16,
+      "away": "Los Angeles Rams",
+      "home": "Seattle Seahawks",
+      "excel_Z_model_home_score": 25.7518722554631,
+      "excel_AA_model_away_score": 22.2189342665559
+    },
+    {
+      "week": 16,
+      "away": "New England Patriots",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 22.106996012945,
+      "excel_AA_model_away_score": 24.6418475093398
+    },
+    {
+      "week": 16,
+      "away": "New York Giants",
+      "home": "Detroit Lions",
+      "excel_Z_model_home_score": 31.6894848206641,
+      "excel_AA_model_away_score": 18.5815638788499
+    },
+    {
+      "week": 16,
+      "away": "San Francisco 49ers",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 26.4777609416249,
+      "excel_AA_model_away_score": 20.458855092047
+    },
+    {
+      "week": 16,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 24.5956036718759,
+      "excel_AA_model_away_score": 21.2501644826266
+    },
+    {
+      "week": 16,
+      "away": "Tennessee Titans",
+      "home": "Las Vegas Raiders",
+      "excel_Z_model_home_score": 24.9415668309638,
+      "excel_AA_model_away_score": 16.9178988943181
+    },
+    {
+      "week": 16,
+      "away": "Washington Commanders",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 28.1098627604885,
+      "excel_AA_model_away_score": 17.5052407740079
+    },
+    {
+      "week": 17,
+      "away": "Baltimore Ravens",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 25.3227461758203,
+      "excel_AA_model_away_score": 26.735199033175
+    },
+    {
+      "week": 17,
+      "away": "Buffalo Bills",
+      "home": "Miami Dolphins",
+      "excel_Z_model_home_score": 24.1484281607548,
+      "excel_AA_model_away_score": 24.9429002050106
+    },
+    {
+      "week": 17,
+      "away": "Denver Broncos",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 23.3363213911423,
+      "excel_AA_model_away_score": 20.9493723573685
+    },
+    {
+      "week": 17,
+      "away": "Detroit Lions",
+      "home": "Chicago Bears",
+      "excel_Z_model_home_score": 26.4297933729506,
+      "excel_AA_model_away_score": 23.4099658161004
+    },
+    {
+      "week": 17,
+      "away": "Houston Texans",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 24.5078902090108,
+      "excel_AA_model_away_score": 20.9849443005534
+    },
+    {
+      "week": 17,
+      "away": "Indianapolis Colts",
+      "home": "Cleveland Browns",
+      "excel_Z_model_home_score": 23.440603404591,
+      "excel_AA_model_away_score": 19.6908988154551
+    },
+    {
+      "week": 17,
+      "away": "Kansas City Chiefs",
+      "home": "Los Angeles Chargers",
+      "excel_Z_model_home_score": 23.253400380489,
+      "excel_AA_model_away_score": 18.7266851553634
+    },
+    {
+      "week": 17,
+      "away": "Las Vegas Raiders",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 25.9023559243018,
+      "excel_AA_model_away_score": 20.4394290157688
+    },
+    {
+      "week": 17,
+      "away": "Los Angeles Rams",
+      "home": "Tampa Bay Buccaneers",
+      "excel_Z_model_home_score": 23.7574955099701,
+      "excel_AA_model_away_score": 23.4500517084729
+    },
+    {
+      "week": 17,
+      "away": "Minnesota Vikings",
+      "home": "New York Jets",
+      "excel_Z_model_home_score": 21.0259444339239,
+      "excel_AA_model_away_score": 21.0600601090015
+    },
+    {
+      "week": 17,
+      "away": "New Orleans Saints",
+      "home": "Atlanta Falcons",
+      "excel_Z_model_home_score": 23.7402526411443,
+      "excel_AA_model_away_score": 19.1971186010263
+    },
+    {
+      "week": 17,
+      "away": "New York Giants",
+      "home": "Dallas Cowboys",
+      "excel_Z_model_home_score": 28.2239563318267,
+      "excel_AA_model_away_score": 22.5663906395114
+    },
+    {
+      "week": 17,
+      "away": "Philadelphia Eagles",
+      "home": "San Francisco 49ers",
+      "excel_Z_model_home_score": 23.6760990573041,
+      "excel_AA_model_away_score": 23.6751186687176
+    },
+    {
+      "week": 17,
+      "away": "Pittsburgh Steelers",
+      "home": "Tennessee Titans",
+      "excel_Z_model_home_score": 22.0303763862735,
+      "excel_AA_model_away_score": 22.6090055551239
+    },
+    {
+      "week": 17,
+      "away": "Seattle Seahawks",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 20.9194562232988,
+      "excel_AA_model_away_score": 24.339358465327
+    },
+    {
+      "week": 17,
+      "away": "Washington Commanders",
+      "home": "Jacksonville Jaguars",
+      "excel_Z_model_home_score": 28.8649492260402,
+      "excel_AA_model_away_score": 19.374366148333
+    },
+    {
+      "week": 18,
+      "away": "Atlanta Falcons",
+      "home": "Carolina Panthers",
+      "excel_Z_model_home_score": 23.2361380646923,
+      "excel_AA_model_away_score": 22.5797268363378
+    },
+    {
+      "week": 18,
+      "away": "Chicago Bears",
+      "home": "Minnesota Vikings",
+      "excel_Z_model_home_score": 26.3441521141601,
+      "excel_AA_model_away_score": 17.2853784394847
+    },
+    {
+      "week": 18,
+      "away": "Cleveland Browns",
+      "home": "Cincinnati Bengals",
+      "excel_Z_model_home_score": 24.6740780554395,
+      "excel_AA_model_away_score": 19.6625169740282
+    },
+    {
+      "week": 18,
+      "away": "Dallas Cowboys",
+      "home": "Washington Commanders",
+      "excel_Z_model_home_score": 26.4266023082975,
+      "excel_AA_model_away_score": 24.1763261576215
+    },
+    {
+      "week": 18,
+      "away": "Detroit Lions",
+      "home": "Green Bay Packers",
+      "excel_Z_model_home_score": 26.5810832454442,
+      "excel_AA_model_away_score": 23.3618963612186
+    },
+    {
+      "week": 18,
+      "away": "Jacksonville Jaguars",
+      "home": "Indianapolis Colts",
+      "excel_Z_model_home_score": 26.0106223640863,
+      "excel_AA_model_away_score": 20.8438585885102
+    },
+    {
+      "week": 18,
+      "away": "Las Vegas Raiders",
+      "home": "Kansas City Chiefs",
+      "excel_Z_model_home_score": 26.0166123090568,
+      "excel_AA_model_away_score": 14.6808649139564
+    },
+    {
+      "week": 18,
+      "away": "Los Angeles Chargers",
+      "home": "Denver Broncos",
+      "excel_Z_model_home_score": 24.7679296562101,
+      "excel_AA_model_away_score": 15.6586613213569
+    },
+    {
+      "week": 18,
+      "away": "Miami Dolphins",
+      "home": "New England Patriots",
+      "excel_Z_model_home_score": 27.7962635729931,
+      "excel_AA_model_away_score": 19.7697321453189
+    },
+    {
+      "week": 18,
+      "away": "New York Jets",
+      "home": "Buffalo Bills",
+      "excel_Z_model_home_score": 30.6979356407903,
+      "excel_AA_model_away_score": 17.4816353177622
+    },
+    {
+      "week": 18,
+      "away": "Philadelphia Eagles",
+      "home": "New York Giants",
+      "excel_Z_model_home_score": 21.4394892845618,
+      "excel_AA_model_away_score": 23.9982304715964
+    },
+    {
+      "week": 18,
+      "away": "Pittsburgh Steelers",
+      "home": "Baltimore Ravens",
+      "excel_Z_model_home_score": 26.0473239596011,
+      "excel_AA_model_away_score": 21.6622648003386
+    },
+    {
+      "week": 18,
+      "away": "San Francisco 49ers",
+      "home": "Arizona Cardinals",
+      "excel_Z_model_home_score": 25.8858483824207,
+      "excel_AA_model_away_score": 24.7077391938594
+    },
+    {
+      "week": 18,
+      "away": "Seattle Seahawks",
+      "home": "Los Angeles Rams",
+      "excel_Z_model_home_score": 24.8181860721115,
+      "excel_AA_model_away_score": 23.1526204499075
+    },
+    {
+      "week": 18,
+      "away": "Tampa Bay Buccaneers",
+      "home": "New Orleans Saints",
+      "excel_Z_model_home_score": 23.2042429858139,
+      "excel_AA_model_away_score": 19.2011890524184
+    },
+    {
+      "week": 18,
+      "away": "Tennessee Titans",
+      "home": "Houston Texans",
+      "excel_Z_model_home_score": 27.0963017873612,
+      "excel_AA_model_away_score": 14.5033765760104
+    }
+  ]
+}

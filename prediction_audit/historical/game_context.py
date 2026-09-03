@@ -28,6 +28,7 @@ from prediction_audit.engine.core_formula_simple_terms import (
     WeatherAdjConstants,
     division_adj,
     rest_effect,
+    road_fatigue_adj,
 )
 
 # Real nflverse `roof` values meaning no outdoor weather exposure (matches the live pipeline's
@@ -45,6 +46,40 @@ def resolve_division_adj_for_game(game_row: pd.Series, division_adj_const: float
     """game_row: real nflverse div_game (int 0/1) mapped to the engine's own "Y"/"N" convention."""
     is_divisional = "Y" if bool(game_row["div_game"]) else "N"
     return division_adj(is_divisional, division_adj_const)
+
+
+def resolve_consecutive_road_games(
+    sched: pd.DataFrame, target_season: int, target_week: int, team: str,
+) -> int:
+    """Real count of consecutive real AWAY games this team played immediately before
+    target_week (a bye week or a real HOME game resets the count to 0) -- computed directly
+    from nflverse's own real schedule, not sourced from the not-yet-ported Availability Index
+    tab this term was originally scoped as a given input from. `team` is nflverse's own real
+    abbreviation (not the project's full-name convention -- schedules' own home_team/away_team
+    columns are abbreviations)."""
+    reg = sched[
+        (sched["season"] == target_season) & (sched["game_type"] == "REG")
+        & (sched["week"] < target_week)
+        & ((sched["home_team"] == team) | (sched["away_team"] == team))
+    ].sort_values("week")
+
+    count = 0
+    for _, row in reg.iloc[::-1].iterrows():
+        if row["away_team"] == team:
+            count += 1
+        else:
+            break
+    return count
+
+
+def resolve_road_fatigue_adj_for_game(
+    sched: pd.DataFrame, target_season: int, target_week: int, team: str,
+    threshold: float, penalty: float,
+) -> float:
+    """Real Road Fatigue Adj -- wires resolve_consecutive_road_games()'s own real count into
+    the already-Excel-proven road_fatigue_adj()."""
+    consecutive = resolve_consecutive_road_games(sched, target_season, target_week, team)
+    return road_fatigue_adj(consecutive, threshold, penalty)
 
 
 def resolve_weather_adj_for_game(

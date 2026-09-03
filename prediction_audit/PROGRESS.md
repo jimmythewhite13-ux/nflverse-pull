@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-03 (Step 6 -- component layer complete: all 11 indices + all 5 matchup tabs have real walk-forward resolvers)
+**Last updated**: 2026-09-03 (Step 6 DONE -- full real end-to-end historical game prediction composed and verified live; Step 7 starting)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,8 +17,8 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **Component layer complete** — every real Z/AA term, all 11 real indices, and all 5 real matchup tabs now have a real, verified walk-forward resolver (see below); composing all of them into one real end-to-end historical GAME prediction (mirroring `season_matchups.py` for a past target) is the one real integration piece left before Steps 7-9 can run |
-| 7 | Baseline backtest | Not started (depends on Step 6) |
+| 6 | Historical reconstruction 2021-2025 | **Done** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). 2 real, documented gaps remain (Travel Effect, Travel Direction Adj — no real geographic/timezone source extracted yet), both default to their real Excel blank-guard value (0.0) |
+| 7 | Baseline backtest | **Starting** — Step 6's real dependency is now satisfied; a real small-scale backtest is next |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
 | 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
@@ -544,6 +544,45 @@ genuine current-season blend from anyway).
 **Every tab in `v35_core_formula_components.csv`/`v35_all_weighted_components.csv` now has a
 real, verified walk-forward resolver.**
 
+### Full composition — the actual Step 6 deliverable
+
+Beyond the per-component layer above, `full_game_prediction.py`'s
+`resolve_historical_model_home_away_score()` composes all of them into one real, end-to-end
+historical Model Home/Away Score for an arbitrary real past game — the same real summation
+`season_matchups.py` itself uses, sourced from real historical nflverse data instead of the
+frozen 2026 Excel snapshot. Real sub-compositions built to get there: **QB Replacement Value**
+(reuses the QB Index resolver for both Starter and Backup, diffs their real scores), **Road
+Fatigue Adj** (a real consecutive-road-games count computed directly from nflverse's own real
+schedule — previously scoped as a given input, now genuinely computed), **OL Pressure Adj**
+(OL Index Pass Protection Z vs opposing Pass Rush Generation Score), **Effective QB Rating**
+(QB Environment Model + a real OL modifier + a real weather-on-passing modifier, the latter
+using a real, honest pass-rate-share proxy computed from pbp rather than the exact real SUMIFS
+formula), **Phase Matchup Adj** (Effective QB Rating and RB Index vs the opponent's real
+Pass/Run Defense Matchup Score), and **Explosive Play Adj** (composing the already-built
+Explosive Play Matchup resolver for both teams).
+
+Two real, honestly-scoped gaps remain, documented rather than fabricated around: **Travel
+Effect** (needs real stadium-to-stadium distance) and **Travel Direction Adj** (needs real
+per-team UTC offsets) have no real historical resolver built yet — no real, verified
+geographic/timezone data source was identified and extracted this session. Both default to
+their real Excel blank-guard value (0.0), exposed as explicit optional overrides. Coaching
+Index is deliberately excluded from this composition — confirmed real formula text shows it
+feeds Team Ratings' own Net Home Advantage/display composite, never Z/AA directly.
+
+**Real bug caught and fixed during live verification, not after**: an early version of the
+composer passed only the CURRENT season's real schedule into Base Team Quality's own
+resolver, which genuinely needs 3 full real prior seasons from the SAME DataFrame — it
+correctly raised rather than silently using a truncated real history, surfacing the bug
+immediately. Fixed by combining the data bundle's own two real schedule slices before that
+one call.
+
+**Verified live end-to-end, twice, with a programmatically-selected target (never
+hand-picked)**: San Francisco @ LA Rams (2025 week 10) — real Model Score 25.70-22.45, +3.25
+real home margin; Arizona @ Seattle (2025 week 10, first real game of that week by real
+game_id sort order) — real Model Score, Seattle 25.88-22.68, +3.20 real home margin (real
+actual result: Seattle won 44-22, directionally consistent with the real prediction favoring
+Seattle).
+
 ## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
 
 A full spec for automating DraftKings/FanDuel/BetMGM/Caesars line entry via The Odds API
@@ -560,7 +599,7 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10147 tests pass, 0 failures.**
+Current total: **10161 tests pass, 0 failures.**
 
 ## Suggested next step
 

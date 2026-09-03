@@ -48,10 +48,10 @@ def load_real_model_assumptions(frozen_xlsx_path: str) -> dict[int, float]:
     wb = openpyxl.load_workbook(frozen_xlsx_path, data_only=True)
     ma = wb["Model Assumptions"]
     rows = [
-        3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 34, 35, 36, 37, 38, 39,
+        3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 34, 35, 36, 37, 38, 39,
         44, 45, 46, 47, 58, 59, 67, 81, 82, 87, 88, 89, 90, 91, 94, 95, 96, 97, 98,
         101, 102, 119, 120, 121, 123, 124, 128, 129, 130, 131, 133, 134, 136, 137, 138,
-        150, 151, 152, 153, 154, 155, 156, 158, 159, 160,
+        150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
     ]
     return {r: ma.cell(row=r, column=3).value for r in rows}
 
@@ -174,4 +174,5 @@ def build_real_constants(
         ol_pressure_conversion=c[123], ol_modifier_scaling=c[133],
         weather_modifier_scaling=c[134], road_fatigue_threshold=c[155],
         road_fatigue_penalty=c[156], qb_replacement_conversion=c[39],
+        travel_coefficient=c[5], west_to_east_penalty=c[157],
     )

@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **Done** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). 2 real, documented gaps remain (Travel Effect, Travel Direction Adj — no real geographic/timezone source extracted yet), both default to their real Excel blank-guard value (0.0) |
+| 6 | Historical reconstruction 2021-2025 | **Done, all 22 real inputs resolved** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). Travel Effect and Travel Direction Adj (the last 2 real gaps) are now real, resolved terms via `stadium_locations.py` — individually-sourced stadium coordinates validated to within 0.5mi on all 272 real games in v35's own ground truth, real per-team UTC offsets consolidated from that same real ground truth |
 | 7 | Baseline backtest | **Real constants applied** — `backtest_step7_real_constants.py` reruns Step 7 with the REAL Model Assumptions weights/conversions (extracted live from the frozen v35 workbook, not approximated) + real per-season league stats for every tab: real MAE=10.68 pts, real winner-pick accuracy=64.3%, real closing-line agreement=78.6% (one real week — see below) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -561,13 +561,30 @@ formula), **Phase Matchup Adj** (Effective QB Rating and RB Index vs the opponen
 Pass/Run Defense Matchup Score), and **Explosive Play Adj** (composing the already-built
 Explosive Play Matchup resolver for both teams).
 
-Two real, honestly-scoped gaps remain, documented rather than fabricated around: **Travel
-Effect** (needs real stadium-to-stadium distance) and **Travel Direction Adj** (needs real
-per-team UTC offsets) have no real historical resolver built yet — no real, verified
-geographic/timezone data source was identified and extracted this session. Both default to
-their real Excel blank-guard value (0.0), exposed as explicit optional overrides. Coaching
-Index is deliberately excluded from this composition — confirmed real formula text shows it
-feeds Team Ratings' own Net Home Advantage/display composite, never Z/AA directly.
+**Travel Effect and Travel Direction Adj are now real, resolved terms** — the last 2 of the
+formula's 22 real inputs. `stadium_locations.py` individually sources each of the 32 real
+teams' own current stadium coordinates (live web search against that stadium's own real
+Wikipedia article, not a single aggregated dataset — an earlier candidate aggregate CSV was
+checked and found stale: pre-relocation Chargers/Raiders/Rams, "Redskins" not renamed). This
+table is independently validated, not just individually sourced: computing real haversine
+distance from these coordinates reproduces v35's own real `away_travel_miles` ground truth
+(`v35_hfa_delta_travel_fatigue_ground_truth.json`, already extracted from the frozen workbook)
+to within **0.21 miles on every one of 272 real games in a full season** — confirming both the
+coordinates and that v35's real formula is plain great-circle distance at Earth radius 3959mi.
+Real per-team UTC offsets are not re-derived at all — consolidated directly from
+`v35_travel_direction_ground_truth.json` (also already extracted from the frozen workbook,
+confirmed static per team across all 272 real games). A real, bounded neutral-site check
+(`resolve_game_venue_team()`) verifies a "Neutral"-location game's real schedule-row stadium
+name against the home team's own real stadium before using it, raising rather than silently
+guessing for a genuine international venue outside the composer's real reachable season range
+(2024's real London/Munich/São Paulo games — already excluded by OL Index's own real
+FTN-coverage constraint) — live-checked against 2023-2025 real schedule data and found that
+every real in-scope "Neutral" game is actually hosted at the home team's own real stadium
+under an nflverse-internal older sponsor name, so no separate international-venue table was
+needed. `resolve_historical_model_home_away_score()` now resolves both terms automatically by
+default; still accepts an explicit override for a real venue this module doesn't yet cover.
+Coaching Index is deliberately excluded from this composition — confirmed real formula text
+shows it feeds Team Ratings' own Net Home Advantage/display composite, never Z/AA directly.
 
 **Real bug caught and fixed during live verification, not after**: an early version of the
 composer passed only the CURRENT season's real schedule into Base Team Quality's own
@@ -658,23 +675,20 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10164 tests pass, 0 failures.**
+Current total: **10716 tests pass, 0 failures.**
 
 ## Suggested next step
 
-Four real options, all concrete:
+Three real options, all concrete (the 2 travel gaps are now resolved — see Step 6 above):
 
-1. **Scale up the Step 7 backtest** — run `backtest_step7_real_constants.py` across many real
-   weeks/seasons instead of one, and persist the results into the Step 2 database (the schema
-   already supports it) instead of printing them, so Steps 8-9 (walk-forward validation,
-   ablation) have a real, queryable base to work from.
-2. **Fill the 2 remaining real gaps** — Travel Effect (real stadium-to-stadium distance) and
-   Travel Direction Adj (real per-team UTC offsets) still default to 0.0. A real, free
-   stadium-coordinates source would need to be found and verified the same way every other
-   real data source in this project was.
-3. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
+1. **Scale up the Step 7 backtest further** — `backtest_step7_multiweek.py` now runs the real
+   pipeline across several real consecutive weeks in one real season, reusing the fetched
+   season data (see its own results below/pending). Persisting results into the Step 2
+   database (the schema already supports it) instead of printing them is the next real step,
+   so Steps 8-9 (walk-forward validation, ablation) have a real, queryable base to work from.
+2. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-4. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
+3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.

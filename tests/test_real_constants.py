@@ -35,6 +35,8 @@ def test_load_real_model_assumptions_returns_real_known_values():
     c = load_real_model_assumptions(FROZEN_XLSX)
     # Spot-check a handful of real, already-verified-elsewhere-this-session constants.
     assert c[3] == 1.5       # flat HFA
+    assert c[5] == 0.4       # travel coefficient
+    assert c[157] == -0.5    # west-to-east travel direction penalty
     assert c[20] == 0.5      # decay factor
     assert c[21] == 0.4      # carryover weight
     assert c[22] == 0.3      # last-year emphasis
@@ -51,10 +53,10 @@ def test_load_real_model_assumptions_returns_real_known_values():
 def test_load_real_model_assumptions_covers_every_row_build_real_constants_needs():
     c = load_real_model_assumptions(FROZEN_XLSX)
     required_rows = [
-        3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 34, 35, 36, 37, 38, 39,
+        3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 34, 35, 36, 37, 38, 39,
         44, 45, 46, 47, 58, 59, 67, 81, 82, 87, 88, 89, 90, 91, 94, 95, 96, 97, 98,
         101, 102, 119, 120, 121, 123, 124, 128, 129, 130, 131, 133, 134, 136, 137, 138,
-        150, 151, 152, 153, 154, 155, 156, 158, 159, 160,
+        150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
     ]
     for row in required_rows:
         assert row in c, f"real row C{row} missing from load_real_model_assumptions()"

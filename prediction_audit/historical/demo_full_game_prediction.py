@@ -148,6 +148,7 @@ def build_demo_constants() -> HistoricalGameModelConstants:
         flat_hfa=1.5, pass_matchup_conversion=0.08, run_matchup_conversion=0.06,
         ol_pressure_conversion=0.05, ol_modifier_scaling=0.25, weather_modifier_scaling=0.5,
         road_fatigue_threshold=3, road_fatigue_penalty=-1.0, qb_replacement_conversion=0.3,
+        travel_coefficient=0.4, west_to_east_penalty=-0.5,
     )
 
 

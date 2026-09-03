@@ -5,15 +5,12 @@ built (see PROGRESS.md's own summary table) exactly as `season_matchups.py`'s ow
 Excel-proven `compute_model_home_away_score()` sums them -- but sourced from real historical
 nflverse data instead of the frozen 2026 Excel snapshot.
 
-Real, honestly-scoped gaps (documented, not fabricated around): 2 of the real formula's 22
-inputs -- Travel Effect (needs real stadium-to-stadium distance) and Travel Direction Adj
-(needs real per-team UTC offsets) -- have no real historical resolver built yet in this
-session; no real, verified geographic/timezone data source was identified and extracted for
-them. Both default to their real Excel "blank guard" value (0.0) here, matching how every
-other term in this engine already treats a genuinely unresolvable real input, and are passed
-as explicit optional overrides so a caller with a real geographic data source can supply them.
-Injury Adj is not a gap -- it is confirmed to be a real, permanent constant 0 in the live
-workbook itself (core_formula_simple_terms.py's own `injury_adj()`).
+Travel Effect and Travel Direction Adj are now real, resolved terms (`stadium_locations.py`,
+verified against v35's own real 272-game ground truth to within 0.5mi/exact-offset on every
+game -- see that module's docstring), not the earlier placeholder 0.0 default. Both are still
+exposed as optional overrides for a caller with a more specific real venue than the schedule
+row implies. Injury Adj is not a gap -- it is confirmed to be a real, permanent constant 0 in
+the live workbook itself (core_formula_simple_terms.py's own `injury_adj()`).
 """
 from __future__ import annotations
 
@@ -28,6 +25,8 @@ from prediction_audit.engine.core_formula_simple_terms import (
     hfa_delta_home,
     injury_adj,
     qb_replacement_adj,
+    travel_direction_adj,
+    travel_effect,
 )
 from prediction_audit.engine.core_formula_simple_terms import (
     road_fatigue_adj as _road_fatigue_adj_fn,
@@ -56,6 +55,10 @@ from prediction_audit.historical.ol_pressure_adj_historical import resolve_ol_pr
 from prediction_audit.historical.phase_matchup_historical import resolve_phase_matchup_adj
 from prediction_audit.historical.qb_replacement_value_historical import (
     resolve_qb_replacement_value,
+)
+from prediction_audit.historical.stadium_locations import (
+    resolve_travel_direction_offsets,
+    resolve_travel_effect_miles,
 )
 from prediction_audit.historical.team_hfa import resolve_team_specific_hfa_for_game
 from prediction_audit.historical.walk_forward import (
@@ -94,6 +97,8 @@ class HistoricalGameModelConstants:
     road_fatigue_threshold: float            # C150-family (Road Fatigue's own threshold)
     road_fatigue_penalty: float
     qb_replacement_conversion: float         # C39
+    travel_coefficient: float                # C5
+    west_to_east_penalty: float              # C157
 
 
 @dataclass
@@ -117,13 +122,16 @@ def resolve_historical_model_home_away_score(
     target_season: int, target_week: int,
     home_team: str, home_abbr: str, away_team: str, away_abbr: str,
     home_backup_in: bool = False, away_backup_in: bool = False,
-    travel_effect_away: float = 0.0, travel_direction_away: float = 0.0,
+    travel_effect_away: float | None = None, travel_direction_away: float | None = None,
 ) -> tuple[float, float]:
     """Returns (model_home_score, model_away_score) -- a real, end-to-end historical Z/AA
     prediction for one real past game, using only real data available before its own kickoff.
     `home_backup_in`/`away_backup_in`: real, live roster-status facts for THIS specific game
     (whether the primary starter was out) -- not derivable from season-to-date stats alone,
     so still a required caller input, matching this project's established scoping.
+    `travel_effect_away`/`travel_direction_away`: real values are resolved automatically from
+    `stadium_locations.py` when left as None; pass an explicit value only to override (e.g. a
+    genuine international/neutral-site venue that module's own alias table does not cover).
     """
     game_row = bundle.sched_current_season[
         (bundle.sched_current_season["season"] == target_season)
@@ -241,6 +249,16 @@ def resolve_historical_model_home_away_score(
     away_road_fatigue = _road_fatigue_adj_fn(
         away_road_games, constants.road_fatigue_threshold, constants.road_fatigue_penalty,
     )
+
+    # ---- Travel Effect / Travel Direction Adj (away side only) --------------------------
+    if travel_effect_away is None:
+        away_travel_miles = resolve_travel_effect_miles(away_team, home_team, game_row)
+        travel_effect_away = travel_effect(away_travel_miles, constants.travel_coefficient)
+    if travel_direction_away is None:
+        home_utc, away_utc = resolve_travel_direction_offsets(home_team, away_team)
+        travel_direction_away = travel_direction_adj(
+            home_utc, away_utc, constants.west_to_east_penalty,
+        )
 
     return compute_model_home_away_score(
         base_team_quality_home=home_base_quality,

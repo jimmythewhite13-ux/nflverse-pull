@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-02 (Step 6 -- real historical QB Index walk-forward, first player-level index)
+**Last updated**: 2026-09-02 (Step 6 -- real historical RB Value Index walk-forward, second player-level index)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward now runs end to end for 5 real Z/AA terms plus the first real player-level index (QB Index — see below); the remaining player-level indices are the next real increment |
+| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward now runs end to end for 5 real Z/AA terms plus 2 real player-level indices (QB Index, RB Value Index — see below); the remaining player-level indices are the next real increment |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -364,15 +364,32 @@ real dropbacks-so-far. Verified live (2024 week 10): real league-wide EPA/CPOE/A
 all in plausible real NFL ranges, feeding real per-team scores (New Orleans Saints
 starter=54.46, Atlanta Falcons starter=53.84) both near the real 50-point baseline as expected.
 
+**RB Value Index** (`rb_index_historical.py`) — second player-level index, following QB
+Index's exact pattern but more involved: 5 real metrics instead of 3, two needing extra real
+data sources beyond pbp (real NGS rushing data for RYOE/Att; real red-zone-carry pbp
+aggregation for Red-Zone Carry Share, whose real weight is 0 — included for completeness, not
+because it affects any real score). Real finding: real NGS rushing data has a small number of
+season-aggregate rows (7/149 in 2021) with a null `team_abbr`, among them several real notable
+backs (Najee Harris, Nick Chubb, Jonathan Taylor) — filtered out in this module rather than
+touching the shared `nflverse_pull` function, so that player-season's RYOE correctly becomes
+unresolvable via the real never-fabricate path instead of crashing. RYOE/Att's own real v35
+rookie-substitution logic is explicitly NOT replicated (a real missing RYOE season raises, same
+as any other missing metric). Verified live (2024 week 10) on BOTH real code paths: Baltimore
+Ravens' real starter (Derrick Henry, score=65.93) resolves successfully; several other real
+2024 starters (young backs without 3 full real prior qualifying seasons — Atlanta's, San
+Francisco's) correctly raise rather than fabricate a substitute for missing rookie-era history
+— a real, expected limitation (young feature backs are common in the NFL), not a bug.
+
 **Not yet historically resolvable** — the larger remaining lift: every OTHER player-level
-index (RB/WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-Player/Kicking) and the matchup tabs
+index (WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-Player/Kicking) and the matchup tabs
 that depend on them (Pass/Run Defense Matchup, Pass Rush Generation, Explosive Play Matchup,
 QB Environment Model, Coaching Index, Secondary Index) still need their own real historical
 per-player/per-team metric aggregation from real pbp (`fetch_pbp()`/`compute_team_season_efficiency()`
 etc. — already real, parameterized, reusable — but not yet wired for a historical target) —
-QB Index is the proof the pattern works; each remaining index is now "apply the same pattern,"
-not "solve a new problem," though real starter/backup role resolution for non-QB positions may
-need real historical snap-count or depth-chart data (`fetch_depth_charts()`) rather than
+QB Index and RB Value Index are the proof the pattern works twice over; each remaining index is
+now "apply the same pattern," not "solve a new problem," though real starter/backup role
+resolution for non-QB/RB positions may need real historical snap-count or depth-chart data
+(`fetch_depth_charts()`) rather than
 QB Index's own dropback-ranking proxy, since e.g. WR/CB rotations don't rank as cleanly by a
 single volume stat.
 
@@ -392,7 +409,7 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10085 tests pass, 0 failures.**
+Current total: **10091 tests pass, 0 failures.**
 
 ## Suggested next step
 
@@ -402,11 +419,11 @@ Three real options, all concrete:
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Extend Step 6's real walk-forward to the remaining player-level indices** — QB Index is
-   now the proven template; RB Value Index is the natural next one (same
-   decay→blend→Z-score shape, same real dropback-style volume-ranking role convention likely
-   applies via `nflverse_pull.rb_stats`), then WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-
-   Player/Kicking, then the matchup tabs that depend on them.
+2. **Extend Step 6's real walk-forward to the remaining player-level indices** — QB Index and
+   RB Value Index are the proven template, twice over; WR-TE Value Index is the natural next
+   one (same decay→blend→Z-score shape, likely a similar real target-share/route-based role
+   convention via `nflverse_pull`'s own receiving-stats module), then OL/Front-7/EDGE-IDL/LB/
+   CB-S/Special-Teams-Player/Kicking, then the matchup tabs that depend on them.
 3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.
 

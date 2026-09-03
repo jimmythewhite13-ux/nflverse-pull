@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-03 (Step 6 DONE; Step 7 first real preliminary backtest results -- MAE 10.60pts, 71.4% winner-pick accuracy)
+**Last updated**: 2026-09-03 (Step 6 DONE; Step 7 rerun with real Model Assumptions constants -- MAE 10.68pts, 64.3% winner-pick, 78.6% closing-line agreement)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -18,7 +18,7 @@ planned.
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Done** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). 2 real, documented gaps remain (Travel Effect, Travel Direction Adj — no real geographic/timezone source extracted yet), both default to their real Excel blank-guard value (0.0) |
-| 7 | Baseline backtest | **First real results** — `backtest_step7_baseline.py` ran the full Step 6 composer against all 14 real games in 2025 week 10: real MAE=10.60 pts, real winner-pick accuracy=71.4%, real agreement with the real closing line=71.4%. Preliminary (representative constants, one real week) — see below |
+| 7 | Baseline backtest | **Real constants applied** — `backtest_step7_real_constants.py` reruns Step 7 with the REAL Model Assumptions weights/conversions (extracted live from the frozen v35 workbook, not approximated) + real per-season league stats for every tab: real MAE=10.68 pts, real winner-pick accuracy=64.3%, real closing-line agreement=78.6% (one real week — see below) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
 | 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
@@ -611,6 +611,37 @@ in the range a reasonable real model should land in, not a red flag in either di
 near 0 or an agreement rate near 100% with the real closing line would have suggested a bug,
 e.g. the model accidentally leaking the real line itself into its own prediction).
 
+### Rigor fix — real Model Assumptions constants, not representative ones
+
+`real_constants.py` extracts the REAL weight/conversion/threshold constants directly from the
+frozen v35 workbook (a live read, never hardcoded), replacing the representative constants
+above. `league_avg`/`league_std` stay correctly separate — real, per-target-season COMPUTED
+values (each tab's own real Section 4), resolved via this package's own
+`resolve_*_league_stats()` functions, not extracted from the workbook.
+
+**Real corrections this caught**, documented rather than silently fixed: QB Index's real
+ANY/A weight is 0.3 (the representative version used 0.2); QB Index's real Points-to-Game-
+Points Conversion (C39) is 0.15 (the representative version used 0.3); RB Index's real
+RYOE/Att weight (C82) is 0.35 (the representative version used 0.2); several Pass/Run Defense
+Matchup and Explosive Play Matchup weights were off by smaller amounts. Also confirmed C92/C99
+really are the dead constants Step 1 found — those tabs' own Score conversion uses the
+standard C37/C38 instead.
+
+**Real result with the corrected constants** (same real target — all 14 real week-10 2025
+games):
+
+| Metric | Representative constants | Real constants |
+|---|---|---|
+| MAE vs real actual margin | 10.60 pts | 10.68 pts |
+| Real winner-pick accuracy | 71.4% (10/14) | 64.3% (9/14) |
+| Real closing-line agreement | 71.4% (10/14) | 78.6% (11/14) |
+
+Small sample (n=14), so these shifts aren't individually meaningful — the real value of this
+fix is confirming the pipeline is robust to the real corrected constants (not a lucky
+coincidence with the earlier approximations), and every real per-tab league-wide stat (QB EPA,
+RB rushing EPA, OL pass protection, Pass/Run Defense Matchup rates, etc.) landed in a real,
+plausible NFL range.
+
 ## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
 
 A full spec for automating DraftKings/FanDuel/BetMGM/Caesars line entry via The Odds API
@@ -627,28 +658,23 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10161 tests pass, 0 failures.**
+Current total: **10164 tests pass, 0 failures.**
 
 ## Suggested next step
 
-Three real options, all concrete:
+Four real options, all concrete:
 
-1. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
+1. **Scale up the Step 7 backtest** — run `backtest_step7_real_constants.py` across many real
+   weeks/seasons instead of one, and persist the results into the Step 2 database (the schema
+   already supports it) instead of printing them, so Steps 8-9 (walk-forward validation,
+   ablation) have a real, queryable base to work from.
+2. **Fill the 2 remaining real gaps** — Travel Effect (real stadium-to-stadium distance) and
+   Travel Direction Adj (real per-team UTC offsets) still default to 0.0. A real, free
+   stadium-coordinates source would need to be found and verified the same way every other
+   real data source in this project was.
+3. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Compose the 16 real component resolvers into one real historical game prediction** — the
-   actual remaining Step 6 deliverable. Every real Z/AA term/index/matchup tab now resolves in
-   isolation; the next piece is a real
-   `resolve_historical_model_home_away_score(season, week, home_team, away_team)`, mirroring
-   `season_matchups.py`'s own real `compute_model_home_away_score()` but sourced from this
-   historical layer — including the real cross-references already proven in isolation (Phase
-   Matchup Adj/OL Pressure Adj/QB Replacement Adj against QB/RB/OL/Pass-Rush-Generation, and
-   Effective QB Rating's own OL-modifier/weather-modifier composite over QB Environment
-   Model). This is real integration work over already-proven pieces, not new data-resolution
-   problems — proving it against one real historical game closes the loop from "every
-   component is provably correct" to "a full historical prediction is provably correct,"
-   which is what Steps 7-9 (backtest, walk-forward validation, ablation) actually need to run
-   against real past seasons.
-3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
+4. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.

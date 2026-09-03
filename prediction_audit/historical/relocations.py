@@ -21,11 +21,23 @@ _ABBR_RELOCATIONS: dict[str, str] = {
 }
 
 
-def normalize_relocated_abbreviations(sched: pd.DataFrame) -> pd.DataFrame:
-    """Pure function, no network. Returns a copy of `sched` with home_team/away_team real
-    pre-relocation abbreviations replaced by their current real equivalent."""
-    out = sched.copy()
-    for col in ("home_team", "away_team"):
+_SCHEDULE_TEAM_COLUMNS = ("home_team", "away_team")
+_PBP_TEAM_COLUMNS = ("posteam", "defteam", "home_team", "away_team")
+
+
+def normalize_relocated_abbreviations(
+    df: pd.DataFrame, columns: tuple[str, ...] = _SCHEDULE_TEAM_COLUMNS,
+) -> pd.DataFrame:
+    """Pure function, no network. Returns a copy of `df` with real pre-relocation team
+    abbreviations, in any of `columns` that are actually present, replaced by their current
+    real equivalent. Defaults to schedule data's own home_team/away_team; pass
+    `columns=PBP_TEAM_COLUMNS` for real pbp data's own posteam/defteam (plus home_team/
+    away_team, which real pbp also carries)."""
+    out = df.copy()
+    for col in columns:
         if col in out.columns:
             out[col] = out[col].replace(_ABBR_RELOCATIONS)
     return out
+
+
+PBP_TEAM_COLUMNS = _PBP_TEAM_COLUMNS

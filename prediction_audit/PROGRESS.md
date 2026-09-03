@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-02 (zero-Excel-dependency reconstruction + Market Comparison & Confidence)
+**Last updated**: 2026-09-02 (Step 6 real walk-forward proof of concept -- Base Team Quality, Rest Effect, Division Adj, partial Weather Adj, Team-Specific HFA)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **Unblocked, not yet run** — the Python Model Engine now reproduces a full real game prediction end to end with zero Excel dependency (see milestone below); walk-forward reconstruction across historical seasons is the next real increment |
+| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward proof of concept now runs end to end for 5 real Z/AA terms against arbitrary real historical targets (see below); the remaining terms (player-level indices) are the next real increment |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -307,25 +307,87 @@ user actually looks at: a win probability and a confidence read.
   was ever really populated with per-game manual entry, confirmed while sourcing Step 5's real
   external market data and porting Market Comparison & Confidence's own Moneyline system.
 
+## Step 6 — real walk-forward proof of concept, in progress
+
+`prediction_audit/historical/` is the real historical data-resolution layer Step 6 needs,
+started this session. Confirmed live: the raw per-team/per-season data most of these terms
+need is **already free and already flowing** through this project's own existing code
+(`nflverse_pull.pull`'s `fetch_schedules()`/`transform_to_team_season()`/
+`compute_team_season_home_away_splits()`, built for the live 2026 pipeline but genuinely
+reusable for any historical season) — Step 6 did not need a from-scratch historical data
+pipeline for these terms, just week-aware wrappers around what already existed.
+
+**Real terms with a working historical walk-forward, verified against real, non-adjacent
+targets (not just one cherry-picked game):**
+- **Base Team Quality** (`team_ppg.py` + `walk_forward.py`) — real Y1/Y2/Y3 (3 full prior
+  seasons) + real current-season-so-far PPG, with a strict `through_week` no-future-information
+  guard (`week < target_week`, never `<=`).
+- **Rest Effect** and **Division Adj** (`game_context.py`) — nflverse's own real per-game
+  `home_rest`/`away_rest`/`div_game` fields, 0% null every season, wired directly into the
+  already-proven arithmetic. No caveats.
+- **Weather Adj** (`game_context.py`) — real but honestly PARTIAL: nflverse has real
+  `roof`/`temp`/`wind` but no `snow_flag`/`precip_flag`/`humidity` field at all for any
+  historical season (those are the live pipeline's own manually-entered current-week-only
+  inputs). The wind/cold-threshold portion is computed for real; snow/precip/humidity are
+  excluded outright, not defaulted to "none" (returns `None`, not a fabricated `0.0`, for a
+  real outdoor game where nflverse's own temp/wind happen to be null too — ~21-25% of such
+  games in 2021-2023).
+- **Team-Specific HFA** (`team_hfa.py`) — real Y1/Y2/Y3 raw HFA (Home Margin − Away Margin) via
+  `compute_team_season_home_away_splits()`; no current-season blend exists for this tab, so no
+  `through_week` logic is needed here at all. Verified against 2 real non-adjacent targets
+  (2024 New Orleans Saints: 4.24; 2022 Seattle Seahawks: 3.26), both plausible against the real
+  ~4.18 2025 league-wide average confirmed when this tab was first ported.
+
+**Real finding along the way**: a 2022-target walk-forward needs Y2=2020 data, which still
+uses nflverse's real pre-relocation abbreviations (`OAK` before the 2020 Raiders move, etc.) —
+running the demo against that target raised a real "no mapping" error rather than silently
+using stale/wrong data. Fixed with `relocations.py`, which normalizes `OAK`→`LV`, `SD`→`LAC`,
+`STL`→`LA` at the raw-abbreviation level (real franchise continuity) before any downstream
+processing, so every consumer — this package's own functions and nflverse_pull's shared ones
+alike — works unchanged.
+
+**Not yet historically resolvable** — the larger remaining lift: every player-level index
+(QB/RB/WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-Player/Kicking) and the matchup tabs
+that depend on them (Pass/Run Defense Matchup, Pass Rush Generation, Explosive Play Matchup,
+QB Environment Model, Coaching Index, Secondary Index) all need real historical per-player/
+per-team metric aggregation from real pbp (`fetch_pbp()`/`compute_team_season_efficiency()`
+etc. — already real, parameterized, reusable, per this session's own investigation — but not
+yet wired for a historical target) PLUS real historical starter/backup roster resolution
+(`fetch_depth_charts()`, real per-week nflverse data, not yet wired either).
+
+## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
+
+A full spec for automating DraftKings/FanDuel/BetMGM/Caesars line entry via The Odds API
+(explicitly NOT MyBookie, which stays 100% manual — offshore book, scraping/credential access
+both ruled out) arrived this session. Real blocker: Part A requires checking real coverage
+(props tier, season-win-totals tier, book presence) against a real API key, and creating an
+Odds API account is outside what this assistant can do on its own (account/credential creation
+is off-limits regardless of authorization) — the user chose to hold this and continue Step 6
+instead. Prep work already done: `.gitignore` now excludes `.env`/`.env.*`/`*.local.json` so a
+future key can never be accidentally committed. **Next step when resumed**: the user provides
+a real Odds API key (existing or newly signed-up), then Part A's 3 real coverage questions get
+checked against real response data before any pull code is written.
+
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10049 tests pass, 0 failures.**
+Current total: **10080 tests pass, 0 failures.**
 
 ## Suggested next step
 
-Two real options, both concrete:
+Three real options, all concrete:
 
 1. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Start Step 6 for real** — this is the large remaining lift: re-deriving each historical
-   week's real 3-year decay-baseline inputs from real nflverse pbp data as of that week (the
-   Python Model Engine's own functions were deliberately scoped to "arithmetic only, not data
-   sourcing," so this needs a genuinely new historical data-resolution layer, not just more
-   arithmetic), running it through the completed engine, and comparing against the real
-   historical closing lines Step 5 now provides (no future information, real walk-forward).
-   With the zero-Excel-dependency reconstruction and Market Comparison & Confidence both done,
-   this is now the one substantial piece of real engineering left before Steps 7-9 (backtest,
+2. **Extend Step 6's real walk-forward to the player-level indices** — the large remaining
+   lift described above: real historical per-player pbp aggregation + real historical
+   starter/backup resolution, for QB Index first (the most-wired-in index, feeding Phase
+   Matchup Adj/QB Replacement Adj/Effective QB Rating), then the rest.
+3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
+   coverage questions for real before writing any pull code.
+
+With the zero-Excel-dependency reconstruction and Market Comparison & Confidence both done,
+extending Step 6 is now the one substantial piece of real engineering left before Steps 7-9 (backtest,
    walk-forward validation, ablation) become meaningful.

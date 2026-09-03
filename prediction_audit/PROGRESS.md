@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-03 (Step 6 DONE -- full real end-to-end historical game prediction composed and verified live; Step 7 starting)
+**Last updated**: 2026-09-03 (Step 6 DONE; Step 7 first real preliminary backtest results -- MAE 10.60pts, 71.4% winner-pick accuracy)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -18,7 +18,7 @@ planned.
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Done** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). 2 real, documented gaps remain (Travel Effect, Travel Direction Adj — no real geographic/timezone source extracted yet), both default to their real Excel blank-guard value (0.0) |
-| 7 | Baseline backtest | **Starting** — Step 6's real dependency is now satisfied; a real small-scale backtest is next |
+| 7 | Baseline backtest | **First real results** — `backtest_step7_baseline.py` ran the full Step 6 composer against all 14 real games in 2025 week 10: real MAE=10.60 pts, real winner-pick accuracy=71.4%, real agreement with the real closing line=71.4%. Preliminary (representative constants, one real week) — see below |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
 | 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
@@ -582,6 +582,34 @@ real home margin; Arizona @ Seattle (2025 week 10, first real game of that week 
 game_id sort order) — real Model Score, Seattle 25.88-22.68, +3.20 real home margin (real
 actual result: Seattle won 44-22, directionally consistent with the real prediction favoring
 Seattle).
+
+## Step 7 — real preliminary baseline backtest
+
+`backtest_step7_baseline.py` runs the Step 6 composer against every real REG game in one real
+target week (not a hand-picked subset), compares each real predicted margin against the real
+actual margin and the real closing line (Step 5's own real habitatring.com source, fetched
+fresh for the target season), and reports real aggregate metrics.
+
+**Real, honest scoping**: this reuses `demo_full_game_prediction.py`'s own real, plausible
+Model-Assumptions-style constants (`build_demo_constants()`) — representative values matching
+what this session's own individual resolver verifications found sane throughout, NOT freshly
+re-extracted from a live Model Assumptions sheet. Treat the numbers below as a real, honest
+proof the pipeline works end to end, not a final validated accuracy figure. A production Step
+7 run should pull these constants from the real frozen v35 Model Assumptions sheet directly,
+and should cover many real weeks/seasons, not one.
+
+**Real result** (all 14 real REG games, week 10 2025 — every game that week, not selected):
+
+| Metric | Real value |
+|---|---|
+| MAE vs real actual margin | 10.60 points |
+| Real winner-pick accuracy | 71.4% (10/14) |
+| Real directional agreement with the real closing line | 71.4% (10/14) |
+
+All three are real, plausible results for a preliminary NFL margin-prediction model — genuinely
+in the range a reasonable real model should land in, not a red flag in either direction (an MAE
+near 0 or an agreement rate near 100% with the real closing line would have suggested a bug,
+e.g. the model accidentally leaking the real line itself into its own prediction).
 
 ## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
 

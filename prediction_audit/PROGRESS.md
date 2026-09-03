@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-02 (Step 6 -- real historical Front Seven + Secondary Index walk-forward, 4th/5th indices)
+**Last updated**: 2026-09-02 (Step 6 -- real historical EDGE-IDL/LB/CB-S Index walk-forward, 6th/7th/8th indices)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward now runs end to end for 5 real Z/AA terms, 3 real player-level indices (QB, RB, Kicking), and 2 real team-level defense indices (Front Seven, Secondary — see below); the remaining indices are the next real increment |
+| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward now runs end to end for 5 real Z/AA terms and 8 real indices (QB, RB, Kicking, Front Seven, Secondary, EDGE-IDL, LB, CB-S — see below); WR-TE Value Index and OL Index are the remaining real increments |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -412,14 +412,39 @@ Y-3 ≥ 2022) can't resolve all 3 metrics for real — a genuine, real scoping c
 worked around (deferred rather than silently dropping the third metric or fabricating a
 substitute for pre-2022 years).
 
-**Not yet historically resolvable** — the larger remaining lift: WR-TE/OL/EDGE-IDL/LB/CB-S/
-Special-Teams-Player and the matchup tabs that depend on them (Pass/Run Defense Matchup, Pass
-Rush Generation, Explosive Play Matchup, QB Environment Model, Coaching Index) still need their
-own real historical per-player/per-team metric aggregation from real pbp — already real,
-parameterized, reusable, but not yet wired for a historical target. 5 real indices are the
-proof the pattern works, across a Starter/Backup binary, a Starter/Backup binary with extra
-real data sources, a single-role position, and two team-level rate stats — each remaining
-index is now "apply the same pattern," not "solve a new problem," though: WR-TE Index has NO
+**EDGE-IDL, LB, and CB-S Index** (`edge_idl_index_historical.py`/`lb_index_historical.py`/
+`cb_s_index_historical.py`) — 6th/7th/8th indices, the first defensive PLAYER-level ones.
+Genuinely simpler than QB/RB/Kicking in one respect: none of these 3 tabs has a current-season
+blend step (confirmed when each was first ported), so no `through_week`/partial-season logic
+is needed — just real Y1/Y2/Y3 (3 full real prior seasons) + a real league baseline/avg/std.
+Real data assembly needs 4 real sources joined together per tab, via
+`nflverse_pull.defense_stats`'s own already-real functions: real per-player raw counts
+(`compute_player_season_front7_stats` for EDGE-IDL's Sacks/TFL/QB-Hits; a real merge of
+`compute_player_season_tackle_stats` + `compute_player_season_front7_stats` for LB's
+Tackles+TFL; `compute_player_season_secondary_stats` for CB-S's INT/PBU) + real per-player
+defensive snaps (`fetch_snap_counts`/`fetch_player_ids`, PFR-sourced, cross-walked to this
+project's gsis_id) + real seasonal rosters, run through the SAME shared
+`compute_player_season_defensive_rates` (the real 200-snap qualifying threshold + rate
+conversion, used identically by all 3). All 3 modules deliberately do NOT resolve "who is
+starting" — each tab's real population is every player who could appear at any of several real
+slots (current_roster.py's own per-slot logic), a genuinely different, harder resolution
+problem than a single volume rank, deliberately deferred; each takes a specific real player_id
+(however sourced) and resolves their own real historical score. Verified live (2024, real pbp +
+snap counts + player-ID crosswalk + rosters): real league-wide per-snap rates all plausible
+(EDGE-IDL sack rate avg=0.43%, TFL rate avg=0.78%, QB hit rate avg=0.99%; LB tackle rate
+avg=6.5%, TFL rate avg=0.69%; CB-S INT rate avg=0.13%, PBU rate avg=0.70%) — real players
+sampled from each all resolved to real, spread scores around the 50-point baseline.
+
+**Not yet historically resolvable** — the larger remaining lift: WR-TE Value Index, OL Index
+(the real FTN-coverage constraint above), Special-Teams-Player Index, and the matchup tabs
+that depend on any of these (Pass/Run Defense Matchup, Pass Rush Generation, Explosive Play
+Matchup, QB Environment Model, Coaching Index) still need their own real historical resolution
+— already real, parameterized, reusable source data in most cases, but not yet wired for a
+historical target. 8 real indices are the proof the pattern works, across a Starter/Backup
+binary, a Starter/Backup binary with extra
+real data sources, a single-role position, two team-level rate stats, and 3 given-player-
+identity resolutions with a real multi-source snap-rate join — each remaining index is now
+"apply the same pattern," not "solve a new problem," though: WR-TE Index has NO
 pre-existing historical-role convention at all in this project and scores 4 roles per team
 (WR1/WR2/WR3/TE1), a genuinely bigger design decision than a simple volume rank; OL Index has
 the real FTN-coverage constraint above; and real starter/backup role resolution for other
@@ -443,7 +468,7 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10101 tests pass, 0 failures.**
+Current total: **10113 tests pass, 0 failures.**
 
 ## Suggested next step
 
@@ -453,13 +478,13 @@ Three real options, all concrete:
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Extend Step 6's real walk-forward to the remaining indices** — 5 real indices down (QB,
-   RB, Kicking, Front Seven, Secondary); EDGE-IDL/LB/CB-S (player-level defense) are the
-   natural next ones, likely another clean volume-ranking role convention like Kicking's. OL
-   Index has the real FTN-coverage constraint documented above (targets before 2025 can't
-   resolve all 3 metrics). WR-TE Value Index is the biggest remaining design decision: no
-   pre-existing historical-role convention in this project at all, and scores 4 roles per team
-   instead of 1-2.
+2. **Extend Step 6's real walk-forward to the remaining indices** — 8 real indices down (QB,
+   RB, Kicking, Front Seven, Secondary, EDGE-IDL, LB, CB-S). Two remain: OL Index has the real
+   FTN-coverage constraint documented above (targets before 2025 can't resolve all 3 metrics).
+   WR-TE Value Index is the biggest remaining design decision: no pre-existing historical-role
+   convention in this project at all, and scores 4 roles per team instead of 1-2 — worth a
+   deliberate role-resolution design (e.g. real target-share ranking split by real Position)
+   before writing the resolver, not just "apply the pattern."
 3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.
 

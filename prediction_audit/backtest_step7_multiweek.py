@@ -3,12 +3,17 @@ Step 7 scale-up: reruns `backtest_step7_real_constants.py`'s own real pipeline (
 Assumptions constants + real per-week league stats + real Travel Effect/Direction, now that
 `stadium_locations.py` fills those 2 real gaps) across several real consecutive weeks in one
 real season, fetching the real season-level data (pbp/schedule/PFR/FTN/NGS) only once and
-reusing it -- real per-week league stats (QB Index, RB Index -- the 2 tabs with a real
-current-season blend) are still recomputed for each real target week, since those genuinely
-depend on how much of the real season has elapsed by that week; the other 6 tabs' real league
-stats are season-level (not week-dependent) and are also recomputed per week here for
-simplicity, at the real cost of some redundant computation -- correctness over efficiency for
-a "handful of weeks" scale.
+reusing it.
+
+Real efficiency fix (this version): only QB Index and RB Index league stats genuinely depend
+on the real target week (their own real current-season blend uses "how many games has this
+team played so far"). The other 6 tabs' real league stats (OL Index, Pass Rush Generation,
+Pass/Run Defense Matchup, QB Environment Model, Explosive Play Matchup) are real season-level
+values with no week dependency -- resolved ONCE per season here, not once per target week. An
+earlier version of this script recomputed all 8 tabs fresh for every week (documented there as
+"correctness over efficiency for a handful of weeks"); live-timed, that redundant recomputation
+of OL Index's own real 3-year PFR+FTN+pbp join alone made a 5-week run take multiple real hours
+-- real evidence the earlier scoping call was wrong at this scale, not a hypothetical concern.
 
 Real, non-cherry-picked week selection: a contiguous real range immediately following the
 single real week (10) already covered by the earlier preliminary run -- never hand-picked for
@@ -28,23 +33,186 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+FROZEN_XLSX = str(
+    Path(__file__).resolve().parent / "frozen_baselines" / "NFL_Prediction_Model_v35.xlsx"
+)
+
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
 from nflverse_pull.oline_stats import fetch_ftn, fetch_pfr_pass, fetch_pfr_rush  # noqa: E402
 from nflverse_pull.pull import TEAM_NAMES, fetch_schedules  # noqa: E402
 from nflverse_pull.rb_stats import fetch_ngs_rushing  # noqa: E402
-from prediction_audit.backtest_step7_real_constants import (  # noqa: E402
-    FROZEN_XLSX,
-    _resolve_all_real_league_stats,
+from prediction_audit.engine.explosive_play_matchup import (  # noqa: E402
+    ExplosivePlayMatchupConstants,
+)
+from prediction_audit.engine.offensive_line_index import OLIndexConstants  # noqa: E402
+from prediction_audit.engine.pass_defense_matchup import PassDefenseMatchupConstants  # noqa: E402
+from prediction_audit.engine.pass_rush_generation_index import (  # noqa: E402
+    PassRushGenerationConstants,
+)
+from prediction_audit.engine.qb_environment_model import QBEnvironmentModelConstants  # noqa: E402
+from prediction_audit.engine.qb_index import QBIndexConstants  # noqa: E402
+from prediction_audit.engine.rb_index import RBIndexConstants  # noqa: E402
+from prediction_audit.engine.run_defense_matchup import RunDefenseMatchupConstants  # noqa: E402
+from prediction_audit.historical.explosive_play_matchup_historical import (  # noqa: E402
+    resolve_explosive_play_matchup_league_stats,
 )
 from prediction_audit.historical.full_game_prediction import (  # noqa: E402
     HistoricalGameDataBundle,
     resolve_historical_model_home_away_score,
 )
+from prediction_audit.historical.offensive_line_index_historical import (  # noqa: E402
+    resolve_ol_index_league_stats,
+)
+from prediction_audit.historical.pass_defense_matchup_historical import (  # noqa: E402
+    resolve_pass_defense_matchup_league_stats,
+)
+from prediction_audit.historical.pass_rush_generation_index_historical import (  # noqa: E402
+    resolve_pass_rush_generation_league_stats,
+)
+from prediction_audit.historical.qb_environment_model_historical import (  # noqa: E402
+    resolve_qb_environment_model_league_stats,
+)
+from prediction_audit.historical.qb_index_historical import (  # noqa: E402
+    resolve_qb_index_league_stats,
+)
+from prediction_audit.historical.rb_index_historical import (  # noqa: E402
+    resolve_rb_index_league_stats,
+)
 from prediction_audit.historical.real_constants import (  # noqa: E402
     build_real_constants,
     load_real_model_assumptions,
 )
+from prediction_audit.historical.run_defense_matchup_historical import (  # noqa: E402
+    resolve_run_defense_matchup_league_stats,
+)
 from prediction_audit.market_data import fetch_real_market_lines  # noqa: E402
+
+
+def _resolve_season_level_stats(bundle: HistoricalGameDataBundle, target_season: int, c: dict):
+    """Real league stats for the 6 tabs with NO real week dependency -- resolved once per
+    season, reused for every real target week (see module docstring's real efficiency note)."""
+    ol_placeholder = OLIndexConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        blend_base=c[12], blend_per_game=c[13], blend_cap=c[14],
+        weights={"pass_protection": c[58], "run_blocking": c[59], "sack_free_rate": c[81]},
+        score_baseline=c[37], points_per_sd=c[38],
+        league_avg=dict.fromkeys(["pass_protection", "run_blocking", "sack_free_rate"], 0.0),
+        league_std=dict.fromkeys(["pass_protection", "run_blocking", "sack_free_rate"], 1.0),
+    )
+    ol_stats = resolve_ol_index_league_stats(
+        bundle.pfr_pass_3yr, bundle.pfr_rush_3yr, bundle.pbp_3yr_prior, bundle.ftn_3yr,
+        target_season, ol_placeholder,
+    )
+    print(f"  real OL Index league stats: {ol_stats}")
+
+    prg_placeholder = PassRushGenerationConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        weights={"sack_rate": c[119], "pressure_proxy": c[120], "blitz_rate": c[121]},
+        league_avg=dict.fromkeys(["sack_rate", "pressure_proxy", "blitz_rate"], 0.0),
+        league_std=dict.fromkeys(["sack_rate", "pressure_proxy", "blitz_rate"], 1.0),
+    )
+    prg_stats = resolve_pass_rush_generation_league_stats(
+        bundle.pbp_3yr_prior, target_season, prg_placeholder,
+    )
+    print(f"  real Pass Rush Generation league stats: {prg_stats}")
+
+    pd_placeholder = PassDefenseMatchupConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        weights={"epa_dropback": c[87], "pass_success": c[88], "completion_pct": c[89],
+                 "nya": c[90], "explosive_pass": c[91]},
+        score_baseline=c[37], points_per_sd=c[38],
+        league_avg=dict.fromkeys(
+            ["epa_dropback", "pass_success", "completion_pct", "nya", "explosive_pass"], 0.0,
+        ),
+        league_std=dict.fromkeys(
+            ["epa_dropback", "pass_success", "completion_pct", "nya", "explosive_pass"], 1.0,
+        ),
+    )
+    pd_stats = resolve_pass_defense_matchup_league_stats(
+        bundle.pbp_3yr_prior, target_season, pd_placeholder,
+    )
+    print(f"  real Pass Defense Matchup league stats: {pd_stats}")
+
+    rd_placeholder = RunDefenseMatchupConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        weights={"epa_rush": c[94], "run_success": c[95], "ypc": c[96],
+                 "explosive_run": c[97], "stuff_rate": c[98]},
+        score_baseline=c[37], points_per_sd=c[38],
+        league_avg=dict.fromkeys(
+            ["epa_rush", "run_success", "ypc", "explosive_run", "stuff_rate"], 0.0,
+        ),
+        league_std=dict.fromkeys(
+            ["epa_rush", "run_success", "ypc", "explosive_run", "stuff_rate"], 1.0,
+        ),
+    )
+    rd_stats = resolve_run_defense_matchup_league_stats(
+        bundle.pbp_3yr_prior, target_season, rd_placeholder,
+    )
+    print(f"  real Run Defense Matchup league stats: {rd_stats}")
+
+    qbe_placeholder = QBEnvironmentModelConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        league_avg=dict.fromkeys(["success", "explosive", "sack"], 0.0),
+        league_std=dict.fromkeys(["success", "explosive", "sack"], 1.0),
+        success_weight=c[128], explosive_weight=c[129], epa_weight=c[34],
+        cpoe_weight=c[35], anya_weight=c[36], score_baseline=c[37], points_per_sd=c[38],
+        new_team_penalty=c[130], recently_injured_penalty=c[131],
+    )
+    qbe_stats = resolve_qb_environment_model_league_stats(
+        bundle.pbp_3yr_prior, target_season, qbe_placeholder,
+    )
+    print(f"  real QB Environment Model league stats: {qbe_stats}")
+
+    ep_placeholder = ExplosivePlayMatchupConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        league_avg_pass_off=0.0, league_std_pass_off=1.0,
+        league_avg_run_off=0.0, league_std_run_off=1.0,
+        league_avg_deep_pass_allowed=0.0, league_std_deep_pass_allowed=1.0,
+        league_avg_yac_allowed=0.0, league_std_yac_allowed=1.0,
+        pass_prevention_w_explosive_pass_allowed=c[136],
+        pass_prevention_w_deep_pass_allowed=c[137], pass_prevention_w_yac_allowed=c[138],
+    )
+    ep_stats = resolve_explosive_play_matchup_league_stats(
+        bundle.pbp_3yr_prior, target_season, pd_placeholder, rd_placeholder, ep_placeholder,
+    )
+    print(f"  real Explosive Play Matchup league stats: {ep_stats}")
+
+    return ol_stats, prg_stats, pd_stats, rd_stats, qbe_stats, ep_stats
+
+
+def _resolve_week_level_stats(
+    bundle: HistoricalGameDataBundle, target_season: int, target_week: int, c: dict,
+):
+    """Real league stats for the 2 tabs with a real current-season blend -- genuinely depend
+    on the real target week, so these alone are recomputed per week."""
+    qb_placeholder = QBIndexConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        blend_base=c[12], blend_per_game=c[13], blend_cap=c[14],
+        weights={"epa": c[34], "cpoe": c[35], "anya": c[36]}, score_baseline=c[37],
+        points_per_sd=c[38],
+        league_avg=dict.fromkeys(["epa", "cpoe", "anya"], 0.0),
+        league_std=dict.fromkeys(["epa", "cpoe", "anya"], 1.0),
+    )
+    qb_stats = resolve_qb_index_league_stats(
+        bundle.pbp_3yr_prior, bundle.pbp_current_season, bundle.sched_current_season,
+        target_season, target_week, qb_placeholder,
+    )
+
+    rb_placeholder = RBIndexConstants(
+        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
+        blend_base=c[12], blend_per_game=c[13], blend_cap=c[14],
+        weights={"rushing_epa": c[44], "rushing_sr": c[45], "ypc": c[46], "ryoe": c[82],
+                 "rz_share": c[124]},
+        score_baseline=c[37], points_per_sd=c[38],
+        league_avg=dict.fromkeys(["rushing_epa", "rushing_sr", "ypc", "ryoe", "rz_share"], 0.0),
+        league_std=dict.fromkeys(["rushing_epa", "rushing_sr", "ypc", "ryoe", "rz_share"], 1.0),
+    )
+    rb_stats = resolve_rb_index_league_stats(
+        bundle.pbp_3yr_prior, bundle.pbp_current_season, bundle.ngs_rushing_3yr_prior,
+        bundle.ngs_rushing_current, bundle.sched_current_season, target_season, target_week,
+        rb_placeholder,
+    )
+    return qb_stats, rb_stats
 
 
 def main(season: int, start_week: int, end_week: int) -> None:
@@ -73,6 +241,11 @@ def main(season: int, start_week: int, end_week: int) -> None:
     )
     c = load_real_model_assumptions(FROZEN_XLSX)
 
+    print("Resolving real season-level league stats (once, reused every target week)...")
+    ol_stats, prg_stats, pd_stats, rd_stats, qbe_stats, ep_stats = _resolve_season_level_stats(
+        bundle, season, c,
+    )
+
     all_rows = []
     per_week_summary = []
     for week in range(start_week, end_week + 1):
@@ -85,10 +258,8 @@ def main(season: int, start_week: int, end_week: int) -> None:
             print("  No real REG games this week -- skipping.")
             continue
 
-        print("  Resolving real league-wide stats for this target week...")
-        qb_stats, rb_stats, ol_stats, prg_stats, pd_stats, rd_stats, qbe_stats, ep_stats = (
-            _resolve_all_real_league_stats(bundle, season, week, c)
-        )
+        print("  Resolving real week-dependent league stats (QB Index, RB Index)...")
+        qb_stats, rb_stats = _resolve_week_level_stats(bundle, season, week, c)
         constants = build_real_constants(
             FROZEN_XLSX, qb_stats, rb_stats, ol_stats, prg_stats, pd_stats, rd_stats,
             qbe_stats, ep_stats,

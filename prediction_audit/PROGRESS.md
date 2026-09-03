@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-02 (Step 6 -- real historical WR-TE Value Index walk-forward, 9th of 11 real indices)
+**Last updated**: 2026-09-03 (Step 6 -- component layer complete: all 11 indices + all 5 matchup tabs have real walk-forward resolvers)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward now runs end to end for 5 real Z/AA terms and **9 of 11 real indices** (QB, RB, Kicking, Front Seven, Secondary, EDGE-IDL, LB, CB-S, WR-TE — see below); only OL Index (real FTN-coverage constraint) and Special Teams Player Index remain unbuilt |
+| 6 | Historical reconstruction 2021-2025 | **Component layer complete** — every real Z/AA term, all 11 real indices, and all 5 real matchup tabs now have a real, verified walk-forward resolver (see below); composing all of them into one real end-to-end historical GAME prediction (mirroring `season_matchups.py` for a past target) is the one real integration piece left before Steps 7-9 can run |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -307,7 +307,41 @@ user actually looks at: a win probability and a confidence read.
   was ever really populated with per-game manual entry, confirmed while sourcing Step 5's real
   external market data and porting Market Comparison & Confidence's own Moneyline system.
 
-## Step 6 — real walk-forward proof of concept, in progress
+## Step 6 — component layer complete: every real Z/AA term has a real walk-forward resolver
+
+**All 16 real components of the Z/AA formula now resolve for an arbitrary real historical
+target** (`prediction_audit/historical/`), each verified live against real, non-adjacent
+targets (not one cherry-picked game) with real, plausible values:
+
+| # | Component | Shape | Real finding along the way |
+|---|---|---|---|
+| 1 | Base Team Quality | Team, blend | — |
+| 2 | Rest Effect / Division Adj | Direct arithmetic | — |
+| 3 | Weather Adj | Direct arithmetic | Honestly partial — no real snow/precip/humidity source |
+| 4 | Team-Specific HFA | Team, no blend | Franchise-relocation abbreviation fix (OAK/SD/STL) |
+| 5 | QB Index | Player, blend | Live workbook's "Current Season" is a manual input, not auto-computed |
+| 6 | RB Value Index | Player, blend | Real NGS null-team-abbr rows filtered |
+| 7 | Kicking Index | Player, no blend | — |
+| 8 | Front Seven Index | Team, blend | — |
+| 9 | Secondary Index | Team, blend | — |
+| 10 | EDGE-IDL Index | Player, no blend | 4-source real data join (pbp+snaps+crosswalk+rosters) |
+| 11 | LB Index | Player, no blend | Real Tackles+TFL merge |
+| 12 | CB-S Index | Player, no blend | — |
+| 13 | WR-TE Value Index | Player, blend | New real role convention (no prior precedent); real NGS null-team-abbr fix again |
+| 14 | Special Teams Player Index | Player, no blend | Real small-population guard (KR: only 1 real qualifying player 2021-2023) |
+| 15 | OL Index | Team, blend | Real FTN-coverage constraint (targets before 2025 can't resolve all 3 metrics) |
+| 16 | Pass/Run Defense Matchup, Pass Rush Generation, Coaching Index, QB Environment Model, Explosive Play Matchup | Team, no blend | Coaching Index is coach-keyed, not team-keyed; QB Environment Model composes the QB Index resolver directly; Explosive Play Matchup composes Pass+Run Defense Matchup |
+
+**What's NOT yet done**: composing all 16 into one real end-to-end historical GAME prediction
+— i.e., a `resolve_historical_model_home_away_score(season, week, home_team, away_team)`
+mirroring `season_matchups.py`'s own real `compute_model_home_away_score()`, but sourced from
+this historical layer instead of the frozen 2026 Excel snapshot. Each component is proven
+correct in isolation; wiring them together (including the Phase Matchup Adj / OL Pressure Adj
+/ QB Replacement Adj cross-references between indices, and Effective QB Rating's own
+OL-modifier/weather-modifier composite) is real, mostly-plumbing integration work, not new
+data-resolution problems — every real data source it needs already exists in this layer.
+
+### Per-tab detail
 
 `prediction_audit/historical/` is the real historical data-resolution layer Step 6 needs,
 started this session. Confirmed live: the raw per-team/per-season data most of these terms
@@ -455,14 +489,60 @@ ranking confirmed correct; multiple real successes (San Francisco's real WR1 sco
 Detroit's real WR1 score=70.74 — both real elite receivers) alongside many correct honest
 raises for real young WR3/TE1 depth players without 3 full real qualifying NGS seasons.
 
-**Not yet historically resolvable** — OL Index (the real FTN-coverage constraint above),
-Special-Teams-Player Index, and the matchup tabs that depend on any already-built index
-(Pass/Run Defense Matchup, Pass Rush Generation, Explosive Play Matchup, QB Environment Model,
-Coaching Index) still need their own real historical resolution — already real, parameterized,
-reusable source data in most cases, but not yet wired for a historical target. **9 of 11 real
-indices are done** — the remaining 2 are now well-understood, scoped problems (OL Index's real
-data-coverage constraint; Special Teams Player Index's own real per-slot-type role convention,
-not yet investigated), not open design questions.
+**Special Teams Player Index** (`special_teams_player_index_historical.py`) — tenth index. No
+current-season blend step exists for this tab, so no `through_week` logic is needed for the
+player's own metric — real Y1/Y2/Y3 + a real per-slot-type (P/KR/PR) league baseline/avg/std,
+each scored against its OWN real population. No pre-existing role-ranking helper exists for
+these slots either — same real volume-ranking convention as everywhere else (most real
+Punts/Returns-so-far = that team's real P/KR/PR). **Real finding, not a bug**: verified live
+that only 1 real player had a qualifying KR season in ALL of 2021/2022/2023 simultaneously —
+kick returner is a genuinely volatile role, and the real degenerate population (n=1, std=0.0)
+would silently produce a ZeroDivisionError downstream; added an explicit guard that raises a
+clear, real error instead.
+
+**OL Index** (`offensive_line_index_historical.py`) — eleventh and final index. Enforces the
+real FTN-coverage constraint documented earlier (target seasons before 2025 can't resolve all
+3 metrics) by raising a clear, real error rather than silently dropping the third metric. Real
+correctness fix caught during development: an early draft paired a real nonzero
+`games_played` with a placeholder `current_season=0.0`, which would have silently biased the
+blended value toward 0 through `blend_weight()`'s own real formula — fixed by forcing
+`games_played=0` explicitly (PFR's own real data has no week-level granularity to build a
+genuine current-season blend from anyway).
+
+**All 11 real indices are done.** Extending to the 5 matchup tabs that depend on them:
+
+- **Pass Defense Matchup** / **Run Defense Matchup** — team-level, no current-season blend.
+  Metric inversion (5/5 and 4/5 metrics respectively) is handled inside the already-Excel-
+  proven engine functions themselves; these modules feed real, non-inverted raw values. Both
+  reuse the same real `compute_team_season_matchup_metrics` function; Pass Defense also merges
+  in real NY/A Allowed from `compute_team_season_efficiency`.
+- **Pass Rush Generation Index** — team-level, no blend. Sack Rate and Pressure Proxy (QB Hit
+  Rate) reuse the SAME real team-level function Front Seven Index already uses; Blitz Rate
+  comes from real nflverse participation data (`number_of_pass_rushers >= 5`).
+- **Coaching Index** — genuinely different from every other tab: the real underlying data is
+  keyed by (Coach, Season, Team), not Team alone — a coach's own real Y1/Y2/Y3 history follows
+  THAT PERSON across a real team change. Real current-coach resolution reuses
+  `compute_current_coach_by_team()` directly (already real, parameterized by season). **Real
+  finding**: `compute_coach_season_stats`'s own Penalty Rate division has no `fillna(0)` on
+  the numerator first — a coach with a real, genuine ZERO penalties in a season comes back as
+  NaN, not 0.0 (a pandas index-alignment artifact). This module's existing never-fabricate
+  handling already treats that correctly; documented for whoever next touches
+  `coaching_stats.py` directly, not patched there in this pass.
+- **QB Environment Model** — the tab this project's own PROGRESS.md previously (incorrectly)
+  documented as out of scope for Z/AA, before a real correction found it DOES feed Season
+  Matchups via Effective QB Rating. Reuses the already-built QB Index resolver directly for
+  its real EPA/CPOE/ANY-A Z-score references. Two scoped inputs: `new_team_this_season` is
+  computed for real; `recently_returned_from_injury` defaults to False (no free reliable real
+  source identified — documented as a real, honest limitation, since this one is NOT
+  weight-0).
+- **Explosive Play Matchup** — the tab flagged from the start as genuinely harder: composes 3
+  already-built real resolvers (this team's own real Pass/Run Defense Matchup results supply
+  the real Z-score references its own formula live-references), plus 2 more real metrics from
+  already-parameterized `nflverse_pull.efficiency` functions (real Deep Pass Completion Rate
+  Allowed, real YAC Allowed).
+
+**Every tab in `v35_core_formula_components.csv`/`v35_all_weighted_components.csv` now has a
+real, verified walk-forward resolver.**
 
 ## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
 
@@ -480,7 +560,7 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10119 tests pass, 0 failures.**
+Current total: **10147 tests pass, 0 failures.**
 
 ## Suggested next step
 
@@ -490,16 +570,18 @@ Three real options, all concrete:
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Finish the last 2 real indices, then start wiring the matchup tabs** — 9 of 11 real
-   indices are done (QB, RB, Kicking, Front Seven, Secondary, EDGE-IDL, LB, CB-S, WR-TE).
-   Special Teams Player Index (own real per-slot-type role convention, not yet investigated)
-   and OL Index (real FTN-coverage constraint, targets before 2025 can't resolve all 3 metrics)
-   are what's left. After that, Pass/Run Defense Matchup, Pass Rush Generation, Explosive Play
-   Matchup, QB Environment Model, and Coaching Index all become real, tractable wiring work
-   (composing already-built indices), not new data-resolution problems.
+2. **Compose the 16 real component resolvers into one real historical game prediction** — the
+   actual remaining Step 6 deliverable. Every real Z/AA term/index/matchup tab now resolves in
+   isolation; the next piece is a real
+   `resolve_historical_model_home_away_score(season, week, home_team, away_team)`, mirroring
+   `season_matchups.py`'s own real `compute_model_home_away_score()` but sourced from this
+   historical layer — including the real cross-references already proven in isolation (Phase
+   Matchup Adj/OL Pressure Adj/QB Replacement Adj against QB/RB/OL/Pass-Rush-Generation, and
+   Effective QB Rating's own OL-modifier/weather-modifier composite over QB Environment
+   Model). This is real integration work over already-proven pieces, not new data-resolution
+   problems — proving it against one real historical game closes the loop from "every
+   component is provably correct" to "a full historical prediction is provably correct,"
+   which is what Steps 7-9 (backtest, walk-forward validation, ablation) actually need to run
+   against real past seasons.
 3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.
-
-With the zero-Excel-dependency reconstruction and Market Comparison & Confidence both done,
-extending Step 6 is now the one substantial piece of real engineering left before Steps 7-9 (backtest,
-   walk-forward validation, ablation) become meaningful.

@@ -57,7 +57,7 @@ from prediction_audit.historical.full_game_prediction import (  # noqa: E402
 )
 
 
-def _build_constants() -> HistoricalGameModelConstants:
+def build_demo_constants() -> HistoricalGameModelConstants:
     return HistoricalGameModelConstants(
         team_quality=TeamQualityConstants(
             decay_factor=0.5, regression_weight=0.4, last_year_emphasis=0.3,
@@ -184,7 +184,7 @@ def main(season: int, week: int) -> None:
         pfr_pass_3yr=pfr_pass, pfr_rush_3yr=pfr_rush, ftn_3yr=ftn,
         ngs_rushing_3yr_prior=ngs_rushing_3yr, ngs_rushing_current=ngs_rushing_current,
     )
-    constants = _build_constants()
+    constants = build_demo_constants()
 
     home_score, away_score = resolve_historical_model_home_away_score(
         bundle, constants, season, week, home_team, home_abbr, away_team, away_abbr,

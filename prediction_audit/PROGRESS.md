@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-02 (Step 6 real walk-forward proof of concept -- Base Team Quality, Rest Effect, Division Adj, partial Weather Adj, Team-Specific HFA)
+**Last updated**: 2026-09-02 (Step 6 -- real historical QB Index walk-forward, first player-level index)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -17,7 +17,7 @@ planned.
 | 3 | Full model-state snapshot schema | **Done** |
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
-| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward proof of concept now runs end to end for 5 real Z/AA terms against arbitrary real historical targets (see below); the remaining terms (player-level indices) are the next real increment |
+| 6 | Historical reconstruction 2021-2025 | **In progress** — real walk-forward now runs end to end for 5 real Z/AA terms plus the first real player-level index (QB Index — see below); the remaining player-level indices are the next real increment |
 | 7 | Baseline backtest | Not started (depends on Step 6) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
@@ -346,14 +346,35 @@ using stale/wrong data. Fixed with `relocations.py`, which normalizes `OAK`→`L
 processing, so every consumer — this package's own functions and nflverse_pull's shared ones
 alike — works unchanged.
 
-**Not yet historically resolvable** — the larger remaining lift: every player-level index
-(QB/RB/WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-Player/Kicking) and the matchup tabs
+**QB Index** (`qb_index_historical.py`) — the first real player-level index made walk-forward-
+capable, and the template for the rest. Reuses `nflverse_pull.qb_stats`'s own already-real,
+already-parameterized `compute_team_season_qb_stats`/`compute_qb_roles` (built for the live
+pipeline, works unchanged for any historical years). Two real findings from reading the live
+pipeline's own code before building this: (1) QB Index's "Current Season" cells are real
+MANUAL inputs in the live workbook (hand-typed weekly), not auto-computed from pbp at all — a
+walk-forward target has no user to type that in, so it's computed for real from historical pbp
+restricted to weeks before the target instead; (2) Section 4's real league avg/std must be
+computed over the BLENDED metric (post current-season blend), not the pre-blend baseline, per
+`current_season_blend.py`'s own docstring — `resolve_qb_index_league_stats()` runs every real
+league-wide qualifying Starter/Backup through the full decay→blend chain before averaging.
+Real historical Starter/Backup resolution reuses `compute_qb_roles()`'s own real dropback-
+ranking method — confirmed via `build_qb_index.py`'s own docstring to be this project's OWN
+documented historical-proxy fallback, not a new invention — applied to the target season's own
+real dropbacks-so-far. Verified live (2024 week 10): real league-wide EPA/CPOE/ANY-A avg/std
+all in plausible real NFL ranges, feeding real per-team scores (New Orleans Saints
+starter=54.46, Atlanta Falcons starter=53.84) both near the real 50-point baseline as expected.
+
+**Not yet historically resolvable** — the larger remaining lift: every OTHER player-level
+index (RB/WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-Player/Kicking) and the matchup tabs
 that depend on them (Pass/Run Defense Matchup, Pass Rush Generation, Explosive Play Matchup,
-QB Environment Model, Coaching Index, Secondary Index) all need real historical per-player/
-per-team metric aggregation from real pbp (`fetch_pbp()`/`compute_team_season_efficiency()`
-etc. — already real, parameterized, reusable, per this session's own investigation — but not
-yet wired for a historical target) PLUS real historical starter/backup roster resolution
-(`fetch_depth_charts()`, real per-week nflverse data, not yet wired either).
+QB Environment Model, Coaching Index, Secondary Index) still need their own real historical
+per-player/per-team metric aggregation from real pbp (`fetch_pbp()`/`compute_team_season_efficiency()`
+etc. — already real, parameterized, reusable — but not yet wired for a historical target) —
+QB Index is the proof the pattern works; each remaining index is now "apply the same pattern,"
+not "solve a new problem," though real starter/backup role resolution for non-QB positions may
+need real historical snap-count or depth-chart data (`fetch_depth_charts()`) rather than
+QB Index's own dropback-ranking proxy, since e.g. WR/CB rotations don't rank as cleanly by a
+single volume stat.
 
 ## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
 
@@ -371,7 +392,7 @@ checked against real response data before any pull code is written.
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.
-Current total: **10080 tests pass, 0 failures.**
+Current total: **10085 tests pass, 0 failures.**
 
 ## Suggested next step
 
@@ -381,10 +402,11 @@ Three real options, all concrete:
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real
    `'closing'` line captured.
-2. **Extend Step 6's real walk-forward to the player-level indices** — the large remaining
-   lift described above: real historical per-player pbp aggregation + real historical
-   starter/backup resolution, for QB Index first (the most-wired-in index, feeding Phase
-   Matchup Adj/QB Replacement Adj/Effective QB Rating), then the rest.
+2. **Extend Step 6's real walk-forward to the remaining player-level indices** — QB Index is
+   now the proven template; RB Value Index is the natural next one (same
+   decay→blend→Z-score shape, same real dropback-style volume-ranking role convention likely
+   applies via `nflverse_pull.rb_stats`), then WR-TE/OL/Front-7/EDGE-IDL/LB/CB-S/Special-Teams-
+   Player/Kicking, then the matchup tabs that depend on them.
 3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.
 

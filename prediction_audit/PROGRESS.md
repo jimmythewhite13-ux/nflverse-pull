@@ -672,6 +672,27 @@ future key can never be accidentally committed. **Next step when resumed**: the 
 a real Odds API key (existing or newly signed-up), then Part A's 3 real coverage questions get
 checked against real response data before any pull code is written.
 
+## Known limitation, real -- not an audit gap: no Strength of Schedule term
+
+Checked directly, not assumed: grepped "strength of schedule"/"SOS" across every cell of all
+30 real sheets in the frozen v35 workbook, and across the whole audited codebase -- zero hits
+either place. Real v35 genuinely has no Strength-of-Schedule adjustment anywhere in its design.
+
+The closest real adjacent mechanism, and why it isn't the same thing: Base Team Quality
+(`base_team_quality()`, Season Matchups Z01/AA01) nets each team's own blended offense against
+*this specific opponent's* blended defense for the one real game being predicted -- a real
+per-matchup adjustment. But the underlying real `blended_off`/`blended_def` ratings feeding
+that formula (each team's own real Y1/Y2/Y3 history) are never themselves corrected for
+whether they were compiled against a strong or weak real slate of opponents. v35 has no real
+mechanism to weight a team's rating up or down based on who they actually played.
+
+This is a genuine, real limitation of the frozen model as designed, not something the audit
+introduced or missed -- Steps 1-7's job is to faithfully reconstruct what v35 actually does,
+never to redesign it. Per the user's explicit direction (2026-09-03): leave this as a known
+limitation for now; a real Strength-of-Schedule term is a legitimate candidate for the
+eventual Python production rebuild (out of scope for the current frozen-baseline validation
+work), not for anything before it.
+
 ## Verification
 
 Every commit in this phase: syntax-checked, ruff-clean, full test suite run before and after.

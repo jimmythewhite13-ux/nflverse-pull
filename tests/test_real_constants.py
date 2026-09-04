@@ -48,6 +48,7 @@ def test_load_real_model_assumptions_returns_real_known_values():
     assert c[82] == 0.35     # RB RYOE/Att weight -- also differed from the demo (0.2)
     assert c[155] == 3       # road fatigue threshold
     assert c[156] == -1      # road fatigue penalty
+    assert c[171] == 10.5    # win probability logistic slope
 
 
 def test_load_real_model_assumptions_covers_every_row_build_real_constants_needs():
@@ -56,7 +57,7 @@ def test_load_real_model_assumptions_covers_every_row_build_real_constants_needs
         3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 34, 35, 36, 37, 38, 39,
         44, 45, 46, 47, 58, 59, 67, 81, 82, 87, 88, 89, 90, 91, 94, 95, 96, 97, 98,
         101, 102, 119, 120, 121, 123, 124, 128, 129, 130, 131, 133, 134, 136, 137, 138,
-        150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
+        150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 171,
     ]
     for row in required_rows:
         assert row in c, f"real row C{row} missing from load_real_model_assumptions()"

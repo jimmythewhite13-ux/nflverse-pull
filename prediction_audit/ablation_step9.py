@@ -133,11 +133,14 @@ def main(season: int, start_week: int, end_week: int) -> None:
             if not (pd.notna(game.get("home_score")) and pd.notna(game.get("away_score"))):
                 continue  # ablation needs a real actual result to compare against
             real_actual_margin = game["home_score"] - game["away_score"]
+            real_actual_total = game["home_score"] + game["away_score"]
 
             home_base, away_base = compute_model_home_away_score(**components)
             baseline_rows.append({
-                "predicted_margin": home_base - away_base, "real_actual_margin":
-                real_actual_margin,
+                "predicted_margin": home_base - away_base,
+                "predicted_total": home_base + away_base,
+                "real_actual_margin": real_actual_margin,
+                "real_actual_total": real_actual_total,
             })
 
             for name, keys in ABLATION_GROUPS.items():
@@ -147,7 +150,9 @@ def main(season: int, start_week: int, end_week: int) -> None:
                 home_abl, away_abl = compute_model_home_away_score(**ablated)
                 ablated_rows[name].append({
                     "predicted_margin": home_abl - away_abl,
+                    "predicted_total": home_abl + away_abl,
                     "real_actual_margin": real_actual_margin,
+                    "real_actual_total": real_actual_total,
                 })
 
         print(f"  Week {week}: {len(baseline_rows)} real games processed so far.")
@@ -156,13 +161,20 @@ def main(season: int, start_week: int, end_week: int) -> None:
         print("\nNo real games resolved -- nothing to ablate.")
         return
 
-    def _mae_and_winrate(rows: list[dict]) -> tuple[float, float]:
+    def _mae_and_winrate(rows: list[dict]) -> tuple[float, float, float]:
+        """Returns (margin_mae, winrate, total_mae). Real, deliberate: division_adj_value and
+        weather_adj_value are added with the SAME sign to both home and away in
+        compute_model_home_away_score() (matching the real workbook's own C11 label,
+        "applied to game total") -- they shift the real predicted TOTAL, never the real
+        predicted MARGIN, so a margin-only metric is structurally blind to them. Tracking
+        total_mae as well is what makes their real ablation result meaningful."""
         df = pd.DataFrame(rows)
         mae = (df["predicted_margin"] - df["real_actual_margin"]).abs().mean()
         winrate = (
             (df["predicted_margin"] > 0) == (df["real_actual_margin"] > 0)
         ).mean()
-        return mae, winrate
+        total_mae = (df["predicted_total"] - df["real_actual_total"]).abs().mean()
+        return mae, winrate, total_mae
 
     # Real safety net: persist raw results to disk BEFORE any print formatting -- a display
     # bug must never lose real, already-computed, expensive-to-reproduce data again (this
@@ -175,22 +187,31 @@ def main(season: int, start_week: int, end_week: int) -> None:
     ), encoding="utf-8")
     print(f"\nReal raw results saved to {results_path}")
 
-    base_mae, base_winrate = _mae_and_winrate(baseline_rows)
-    print("\n" + "=" * 78)
-    print(f"REAL BASELINE (full model): MAE={base_mae:.3f}pts  winner-pick={base_winrate:.1%}  "
+    base_mae, base_winrate, base_total_mae = _mae_and_winrate(baseline_rows)
+    print("\n" + "=" * 96)
+    print(f"REAL BASELINE (full model): margin MAE={base_mae:.3f}pts  "
+          f"winner-pick={base_winrate:.1%}  total MAE={base_total_mae:.3f}pts  "
           f"(n={len(baseline_rows)})")
-    print("=" * 78)
-    print(f"{'Component':<26} {'MAE w/o':>10} {'dMAE':>8} {'Win% w/o':>10} {'dWin%':>8}")
+    print("=" * 96)
+    print(f"{'Component':<26} {'MAE w/o':>10} {'dMAE':>8} {'Win% w/o':>10} {'dWin%':>8} "
+          f"{'TotMAE w/o':>11} {'dTotMAE':>9}")
     for name in ABLATION_GROUPS:
-        mae, winrate = _mae_and_winrate(ablated_rows[name])
+        mae, winrate, total_mae = _mae_and_winrate(ablated_rows[name])
         print(f"{name:<26} {mae:>10.3f} {mae - base_mae:>+8.3f} {winrate:>10.1%} "
-              f"{winrate - base_winrate:>+8.1%}")
+              f"{winrate - base_winrate:>+8.1%} {total_mae:>11.3f} "
+              f"{total_mae - base_total_mae:>+9.3f}")
 
-    print(f"\nReal, honest read: a component whose ablated MAE is WORSE (higher) than baseline "
-          f"is genuinely helping accuracy when included -- removing it hurts. A component "
-          f"whose ablated MAE is the SAME or BETTER than baseline is not pulling its real "
-          f"weight in this real sample (small-sample noise at n={len(baseline_rows)} is "
-          f"expected for the smaller-magnitude terms; don't over-read single-component swings).")
+    print(f"\nReal, honest read: a component whose ablated MAE (margin OR total) is WORSE "
+          f"(higher) than baseline is genuinely helping accuracy when included -- removing it "
+          f"hurts. Division Adj and Weather Adj are real, deliberate TOTAL-only terms (see "
+          f"_mae_and_winrate()'s own docstring) -- always exactly 0 change in margin MAE/"
+          f"winner-pick by design, not a bug; judge them on dTotMAE instead. QB Replacement "
+          f"Value shows 0 change here because this backtest never sets a real home_backup_in/"
+          f"away_backup_in=True for any game (no real live backup-QB roster data wired into "
+          f"this historical composer yet -- an already-documented real scoping gap, not "
+          f"evidence the term itself doesn't matter). Small-sample noise at n="
+          f"{len(baseline_rows)} is expected for the smaller-magnitude terms; don't over-read "
+          f"single-component swings.")
 
 
 if __name__ == "__main__":

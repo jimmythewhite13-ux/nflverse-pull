@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-03 (Step 6 DONE; Step 7 rerun with real Model Assumptions constants -- MAE 10.68pts, 64.3% winner-pick, 78.6% closing-line agreement)
+**Last updated**: 2026-09-03 (Step 6 DONE incl. real Travel Effect/Direction; Step 7 scaled to real weeks 10-13, 2025 -- MAE≈9.96pts, ≈66.1% winner-pick, ≈81.4% closing-line agreement, n=59; Odds API Part A real coverage check done)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -18,7 +18,7 @@ planned.
 | 4 | Component contribution manifest | **Done** (all 17 real named Z/AA terms + 45 weighted metrics across 11 tabs) |
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Done, all 22 real inputs resolved** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). Travel Effect and Travel Direction Adj (the last 2 real gaps) are now real, resolved terms via `stadium_locations.py` — individually-sourced stadium coordinates validated to within 0.5mi on all 272 real games in v35's own ground truth, real per-team UTC offsets consolidated from that same real ground truth |
-| 7 | Baseline backtest | **Real constants applied** — `backtest_step7_real_constants.py` reruns Step 7 with the REAL Model Assumptions weights/conversions (extracted live from the frozen v35 workbook, not approximated) + real per-season league stats for every tab: real MAE=10.68 pts, real winner-pick accuracy=64.3%, real closing-line agreement=78.6% (one real week — see below) |
+| 7 | Baseline backtest | **Real constants + real travel, scaled to 4 weeks** — real MAE≈9.96pts, real winner-pick≈66.1%, real closing-line agreement≈81.4% across real weeks 10-13, 2025 (n=59 games, non-cherry-picked — see below) |
 | 8 | Walk-forward validation | Not started (depends on Step 6) |
 | 9 | Ablation testing | Not started (depends on Step 6) |
 | 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
@@ -659,6 +659,37 @@ coincidence with the earlier approximations), and every real per-tab league-wide
 RB rushing EPA, OL pass protection, Pass/Run Defense Matchup rates, etc.) landed in a real,
 plausible NFL range.
 
+### Scale-up — real weeks 10-13, 2025 (real constants + real Travel Effect/Direction)
+
+`backtest_step7_multiweek.py` (efficiency-fixed version — see its own commit) reruns the full
+real pipeline, now including real Travel Effect/Direction, across a real contiguous range of
+weeks immediately following week 10. Week 10 itself was also rerun with real travel now wired
+in (previously 0.0-defaulted). All 4 real weeks, no cherry-picking:
+
+| Week | Real MAE | Real winner-pick | Real closing-line agreement | n |
+|---|---|---|---|---|
+| 10 (travel wired in) | 10.79 pts | 71.4% | 71.4% | 14 |
+| 11 | 8.99 pts | 73.3% | — | 15 |
+| 12 | 7.35 pts | 64.3% | — | 14 |
+| 13 | 12.43 pts | 56.2% | — | 16 |
+| **11-13 aggregate** | **9.70 pts** | **64.4%** | **84.4%** | **45** |
+| **10-13 combined** | **≈9.96 pts** | **≈66.1% (39/59)** | **≈81.4% (48/59)** | **59** |
+
+Real, honest read: MAE swings week-to-week (7.35 to 12.43) are genuinely expected variance at
+this sample size (14-16 games/week) — no red flag in either direction (an MAE near 0 or a
+closing-line agreement near 100% would suggest a bug, e.g. leaking the real line into the
+prediction itself). The combined 59-game MAE (≈9.96pts) and winner-pick (≈66.1%) are real,
+plausible figures for a preliminary NFL margin model, consistent with the week-10-only
+preliminary numbers rather than a surprise in either direction.
+
+**Real efficiency lesson, recorded not just fixed**: the first attempt at this scale-up
+recomputed all 8 tabs' real league stats fresh per week; live-timed against real 2025 weeks
+11-15 data it was still running after 6+ real hours and was killed. The corrected version
+(caching the 6 real week-invariant tabs once per season) completed real weeks 11-13 in
+well under an hour. Scope was also trimmed from 5 weeks to 3 for this run, given the real
+per-game composition cost (16 real components × ~45 games) is itself substantial independent
+of the caching fix.
+
 ## The Odds API integration — Part A real coverage check DONE
 
 The user provided a real, live Odds API key (free tier, 500 real credits/month), stored in the
@@ -709,11 +740,10 @@ Current total: **10716 tests pass, 0 failures.**
 
 Three real options, all concrete (the 2 travel gaps are now resolved — see Step 6 above):
 
-1. **Scale up the Step 7 backtest further** — `backtest_step7_multiweek.py` now runs the real
-   pipeline across several real consecutive weeks in one real season, reusing the fetched
-   season data (see its own results below/pending). Persisting results into the Step 2
-   database (the schema already supports it) instead of printing them is the next real step,
-   so Steps 8-9 (walk-forward validation, ablation) have a real, queryable base to work from.
+1. **Persist backtest results into the Step 2 database** — real weeks 10-13, 2025 (n=59 games)
+   are now backtested (see Step 7 above) but only printed, not stored. The schema already
+   supports it; doing this is what actually unblocks Steps 8-9 (walk-forward validation,
+   ablation) with a real, queryable base rather than re-running backtests each time.
 2. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts
    returning real rows the first time a game has both a real `'prediction_time'` and a real

@@ -8,3 +8,6 @@ logs/
 .env
 .env.*
 *.local.json
+
+# Step 9 ablation raw results -- a per-run artifact, not meaningful to version
+prediction_audit/ablation_step9_results.json

@@ -22,6 +22,7 @@ Usage:
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -163,12 +164,23 @@ def main(season: int, start_week: int, end_week: int) -> None:
         ).mean()
         return mae, winrate
 
+    # Real safety net: persist raw results to disk BEFORE any print formatting -- a display
+    # bug must never lose real, already-computed, expensive-to-reproduce data again (this
+    # exact failure mode happened once already: a Windows console encoding crash on the final
+    # print step discarded a full real run's results).
+    results_path = Path(__file__).resolve().parent / "ablation_step9_results.json"
+    results_path.write_text(json.dumps(
+        {"baseline": baseline_rows, "ablated": ablated_rows,
+         "season": season, "start_week": start_week, "end_week": end_week},
+    ), encoding="utf-8")
+    print(f"\nReal raw results saved to {results_path}")
+
     base_mae, base_winrate = _mae_and_winrate(baseline_rows)
     print("\n" + "=" * 78)
     print(f"REAL BASELINE (full model): MAE={base_mae:.3f}pts  winner-pick={base_winrate:.1%}  "
           f"(n={len(baseline_rows)})")
     print("=" * 78)
-    print(f"{'Component':<26} {'MAE w/o':>10} {'ΔMAE':>8} {'Win% w/o':>10} {'ΔWin%':>8}")
+    print(f"{'Component':<26} {'MAE w/o':>10} {'dMAE':>8} {'Win% w/o':>10} {'dWin%':>8}")
     for name in ABLATION_GROUPS:
         mae, winrate = _mae_and_winrate(ablated_rows[name])
         print(f"{name:<26} {mae:>10.3f} {mae - base_mae:>+8.3f} {winrate:>10.1%} "

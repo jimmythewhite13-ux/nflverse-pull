@@ -117,15 +117,20 @@ class HistoricalGameDataBundle:
     ngs_rushing_current: pd.DataFrame
 
 
-def resolve_historical_model_home_away_score(
+def resolve_historical_model_components(
     bundle: HistoricalGameDataBundle, constants: HistoricalGameModelConstants,
     target_season: int, target_week: int,
     home_team: str, home_abbr: str, away_team: str, away_abbr: str,
     home_backup_in: bool = False, away_backup_in: bool = False,
     travel_effect_away: float | None = None, travel_direction_away: float | None = None,
-) -> tuple[float, float]:
-    """Returns (model_home_score, model_away_score) -- a real, end-to-end historical Z/AA
-    prediction for one real past game, using only real data available before its own kickoff.
+) -> dict[str, float]:
+    """Returns every real named term `compute_model_home_away_score()` sums, as a flat dict
+    keyed by that function's own real parameter names (so `compute_model_home_away_score(
+    **resolve_historical_model_components(...))` reproduces `resolve_historical_model_home_
+    away_score()`'s own result exactly) -- built for Step 9's real ablation testing, which
+    needs each real term's individual value (the formula is a pure additive sum, so ablating
+    one term is just subtracting its own real value from the final score, not a separate real
+    resolver rerun).
     `home_backup_in`/`away_backup_in`: real, live roster-status facts for THIS specific game
     (whether the primary starter was out) -- not derivable from season-to-date stats alone,
     so still a required caller input, matching this project's established scoping.
@@ -260,27 +265,45 @@ def resolve_historical_model_home_away_score(
             home_utc, away_utc, constants.west_to_east_penalty,
         )
 
-    return compute_model_home_away_score(
-        base_team_quality_home=home_base_quality,
-        base_team_quality_away=away_base_quality,
-        flat_hfa=constants.flat_hfa,
-        rest_effect_value=rest_effect_value,
-        weather_adj_value=weather_adj_value,
-        injury_adj_home=injury_adj_home,
-        injury_adj_away=injury_adj_away,
-        division_adj_value=division_adj_value,
-        qb_replacement_home=qb_replacement_home,
-        qb_replacement_away=qb_replacement_away,
-        phase_matchup_home=phase_matchup_home,
-        phase_matchup_away=phase_matchup_away,
-        ol_pressure_home=ol_pressure_home,
-        ol_pressure_away=ol_pressure_away,
-        explosive_play_home=explosive_play_home,
-        explosive_play_away=explosive_play_away,
-        hfa_delta_home=home_hfa_delta_value,
-        hfa_delta_away=away_hfa_delta_value,
-        road_fatigue_home=home_road_fatigue,
-        road_fatigue_away=away_road_fatigue,
-        travel_effect_away=travel_effect_away,
-        travel_direction_away=travel_direction_away,
+    return {
+        "base_team_quality_home": home_base_quality,
+        "base_team_quality_away": away_base_quality,
+        "flat_hfa": constants.flat_hfa,
+        "rest_effect_value": rest_effect_value,
+        "weather_adj_value": weather_adj_value,
+        "injury_adj_home": injury_adj_home,
+        "injury_adj_away": injury_adj_away,
+        "division_adj_value": division_adj_value,
+        "qb_replacement_home": qb_replacement_home,
+        "qb_replacement_away": qb_replacement_away,
+        "phase_matchup_home": phase_matchup_home,
+        "phase_matchup_away": phase_matchup_away,
+        "ol_pressure_home": ol_pressure_home,
+        "ol_pressure_away": ol_pressure_away,
+        "explosive_play_home": explosive_play_home,
+        "explosive_play_away": explosive_play_away,
+        "hfa_delta_home": home_hfa_delta_value,
+        "hfa_delta_away": away_hfa_delta_value,
+        "road_fatigue_home": home_road_fatigue,
+        "road_fatigue_away": away_road_fatigue,
+        "travel_effect_away": travel_effect_away,
+        "travel_direction_away": travel_direction_away,
+    }
+
+
+def resolve_historical_model_home_away_score(
+    bundle: HistoricalGameDataBundle, constants: HistoricalGameModelConstants,
+    target_season: int, target_week: int,
+    home_team: str, home_abbr: str, away_team: str, away_abbr: str,
+    home_backup_in: bool = False, away_backup_in: bool = False,
+    travel_effect_away: float | None = None, travel_direction_away: float | None = None,
+) -> tuple[float, float]:
+    """Returns (model_home_score, model_away_score) -- a real, end-to-end historical Z/AA
+    prediction for one real past game, using only real data available before its own kickoff.
+    A thin wrapper around `resolve_historical_model_components()` -- see that function for
+    what each real argument means; this one just sums the real components it returns."""
+    components = resolve_historical_model_components(
+        bundle, constants, target_season, target_week, home_team, home_abbr, away_team,
+        away_abbr, home_backup_in, away_backup_in, travel_effect_away, travel_direction_away,
     )
+    return compute_model_home_away_score(**components)

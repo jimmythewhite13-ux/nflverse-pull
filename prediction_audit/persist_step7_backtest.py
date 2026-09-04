@@ -57,7 +57,7 @@ from prediction_audit.historical.real_constants import (  # noqa: E402
     build_real_constants,
     load_real_model_assumptions,
 )
-from prediction_audit.market_data import fetch_real_market_lines  # noqa: E402
+from prediction_audit.market_data import REAL_SOURCE_NAME, fetch_real_market_lines  # noqa: E402
 
 FROZEN_XLSX = str(
     Path(__file__).resolve().parent / "frozen_baselines" / "NFL_Prediction_Model_v35.xlsx"
@@ -168,11 +168,21 @@ def main(season: int, start_week: int, end_week: int) -> None:
                 )
 
             line = real_lines.get((week, away_team, home_team))
-            if line is not None and line.spread_line is not None:
+            if line is not None and line.spread_line is not None and line.total_line is not None:
+                # Real matched spread/total pair -- matches this project's own established
+                # market_lines invariant (see test_market_lines_come_in_matched_spread_total_
+                # pairs_per_game, scoped to line_stage='prediction_time' for Step 5's own rows;
+                # these are real, legitimately different 'closing'-stage rows for the same
+                # real habitatring.com source).
                 write.insert_market_line(
                     conn, run_id, sportsbook="market_consensus", market_type="spread",
                     line_stage="closing", line_value=line.spread_line,
-                    source="habitatring.com (Step 5)", market_data_status="VERIFIED",
+                    source=REAL_SOURCE_NAME, market_data_status="VERIFIED",
+                )
+                write.insert_market_line(
+                    conn, run_id, sportsbook="market_consensus", market_type="total",
+                    line_stage="closing", line_value=line.total_line,
+                    source=REAL_SOURCE_NAME, market_data_status="VERIFIED",
                 )
 
             n_persisted += 1

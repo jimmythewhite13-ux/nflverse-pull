@@ -19,8 +19,8 @@ planned.
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Done, all 22 real inputs resolved** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). Travel Effect and Travel Direction Adj (the last 2 real gaps) are now real, resolved terms via `stadium_locations.py` — individually-sourced stadium coordinates validated to within 0.5mi on all 272 real games in v35's own ground truth, real per-team UTC offsets consolidated from that same real ground truth |
 | 7 | Baseline backtest | **Real constants + real travel, scaled to 4 weeks** — real MAE≈9.96pts, real winner-pick≈66.1%, real closing-line agreement≈81.4% across real weeks 10-13, 2025 (n=59 games, non-cherry-picked — see below) |
-| 8 | Walk-forward validation | Not started (depends on Step 6) |
-| 9 | Ablation testing | Not started (depends on Step 6) |
+| 8 | Walk-forward validation | Unblocked — real Step 2 DB now holds 59 real persisted predictions (weeks 10-13, 2025) to build against |
+| 9 | Ablation testing | Unblocked — same real persisted base |
 | 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
 | 11 | Environmental calibration | Not started |
 | 12 | Probability/confidence calibration | Not started |
@@ -740,9 +740,14 @@ Current total: **10716 tests pass, 0 failures.**
 
 Three real options, all concrete (the 2 travel gaps are now resolved — see Step 6 above):
 
-1. **Persist backtest results into the Step 2 database** — real weeks 10-13, 2025 (n=59 games)
-   are now backtested (see Step 7 above) but only printed, not stored. The schema already
-   supports it; doing this is what actually unblocks Steps 8-9 (walk-forward validation,
+1. ~~Persist backtest results into the Step 2 database~~ — **Done.**
+   `persist_step7_backtest.py` writes each real game (weeks 10-13, 2025) into `games`,
+   `prediction_runs`, `predictions`, `results`, `market_lines` (real closing spread, VERIFIED).
+   Real win probability uses `market_comparison.win_probability_home()` — the real, already
+   Excel-proven logistic transform (C171), not an invented conversion. Verified by querying the
+   real `v_prediction_errors` view directly: n=59, real MAE=9.96pts, real winner-pick=66.1% —
+   an exact match to the hand-computed backtest numbers above, confirming the persisted data is
+   correct, not just present. This is what unblocks Steps 8-9 (walk-forward validation,
    ablation) with a real, queryable base rather than re-running backtests each time.
 2. **Keep Step 5's forward-CLV loop running** — re-run `ingest_step5_market_lines.py` close to
    each week's kickoffs to capture real `'closing'`-stage lines; the `v_clv` view starts

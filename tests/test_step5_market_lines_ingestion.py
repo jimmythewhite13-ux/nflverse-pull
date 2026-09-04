@@ -58,10 +58,15 @@ def test_every_prediction_has_a_valid_win_probability():
 
 
 def test_every_market_line_is_verified_and_sourced():
+    """Scoped to line_stage='prediction_time' -- Step 5's own real ingestion invariant.
+    persist_step7_backtest.py (Step 7 -> Step 2) also writes real market_lines rows to this
+    same table, legitimately at line_stage='closing' (a real closing line for an already-
+    completed historical game, not a live prediction-time line) -- a different, later, equally
+    real writer, not a violation of Step 5's own promise, which this test still verifies."""
     conn = _conn()
     rows = conn.execute(
         "SELECT market_data_status, source, line_stage, market_type, line_value "
-        "FROM market_lines"
+        "FROM market_lines WHERE line_stage = 'prediction_time'"
     ).fetchall()
     assert len(rows) > 0, "expected at least some real market lines to be ingested"
     for status, source, stage, market_type, value in rows:
@@ -76,9 +81,12 @@ def test_every_market_line_is_verified_and_sourced():
 
 
 def test_market_lines_come_in_matched_spread_total_pairs_per_game():
+    """Scoped to line_stage='prediction_time' -- see test_every_market_line_is_verified_and_
+    sourced's own docstring for why a 'closing'-stage row from a different real writer
+    (persist_step7_backtest.py) doesn't belong to this invariant."""
     conn = _conn()
     rows = conn.execute(
-        "SELECT run_id, market_type FROM market_lines"
+        "SELECT run_id, market_type FROM market_lines WHERE line_stage = 'prediction_time'"
     ).fetchall()
     by_run: dict[int, set[str]] = {}
     for run_id, market_type in rows:
@@ -86,6 +94,35 @@ def test_market_lines_come_in_matched_spread_total_pairs_per_game():
     for run_id, types in by_run.items():
         assert types == {"spread", "total"}, (
             f"run_id {run_id} has an incomplete spread/total pair: {types}"
+        )
+
+
+def test_step7_closing_lines_are_verified_and_matched_pairs():
+    """The real, separate invariant persist_step7_backtest.py (Step 7 -> Step 2) establishes:
+    every real 'closing'-stage row it writes is VERIFIED, real-sourced, and a matched
+    spread/total pair -- mirrors Step 5's own real ingestion invariant above, for the
+    different real writer."""
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT market_data_status, source, market_type, line_value "
+        "FROM market_lines WHERE line_stage = 'closing'"
+    ).fetchall()
+    if not rows:
+        return  # real, honest: persist_step7_backtest.py may not have run yet in this DB
+    for status, source, market_type, value in rows:
+        assert status == "VERIFIED"
+        assert source == REAL_SOURCE_NAME
+        assert market_type in ("spread", "total")
+        assert value is not None
+
+    by_run: dict[int, set[str]] = {}
+    for run_id, market_type in conn.execute(
+        "SELECT run_id, market_type FROM market_lines WHERE line_stage = 'closing'"
+    ).fetchall():
+        by_run.setdefault(run_id, set()).add(market_type)
+    for run_id, types in by_run.items():
+        assert types == {"spread", "total"}, (
+            f"run_id {run_id} has an incomplete real closing spread/total pair: {types}"
         )
 
 

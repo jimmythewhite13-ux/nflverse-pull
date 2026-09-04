@@ -659,18 +659,25 @@ coincidence with the earlier approximations), and every real per-tab league-wide
 RB rushing EPA, OL pass protection, Pass/Run Defense Matchup rates, etc.) landed in a real,
 plausible NFL range.
 
-## Tracked but paused — The Odds API integration (Part A blocked, not abandoned)
+## The Odds API integration — Part A real coverage check DONE
 
-A full spec for automating DraftKings/FanDuel/BetMGM/Caesars line entry via The Odds API
-(explicitly NOT MyBookie, which stays 100% manual — offshore book, scraping/credential access
-both ruled out) arrived this session. Real blocker: Part A requires checking real coverage
-(props tier, season-win-totals tier, book presence) against a real API key, and creating an
-Odds API account is outside what this assistant can do on its own (account/credential creation
-is off-limits regardless of authorization) — the user chose to hold this and continue Step 6
-instead. Prep work already done: `.gitignore` now excludes `.env`/`.env.*`/`*.local.json` so a
-future key can never be accidentally committed. **Next step when resumed**: the user provides
-a real Odds API key (existing or newly signed-up), then Part A's 3 real coverage questions get
-checked against real response data before any pull code is written.
+The user provided a real, live Odds API key (free tier, 500 real credits/month), stored in the
+project's already-gitignored `.env` (never committed, never hardcoded in source — read at
+runtime by `check_odds_api_coverage.py`). Real, quota-conscious live check (4 of 500 real
+credits spent; `/sports` calls are confirmed free and don't count):
+
+| Part A question | Real, live-verified answer |
+|---|---|
+| Player props tier | **Covered, even on the free tier** — a real live `player_pass_yds` event-odds call returned real market data at 200/1 credit. This contradicts the general docs' "paid plans only" phrasing for that endpoint; the real live response is authoritative over the general doc text. |
+| Season win totals tier | **Not offered by this provider at any tier** — checked the real, complete NFL sport-key catalog (`/sports?all=true`, free): only 3 real NFL keys exist (`americanfootball_nfl` game odds, `americanfootball_nfl_preseason` [inactive], `americanfootball_nfl_super_bowl_winner` futures). No real season/team win-totals market exists anywhere in this provider's real data — a genuine data-availability gap, not a tier/paywall issue. |
+| Book presence | DraftKings, FanDuel, BetMGM all **present** in real `regions=us`/`us2` odds responses. Caesars (`williamhill_us`) **absent** from both real region buckets checked — a real, current gap in this provider's real book coverage, not a region-split artifact (checked both). `mybookieag` is also a real available key in this feed (unrelated to this project's own separate, deliberate decision to keep MyBookie 100% manual). |
+
+**Real, honest scope note**: Season Win Totals real market data, if wanted, would need a
+different real real-money data source than The Odds API — not something this integration can
+provide. Real next step when resumed: build the real pull code for DraftKings/FanDuel/BetMGM
+game-line and player-prop ingestion (the 2 of 3 real coverage questions this provider does
+answer), explicitly scoping Caesars and season win totals out rather than fabricating coverage
+that was checked live and found absent.
 
 ## Known limitation, real -- not an audit gap: no Strength of Schedule term
 

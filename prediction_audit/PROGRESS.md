@@ -19,8 +19,8 @@ planned.
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Done, all 22 real inputs resolved** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). Travel Effect and Travel Direction Adj (the last 2 real gaps) are now real, resolved terms via `stadium_locations.py` — individually-sourced stadium coordinates validated to within 0.5mi on all 272 real games in v35's own ground truth, real per-team UTC offsets consolidated from that same real ground truth |
 | 7 | Baseline backtest | **Real constants + real travel, scaled to 4 weeks** — real MAE≈9.96pts, real winner-pick≈66.1%, real closing-line agreement≈81.4% across real weeks 10-13, 2025 (n=59 games, non-cherry-picked — see below) |
-| 8 | Walk-forward validation | Unblocked — real Step 2 DB now holds 59 real persisted predictions (weeks 10-13, 2025) to build against |
-| 9 | Ablation testing | Unblocked — same real persisted base |
+| 8 | Walk-forward validation | Real base ready (59 persisted predictions, weeks 10-13 2025); within-season extension to weeks 14-18 is the next real run (see below) |
+| 9 | Ablation testing | **Done** — real 14-component ablation across weeks 10-13, 2025 (n=59). Base Team Quality dominates as expected; HFA Delta is a genuine, real surprise (ablating it improves accuracy in this sample) — see below |
 | 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
 | 11 | Environmental calibration | Not started |
 | 12 | Probability/confidence calibration | Not started |
@@ -730,6 +730,50 @@ never to redesign it. Per the user's explicit direction (2026-09-03): leave this
 limitation for now; a real Strength-of-Schedule term is a legitimate candidate for the
 eventual Python production rebuild (out of scope for the current frozen-baseline validation
 work), not for anything before it.
+
+## Step 9 — real ablation testing (weeks 10-13, 2025, n=59)
+
+`ablation_step9.py` zeroes each of the 14 real named terms `compute_model_home_away_score()`
+sums, one at a time, and re-measures real margin MAE, winner-pick, and total MAE against the
+same real games/results Step 7 already backtested. No extra real resolver work per term --
+the formula is a pure additive sum, so each ablated variant is real arithmetic on an
+already-computed component dict (see `resolve_historical_model_components()`, the real
+refactor this required).
+
+| Component | dMAE (margin) | dWin% | dMAE (total) | Real read |
+|---|---|---|---|---|
+| Base Team Quality | +0.807 | -10.2% | +32.422 | Dominant, as expected — by far the largest real effect on both margin and total |
+| HFA Delta (Team-Specific) | **-0.911** | **+5.1%** | +0.000 | **Genuine, real surprise**: ablating it *improves* both margin MAE and winner-pick in this sample — see honest caveat below |
+| Phase Matchup Adj | -0.326 | -5.1% | -0.461 | Mixed: hurts margin/total accuracy but helps winner-pick when included |
+| Flat HFA | -0.357 | +0.0% | +0.000 | Ablating slightly improves margin MAE; no total effect (a home/away-split term, cancels in the sum by design) |
+| Weather Adj | +0.000 | +0.0% | **+0.119** | Real, deliberate TOTAL-only term (workbook's own C11-family label, "applied to game total") — correctly measured only after this script's own total-MAE fix (see below); genuinely helping total accuracy |
+| Division Adj | +0.000 | +0.0% | **+0.153** | Same real total-only property as Weather Adj — genuinely helping total accuracy, confirmed only after live-checking real division games existed in this sample (6 in week 10 alone) and finding the formula itself, not a bug, explained the initial 0.000 |
+| Rest Effect | +0.034 | -3.4% | +0.000 | Small, real, modestly helpful |
+| OL Pressure Adj / Explosive Play Adj / Road Fatigue Adj / Travel Effect / Travel Direction Adj | all <0.1 in magnitude | mixed, ≤2% | small | Genuinely inconclusive at n=59 — matches these terms' own intentionally modest real weights; not a finding either way |
+| Injury Adj | +0.000 | +0.0% | +0.000 | Expected — confirmed real permanent 0 constant in the live workbook |
+| QB Replacement Value | +0.000 | +0.0% | +0.000 | **Not a real finding** — this backtest never sets a real `home_backup_in`/`away_backup_in=True` for any game (no real live backup-QB roster data wired into the historical composer yet, an already-documented scoping gap); this row says nothing about whether the term itself matters |
+
+**Real bug caught and fixed mid-analysis, not glossed over**: the first live run showed exactly
+0.000 margin-MAE change for Division Adj and Weather Adj across all 59 games. Checked rather
+than accepted: live-verified real division games genuinely occurred in this window (6 in week
+10 alone via nflverse's own `div_game` column), which should have produced *some* nonzero
+effect if these terms mattered at all. Reading `compute_model_home_away_score()` directly
+confirmed the real cause: `division_adj_value`/`weather_adj_value` are added with the *same*
+sign to both home and away (matching the real workbook's own label, "applied to game total"),
+so they move the real predicted total but never the real predicted margin — a margin-only
+ablation metric is structurally blind to them, not evidence they don't matter. Fixed by also
+tracking real total MAE, which correctly shows both terms genuinely helping (table above).
+
+**Real, honest caveat on HFA Delta**: this is the most notable single finding in the whole
+ablation, and deserves scrutiny rather than either dismissal or overclaiming. At n=59 (4 real
+weeks of one real season), this could be genuine sample noise, or it could indicate the real
+Team-Specific HFA regression (decay/regression-weight/last-year-emphasis) is currently
+miscalibrated for this specific stretch of teams/weeks. It is NOT evidence that home-field
+advantage itself doesn't matter (Flat HFA is a separate, structural term always present) --
+only that the *team-specific delta on top of* the flat HFA hurt more than it helped in this
+particular real sample. Recommended real next step: re-run this same ablation across the
+Step 8 weeks-14-18 extension (and, once available, future seasons) before drawing any real
+conclusion about recalibrating Team-Specific HFA.
 
 ## Verification
 

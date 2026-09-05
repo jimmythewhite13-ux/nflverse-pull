@@ -22,7 +22,7 @@ planned.
 | 8 | Walk-forward validation | **Done** — real within-season extension to weeks 14-18, 2025 persisted (78 more real predictions, 137 total). Real weeks 14-18 alone: MAE≈11.86pts, winner-pick≈48.7% — noticeably worse than weeks 10-13's 9.96pts/66.1%, a real, plausible late-season effect (rested starters, non-competitive games) rather than a confirmed red flag — see below |
 | 9 | Ablation testing | **Done** — real 14-component ablation across weeks 10-13, 2025 (n=59). Base Team Quality dominates as expected; HFA Delta is a genuine, real surprise (ablating it improves accuracy in this sample) — see below |
 | 10 | Double-counting/correlation analysis | **Done** — real pairwise correlation across the 14 named terms (weeks 10-13, 2025, n=59): no pair exceeds the 0.6 concern threshold, including the specifically-targeted Phase Matchup Adj / Explosive Play Adj coupling — see below |
-| 11 | Environmental calibration | Not started |
+| 11 | Environmental calibration | **Done** — real thresholds/coefficients checked against real 2019-2025 schedule data (n up to 1871 games). Wind/Cold/Division well-to-reasonably calibrated; Travel Effect is a genuine, notable miss (r=+0.055, effectively no real correlation) — see below |
 | 12 | Probability/confidence calibration | Not started |
 | 13 | Model selection (A/B/C) | Not started |
 | 14 | Prop tracking schema | Not started |
@@ -785,6 +785,45 @@ limitation rather than substitute an unapproved proxy metric; revisit if a real,
 source is identified later. Not an audit gap -- the audit's job is reconstructing what v35
 actually does, and v35 itself never wires its own real injury-history computation into Z/AA
 either.
+
+## Step 11 — real environmental calibration (2019-2025, n up to 1871 REG games)
+
+`environmental_calibration_step11.py` checks whether the real, hardcoded Model Assumptions
+thresholds/coefficients for Weather Adj, Travel Effect, Rest Effect, and Division Adj are
+actually well-fit against real historical scoring effects -- distinct from Step 9's ablation,
+which only asked "does the term help at all." Cheap by design: uses only `fetch_schedules()`
+(real `wind`/`temp`/`div_game`/`home_rest`/`away_rest` columns), no pbp/PFR/FTN pull needed.
+
+| Term | Current real assumption | Real observed (2019-2025) | Read |
+|---|---|---|---|
+| Wind (>15mph) | -3.00 pts | -2.13 pts | Reasonably close; model somewhat overstates the real effect |
+| Cold (<32F) | -2.00 pts | -1.71 pts | Reasonably close; model somewhat overstates the real effect |
+| Division | -1.00 pts | -1.01 pts | Essentially exact — a genuinely well-calibrated real constant |
+| **Travel** | **+0.4 pts/1000mi (away penalty)** | **r=+0.055 (real, ~zero correlation)** | **Genuine, notable miss — see below** |
+
+**Real, honest scope gap**: Precip/Snow/Humidity (3 more real Weather Adj constants) could not
+be checked -- nflverse's own schedule data has no real per-game precipitation/snow/humidity
+field. Not silently skipped; explicitly reported as uncheckable with this data source.
+
+**Real Travel Effect finding, the most notable result here**: real away-team margin binned by
+real travel distance is NOT monotonic and does not support the model's own real assumption --
+the longest-trip bin (2000-3000mi) shows the real AWAY team performing *better* on average
+(+1.47) than the shortest-trip bin (-1.43), backwards from what a real fatigue-based travel
+penalty would predict. The real correlation coefficient (r=+0.055) is effectively zero. Real,
+honest caveat: this is a univariate check, not controlling for opponent quality -- if teams
+that travel farther also happen to face weaker opponents on average (a real, plausible
+scheduling artifact, e.g. West Coast teams crossing the country more often against particular
+divisions), that confound could mask a real travel effect that only shows up after controlling
+for team strength. This finding says the *raw, unconditional* real data doesn't support the
+current calibration -- it does not by itself prove Travel Effect should be removed, only that
+its real coefficient (and possibly its real existence as a standalone term) deserves a second
+look, ideally via a controlled analysis (e.g. residual travel effect after Base Team Quality)
+rather than accepting or discarding it on this univariate result alone.
+
+**Real Rest Effect**: broadly directionally consistent (more real rest days trends toward
+better real margin for both home and away), though noisy at the model's own exact threshold
+boundaries (the 8-10-day bin doesn't cleanly separate from the 4-8-day bin) -- not a clean miss
+like Travel, but not as tightly calibrated as Division either.
 
 ## Step 9 — real ablation testing (weeks 10-13, 2025, n=59)
 

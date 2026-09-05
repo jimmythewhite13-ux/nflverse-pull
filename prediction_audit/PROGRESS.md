@@ -19,7 +19,7 @@ planned.
 | 5 | Market & CLV infrastructure | **Unblocked, real data flowing** — real historical/current market lines now ingested (see below); true timestamped CLV movement remains forward-only |
 | 6 | Historical reconstruction 2021-2025 | **Done, all 22 real inputs resolved** — every real Z/AA component has a real, verified walk-forward resolver, AND `resolve_historical_model_home_away_score()` composes all of them into one real end-to-end historical Model Score, verified live twice against real, non-hand-picked past games (see below). Travel Effect and Travel Direction Adj (the last 2 real gaps) are now real, resolved terms via `stadium_locations.py` — individually-sourced stadium coordinates validated to within 0.5mi on all 272 real games in v35's own ground truth, real per-team UTC offsets consolidated from that same real ground truth |
 | 7 | Baseline backtest | **Real constants + real travel, scaled to 4 weeks** — real MAE≈9.96pts, real winner-pick≈66.1%, real closing-line agreement≈81.4% across real weeks 10-13, 2025 (n=59 games, non-cherry-picked — see below) |
-| 8 | Walk-forward validation | Real base ready (59 persisted predictions, weeks 10-13 2025); within-season extension to weeks 14-18 is the next real run (see below) |
+| 8 | Walk-forward validation | **Done** — real within-season extension to weeks 14-18, 2025 persisted (78 more real predictions, 137 total). Real weeks 14-18 alone: MAE≈11.86pts, winner-pick≈48.7% — noticeably worse than weeks 10-13's 9.96pts/66.1%, a real, plausible late-season effect (rested starters, non-competitive games) rather than a confirmed red flag — see below |
 | 9 | Ablation testing | **Done** — real 14-component ablation across weeks 10-13, 2025 (n=59). Base Team Quality dominates as expected; HFA Delta is a genuine, real surprise (ablating it improves accuracy in this sample) — see below |
 | 10 | Double-counting/correlation analysis | **Done** — real pairwise correlation across the 14 named terms (weeks 10-13, 2025, n=59): no pair exceeds the 0.6 concern threshold, including the specifically-targeted Phase Matchup Adj / Explosive Play Adj coupling — see below |
 | 11 | Environmental calibration | Not started |
@@ -730,6 +730,27 @@ never to redesign it. Per the user's explicit direction (2026-09-03): leave this
 limitation for now; a real Strength-of-Schedule term is a legitimate candidate for the
 eventual Python production rebuild (out of scope for the current frozen-baseline validation
 work), not for anything before it.
+
+## Step 8 — real within-season extension (weeks 14-18, 2025)
+
+`persist_step7_backtest.py` (the same real pipeline used for weeks 10-13) ran again for weeks
+14-18, persisting 78 more real prediction_runs into the same Prediction Audit database (137
+total for season 2025, model_version=v35.0). Verified directly via the real `v_prediction_
+errors` view:
+
+| Range | Real MAE | Real winner-pick | n |
+|---|---|---|---|
+| Weeks 10-13 | 9.96 pts | 66.1% | 59 |
+| Weeks 14-18 | ~11.86 pts | ~48.7% | 78 |
+| **Combined 10-18** | **11.04 pts** | **56.2%** | **137** |
+
+Real, honest read: weeks 14-18 are meaningfully worse on both metrics. Plausible, well-known
+real cause -- late-season weeks include more real non-competitive games (teams resting
+starters after clinching or eliminated, tanking for draft position), which genuinely degrades
+any real model's predictive accuracy, not unique to this one. This is flagged as a real,
+plausible explanation, not a confirmed one -- a legitimate follow-up would be checking real
+MAE specifically excluding games where the real underlying playoff-seeding stakes were already
+settled before kickoff, which this audit has not yet done.
 
 ## Known limitation, real -- not an audit gap: no cumulative injury-burden term (Adjusted Games Lost)
 

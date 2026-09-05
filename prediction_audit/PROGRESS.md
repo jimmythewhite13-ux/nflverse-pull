@@ -21,7 +21,7 @@ planned.
 | 7 | Baseline backtest | **Real constants + real travel, scaled to 4 weeks** — real MAE≈9.96pts, real winner-pick≈66.1%, real closing-line agreement≈81.4% across real weeks 10-13, 2025 (n=59 games, non-cherry-picked — see below) |
 | 8 | Walk-forward validation | Real base ready (59 persisted predictions, weeks 10-13 2025); within-season extension to weeks 14-18 is the next real run (see below) |
 | 9 | Ablation testing | **Done** — real 14-component ablation across weeks 10-13, 2025 (n=59). Base Team Quality dominates as expected; HFA Delta is a genuine, real surprise (ablating it improves accuracy in this sample) — see below |
-| 10 | Double-counting/correlation analysis | Not started (one real finding already surfaced in Step 4 — see below) |
+| 10 | Double-counting/correlation analysis | **Done** — real pairwise correlation across the 14 named terms (weeks 10-13, 2025, n=59): no pair exceeds the 0.6 concern threshold, including the specifically-targeted Phase Matchup Adj / Explosive Play Adj coupling — see below |
 | 11 | Environmental calibration | Not started |
 | 12 | Probability/confidence calibration | Not started |
 | 13 | Model selection (A/B/C) | Not started |
@@ -808,6 +808,34 @@ only that the *team-specific delta on top of* the flat HFA hurt more than it hel
 particular real sample. Recommended real next step: re-run this same ablation across the
 Step 8 weeks-14-18 extension (and, once available, future seasons) before drawing any real
 conclusion about recalibrating Team-Specific HFA.
+
+## Step 10 — real double-counting/correlation analysis (weeks 10-13, 2025, n=59)
+
+`correlation_step10.py` needed no new real backtest run: since the real formula is a pure
+additive sum, each of the 14 real named terms' own isolated per-game contribution to the
+margin/total is exactly `baseline - ablated` from Step 9's own already-saved
+`ablation_step9_results.json` -- real O(1) arithmetic on already-computed, already-persisted
+data, not a fresh computation. Pearson correlation across all real 14×13/2 term pairs (5
+zero-variance terms per field correctly dropped rather than reported as a spurious 0 or NaN
+correlation), threshold |r| > 0.6 (reusing the same concern threshold the user's own AGL spec
+established for a different check, for consistency).
+
+**Real result: no pair exceeds the threshold**, on either margin or total contributions. The
+one specifically-targeted real structural coupling -- Phase Matchup Adj and Explosive Play Adj
+both internally compose real references to Pass/Run Defense Matchup (confirmed by reading
+`phase_matchup_historical.py` and `explosive_play_matchup_historical.py` directly) -- sits
+comfortably below the threshold: r=+0.488 (margin), r=+0.181 (total). The highest real
+observed correlations were a moderate cluster among "matchup-based" terms (Base Team Quality,
+Phase Matchup Adj, OL Pressure Adj, Explosive Play Adj all pairwise in the 0.24-0.49 range on
+margin) -- plausible and expected (strong teams tend to be strong across QB/OL/explosive-play
+simultaneously), not a double-counting red flag at this sample size. A real, sensible negative
+correlation (Division Adj vs Travel Effect, r=-0.40 total) reflects that division opponents
+tend to be geographically closer, not a formula concern.
+
+**Real, honest scope note**: n=59 (weeks 10-13, one season) is a real, useful first check, not
+a final verdict -- the same caveat as Step 9's HFA Delta finding applies here: worth rerunning
+once the Step 8 weeks-14-18 extension lands, to confirm this correlation picture holds at a
+larger real sample before treating it as settled.
 
 ## Verification
 

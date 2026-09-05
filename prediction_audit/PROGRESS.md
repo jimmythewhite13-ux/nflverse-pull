@@ -731,6 +731,40 @@ limitation for now; a real Strength-of-Schedule term is a legitimate candidate f
 eventual Python production rebuild (out of scope for the current frozen-baseline validation
 work), not for anything before it.
 
+## Known limitation, real -- not an audit gap: no cumulative injury-burden term (Adjusted Games Lost)
+
+Checked directly, not assumed. v35's real "Availability Index" tab already computes a genuine
+injury-history metric (real 3-year Out/Doubtful week counts, Z-scored per team) -- conceptually
+close to "Adjusted Games Lost" (AGL). Traced every real cross-sheet formula reference to that
+tab from anywhere else in the workbook: only `E1686:E1717` (real Consecutive Road Games,
+feeding Road Fatigue Adj) is ever pulled in. Zero real formulas anywhere reference the real
+Injury Z-score section (row ~1720+). So the real injury-history computation exists but is never
+wired into the live Z/AA score -- the only real injury-adjacent terms that DO feed Z/AA are
+"Injury/Replacement Adjustment" (confirmed elsewhere a permanent 0 constant) and "QB
+Replacement Value" (a real per-game current-roster-status flag, not a cumulative season metric).
+
+The user proposed a real, detailed AGL spec (2026-09-04): value-weight missed games by each
+player's real Pro-Football-Reference Approximate Value (AV), not raw games-missed counts,
+matching Football Outsiders' own established methodology. Its own Part A required confirming
+real data access before building anything -- both real paths checked and found blocked:
+
+1. **nflverse-bundled AV**: not available. `nfl_data_py`'s current loaders
+   (`import_seasonal_pfr`, `import_seasonal_rosters`, `import_seasonal_data`) carry no `av`
+   column. The one real nflverse-family source that ever had it -- the legacy
+   `leesharpe/nfldata` `rosters.csv` -- is confirmed abandoned: real season coverage stops at
+   2019, and even that final season's own `av` values are blank. Not usable for a 2025+ target.
+2. **Direct PFR pull**: not viable. A live, real check of `pro-football-reference.com/robots.txt`
+   returned an active Cloudflare bot-challenge page, not a robots file -- the site is gated by
+   live bot-detection at the network level. Bypassing that is on this assistant's own
+   prohibited-actions list regardless of the request pattern's reasonableness (once/season/team
+   was the proposed rate) -- not a terms-of-service judgment call, a hard boundary.
+
+Per the user's explicit direction (2026-09-04): hold AGL as a documented, blocked real
+limitation rather than substitute an unapproved proxy metric; revisit if a real, accessible AV
+source is identified later. Not an audit gap -- the audit's job is reconstructing what v35
+actually does, and v35 itself never wires its own real injury-history computation into Z/AA
+either.
+
 ## Step 9 — real ablation testing (weeks 10-13, 2025, n=59)
 
 `ablation_step9.py` zeroes each of the 14 real named terms `compute_model_home_away_score()`

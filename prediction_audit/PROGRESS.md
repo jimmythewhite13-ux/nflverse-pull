@@ -24,7 +24,7 @@ planned.
 | 10 | Double-counting/correlation analysis | **Done** — real pairwise correlation across the 14 named terms (weeks 10-13, 2025, n=59): no pair exceeds the 0.6 concern threshold, including the specifically-targeted Phase Matchup Adj / Explosive Play Adj coupling — see below |
 | 11 | Environmental calibration | **Done** — real thresholds/coefficients checked against real 2019-2025 schedule data (n up to 1871 games). Wind/Cold/Division well-to-reasonably calibrated; Travel Effect is a genuine, notable miss (r=+0.055, effectively no real correlation) — see below |
 | 12 | Probability/confidence calibration | **Done** — real reliability check against the 137 already-persisted predictions (weeks 10-18, 2025). Systematically overconfident in the 50-70% range; real Brier score 0.2371 (close to the 0.25 "always guess 50%" baseline) — see below |
-| 13 | Model selection (A/B/C) | Not started |
+| 13 | Model selection (A/B/C) | **Done** — real, fair comparison of representative vs. real Model Assumptions constants across the same weeks 10-18, 2025 games (n=137). Real constants recommended as the production candidate (marginally better MAE and closing-line agreement, and the authentic v35 values on principle) — see below |
 | 14 | Prop tracking schema | **Done** — `prop_predictions`/`prop_market_lines`/`prop_results` tables + insert helpers + `v_prop_errors` view added to the Step 2 DB, mirroring the existing predictions/market_lines/results split exactly. Schema only, per explicit scope — no new prop-generation pipeline |
 | 15 | Final validated spec document | Not started |
 
@@ -824,6 +824,53 @@ rather than accepting or discarding it on this univariate result alone.
 better real margin for both home and away), though noisy at the model's own exact threshold
 boundaries (the 8-10-day bin doesn't cleanly separate from the 4-8-day bin) -- not a clean miss
 like Travel, but not as tightly calibrated as Division either.
+
+## Step 12 — real probability/confidence calibration (weeks 10-18, 2025, n=137)
+
+Pure query against the already-persisted 137 real predictions -- no new backtest needed. Bins
+real `win_probability_home` and compares against real observed win rate in each bucket.
+
+| Predicted bucket | n | Real mean predicted | Real observed win% |
+|---|---|---|---|
+| 0.00-0.50 | 34 | 0.443 | 0.441 |
+| 0.50-0.55 | 18 | 0.525 | 0.389 |
+| 0.55-0.60 | 13 | 0.582 | 0.462 |
+| 0.60-0.65 | 28 | 0.625 | 0.536 |
+| 0.65-0.70 | 22 | 0.678 | 0.591 |
+| 0.70-0.80 | 18 | 0.749 | 0.722 |
+| 0.80-1.01 | 4 | 0.815 | 1.000 |
+
+**Real, honest finding**: systematically overconfident in the 50-70% range -- e.g. predicts
+62.5% but real observed win rate is only 53.6%. Reasonably calibrated at the extremes (the
+lowest and 70-80% buckets), though the highest bucket (n=4) is too small to trust on its own.
+Real Brier score: **0.2371** (0=perfect, 0.25=the score achieved by always guessing 50%) --
+close enough to the naive baseline to say the real probability output, as currently converted
+via the logistic transform (C171=10.5), is not adding much real discriminating power beyond
+directional accuracy. A real, concrete calibration fix (e.g. Platt scaling / isotonic
+regression fit to real historical margin-to-outcome data) is a legitimate candidate for the
+future Python production system, not attempted here (this step's job was measurement, not
+recalibration).
+
+## Step 13 — real model selection: representative vs. real Model Assumptions constants
+
+Fair, apples-to-apples comparison on the identical real weeks 10-18, 2025 games (n=137) --
+both real constant sets now include real Travel Effect/Direction (the very first
+representative-constants run this session predated that fix and covered week 10 alone, so
+this is the first genuinely fair multi-week comparison).
+
+| Metric | Representative constants | Real constants |
+|---|---|---|
+| Real MAE | 11.132 pts | **11.044 pts** |
+| Real winner-pick | **57.7%** | 56.2% |
+| Real closing-line agreement | 77.4% | **78.8%** |
+
+**Real recommendation: use the real, workbook-extracted constants as the production
+candidate.** They win 2 of 3 metrics (MAE, closing-line agreement), lose the third by a margin
+well within real noise at n=137, and -- separate from the numbers -- they're the authentic v35
+values rather than approximations, which matters on principle for a validation project whose
+whole point is faithfully reconstructing what v35 actually does. `real_constants.py` (already
+built, already used by every backtest since Step 7's rigor fix) is the real artifact this
+recommendation points to; no further change needed to act on it.
 
 ## Step 9 — real ablation testing (weeks 10-13, 2025, n=59)
 

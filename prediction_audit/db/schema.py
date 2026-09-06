@@ -129,6 +129,43 @@ CREATE TABLE IF NOT EXISTS results (
     home_final_score INTEGER NOT NULL
 );
 
+-- ==== Prop predictions (Step 14): one row per real player-prop prediction, same immutable ==
+-- INSERT-only discipline as `predictions` -- a corrected/re-run prop projection gets a NEW row
+-- via a new prediction_runs run_id, never an UPDATE. Mirrors predictions/results' own real
+-- split: the prediction itself, its own real market line(s), and the real actual outcome
+-- (once known) are three separate tables, not one, so a later result/line correction can never
+-- silently overwrite an already-recorded prediction.
+CREATE TABLE IF NOT EXISTS prop_predictions (
+    prop_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id          INTEGER NOT NULL REFERENCES prediction_runs(run_id),
+    player_name     TEXT NOT NULL,
+    team            TEXT NOT NULL,
+    stat_type       TEXT NOT NULL,   -- e.g. 'passing_yards', 'receptions', 'rushing_yards'
+    projected_value REAL NOT NULL
+);
+
+-- ==== Prop market lines: real sportsbook prop lines, honestly labeled when unverified/missing
+-- (same real market_data_status convention as market_lines) ==================================
+CREATE TABLE IF NOT EXISTS prop_market_lines (
+    prop_line_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    prop_id            INTEGER NOT NULL REFERENCES prop_predictions(prop_id),
+    sportsbook         TEXT NOT NULL,
+    line_value         REAL,            -- NULL if genuinely not captured
+    over_odds          REAL,
+    under_odds         REAL,
+    line_stage         TEXT NOT NULL,   -- 'opening' / 'prediction_time' / 'closing'
+    line_timestamp     TEXT,            -- ISO8601, real, if known
+    source             TEXT,
+    market_data_status TEXT NOT NULL DEFAULT 'MISSING'
+                        CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING'))
+);
+
+-- ==== Prop results: real final stat outcomes, once known =====================================
+CREATE TABLE IF NOT EXISTS prop_results (
+    prop_id      INTEGER PRIMARY KEY REFERENCES prop_predictions(prop_id),
+    actual_value REAL NOT NULL
+);
+
 -- ==== Data quality flags per run =============================================================
 CREATE TABLE IF NOT EXISTS data_quality (
     run_id                INTEGER PRIMARY KEY REFERENCES prediction_runs(run_id),
@@ -145,6 +182,8 @@ CREATE INDEX IF NOT EXISTS idx_runs_game ON prediction_runs(game_id);
 CREATE INDEX IF NOT EXISTS idx_runs_model ON prediction_runs(model_version);
 CREATE INDEX IF NOT EXISTS idx_contrib_run ON component_contributions(run_id);
 CREATE INDEX IF NOT EXISTS idx_market_run ON market_lines(run_id);
+CREATE INDEX IF NOT EXISTS idx_prop_run ON prop_predictions(run_id);
+CREATE INDEX IF NOT EXISTS idx_prop_market_prop ON prop_market_lines(prop_id);
 """
 
 VIEWS_SQL = """
@@ -187,6 +226,22 @@ JOIN market_lines close_line
    AND close_line.market_data_status = 'VERIFIED'
 WHERE open_line.line_stage = 'prediction_time'
   AND open_line.market_data_status = 'VERIFIED';
+
+-- Real prop error -- same pure-function-of-prediction+result pattern as v_prediction_errors,
+-- computed fresh every query so a later real result correction never leaves a stale cached
+-- error behind.
+CREATE VIEW IF NOT EXISTS v_prop_errors AS
+SELECT
+    pp.prop_id,
+    pp.run_id,
+    pp.player_name,
+    pp.stat_type,
+    pp.projected_value,
+    pres.actual_value,
+    pp.projected_value - pres.actual_value AS prop_error,
+    ABS(pp.projected_value - pres.actual_value) AS absolute_prop_error
+FROM prop_predictions pp
+JOIN prop_results pres ON pres.prop_id = pp.prop_id;
 """
 
 

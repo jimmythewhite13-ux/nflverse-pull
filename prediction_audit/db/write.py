@@ -137,6 +137,48 @@ def insert_result(
     conn.commit()
 
 
+def insert_prop_prediction(
+    conn: sqlite3.Connection, run_id: int, player_name: str, team: str, stat_type: str,
+    projected_value: float,
+) -> int:
+    """Returns the new prop_id. Always inserts a new row -- same real immutable-audit-record
+    discipline as insert_prediction_run(); a corrected/re-run prop projection belongs to a new
+    prediction_runs run_id, never an UPDATE to an existing prop_predictions row."""
+    cur = conn.execute(
+        "INSERT INTO prop_predictions (run_id, player_name, team, stat_type, projected_value) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (run_id, player_name, team, stat_type, projected_value),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def insert_prop_market_line(
+    conn: sqlite3.Connection, prop_id: int, sportsbook: str, line_stage: str,
+    line_value: float | None = None, over_odds: float | None = None,
+    under_odds: float | None = None, line_timestamp: str | None = None,
+    source: str | None = None, market_data_status: str = "MISSING",
+) -> None:
+    if market_data_status not in ("VERIFIED", "UNVERIFIED", "MISSING"):
+        raise ValueError(f"Unknown market_data_status {market_data_status!r}")
+    conn.execute(
+        "INSERT INTO prop_market_lines (prop_id, sportsbook, line_value, over_odds, "
+        "under_odds, line_stage, line_timestamp, source, market_data_status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (prop_id, sportsbook, line_value, over_odds, under_odds, line_stage, line_timestamp,
+         source, market_data_status),
+    )
+    conn.commit()
+
+
+def insert_prop_result(conn: sqlite3.Connection, prop_id: int, actual_value: float) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO prop_results (prop_id, actual_value) VALUES (?, ?)",
+        (prop_id, actual_value),
+    )
+    conn.commit()
+
+
 def insert_data_quality(
     conn: sqlite3.Connection, run_id: int, missing_data_flag: bool = False,
     data_quality_score: float | None = None, data_quality_status: str | None = None,

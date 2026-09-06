@@ -43,6 +43,7 @@ def test_create_database_is_idempotent(conn):
     expected = {
         "models", "games", "prediction_runs", "predictions", "component_contributions",
         "state_snapshots", "market_lines", "results", "data_quality",
+        "prop_predictions", "prop_market_lines", "prop_results",
     }
     assert expected.issubset(tables)
 
@@ -176,6 +177,79 @@ def test_v_clv_only_returns_verified_rows(conn):
     # Both rows UNVERIFIED -- the view must produce nothing rather than a CLV number built on
     # unverified data.
     assert conn.execute("SELECT * FROM v_clv WHERE run_id=?", (run_id,)).fetchone() is None
+
+
+def test_full_prop_prediction_round_trip(conn):
+    # Step 14 -- mirrors test_full_prediction_run_round_trip's own real immutable-record
+    # pattern, one level down (per-prop instead of per-game).
+    _seed_model_and_game(conn)
+    run_id = write.insert_prediction_run(conn, "v35.0", "2026_01_MIA_BUF", "2026-09-04T14:15:00Z")
+    prop_id = write.insert_prop_prediction(
+        conn, run_id, player_name="Josh Allen", team="Buffalo Bills",
+        stat_type="passing_yards", projected_value=255.5,
+    )
+    write.insert_prop_market_line(
+        conn, prop_id, "DraftKings", "prediction_time", line_value=248.5,
+        over_odds=-110, under_odds=-110, market_data_status="UNVERIFIED",
+    )
+    row = conn.execute(
+        "SELECT player_name, team, stat_type, projected_value FROM prop_predictions "
+        "WHERE prop_id=?", (prop_id,),
+    ).fetchone()
+    assert row == ("Josh Allen", "Buffalo Bills", "passing_yards", 255.5)
+
+    line = conn.execute(
+        "SELECT sportsbook, line_value, market_data_status FROM prop_market_lines "
+        "WHERE prop_id=?", (prop_id,),
+    ).fetchone()
+    assert line == ("DraftKings", 248.5, "UNVERIFIED")
+
+
+def test_prop_market_line_rejects_unknown_status(conn):
+    _seed_model_and_game(conn)
+    run_id = write.insert_prediction_run(conn, "v35.0", "2026_01_MIA_BUF", "2026-09-01T00:00:00Z")
+    prop_id = write.insert_prop_prediction(
+        conn, run_id, "Josh Allen", "Buffalo Bills", "passing_yards", 255.5,
+    )
+    with pytest.raises(ValueError, match="Unknown market_data_status"):
+        write.insert_prop_market_line(
+            conn, prop_id, "DraftKings", "prediction_time", market_data_status="MADE_UP",
+        )
+
+
+def test_v_prop_errors_computed_fresh_from_real_result(conn):
+    _seed_model_and_game(conn)
+    run_id = write.insert_prediction_run(conn, "v35.0", "2026_01_MIA_BUF", "2026-09-01T00:00:00Z")
+    prop_id = write.insert_prop_prediction(
+        conn, run_id, "Josh Allen", "Buffalo Bills", "passing_yards", 255.5,
+    )
+    # No real result yet -- the view must return no row, not a fabricated error.
+    assert conn.execute(
+        "SELECT * FROM v_prop_errors WHERE prop_id=?", (prop_id,),
+    ).fetchone() is None
+
+    write.insert_prop_result(conn, prop_id, actual_value=270.0)
+    row = conn.execute(
+        "SELECT prop_error, absolute_prop_error FROM v_prop_errors WHERE prop_id=?",
+        (prop_id,),
+    ).fetchone()
+    assert row == (255.5 - 270.0, abs(255.5 - 270.0))
+
+
+def test_prop_rerun_creates_new_prop_not_an_update(conn):
+    _seed_model_and_game(conn)
+    run_id = write.insert_prediction_run(conn, "v35.0", "2026_01_MIA_BUF", "2026-09-01T00:00:00Z")
+    prop_1 = write.insert_prop_prediction(
+        conn, run_id, "Josh Allen", "Buffalo Bills", "passing_yards", 255.5,
+    )
+    prop_2 = write.insert_prop_prediction(
+        conn, run_id, "Josh Allen", "Buffalo Bills", "passing_yards", 260.0,
+    )
+    assert prop_1 != prop_2
+    count = conn.execute(
+        "SELECT COUNT(*) FROM prop_predictions WHERE run_id=?", (run_id,),
+    ).fetchone()[0]
+    assert count == 2
 
 
 def test_validate_snapshot_catches_missing_category():

@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-03 (Step 6 DONE incl. real Travel Effect/Direction; Step 7 scaled to real weeks 10-13, 2025 -- MAE≈9.96pts, ≈66.1% winner-pick, ≈81.4% closing-line agreement, n=59; Odds API Part A real coverage check done)
+**Last updated**: 2026-09-06 (All 15 master-spec steps done. Real weeks 10-18, 2025 backtested and persisted (n=137); ablation, correlation, environmental and probability calibration, and model selection all complete; Step 15 synthesis report published)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -26,7 +26,7 @@ planned.
 | 12 | Probability/confidence calibration | **Done** — real reliability check against the 137 already-persisted predictions (weeks 10-18, 2025). Systematically overconfident in the 50-70% range; real Brier score 0.2371 (close to the 0.25 "always guess 50%" baseline) — see below |
 | 13 | Model selection (A/B/C) | **Done** — real, fair comparison of representative vs. real Model Assumptions constants across the same weeks 10-18, 2025 games (n=137). Real constants recommended as the production candidate (marginally better MAE and closing-line agreement, and the authentic v35 values on principle) — see below |
 | 14 | Prop tracking schema | **Done** — `prop_predictions`/`prop_market_lines`/`prop_results` tables + insert helpers + `v_prop_errors` view added to the Step 2 DB, mirroring the existing predictions/market_lines/results split exactly. Schema only, per explicit scope — no new prop-generation pipeline |
-| 15 | Final validated spec document | Not started |
+| 15 | Final validated spec document | **Done** — published synthesis report covering Steps 1-14's real findings, aimed at the production-system decision: https://claude.ai/code/artifact/32e4336b-6ebb-4f9c-a8de-e084d50fb5bc |
 
 ## Step 5 — real solution found and implemented
 

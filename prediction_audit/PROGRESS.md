@@ -968,3 +968,32 @@ Three real options, all concrete (the 2 travel gaps are now resolved — see Ste
    `'closing'` line captured.
 3. **Resume the Odds API integration** — once a real key is available, verify Part A's 3
    coverage questions for real before writing any pull code.
+
+## Real, one-time exception to "never edit the frozen v35 baseline": RB Value Index range fix
+
+A Phase 0 integrity audit (external kickoff prompt, not part of the 15-step master spec above)
+found a genuine, active bug in the live workbook's own formulas -- traced 3 levels deep from a
+real symptom (Player Prop Projections showing a blank Matchup Differential/Projected Yards for
+Jacory Croskey-Merritt, Washington Commanders RB, every single week of the season, both home
+and away) to its real root cause: Season Matchups' `BA`/`BD` columns (Home/Away Starter RB
+Index Score) do a real `INDEX/MATCH` against `'RB Value Index'!$K$335:$K$398` /
+`$M$335:$M$398` -- a range hardcoded 2 rows short of the real data, which runs through row 400.
+Washington Commanders sorts alphabetically last among the 32 real teams, so their real Starter/
+Backup RB entries (rows 399-400) were silently excluded from every real lookup, in 544 real
+cells (272 games x 2 columns) file-wide.
+
+Per the user's explicit confirmation this is "a clear entry error," fixed directly in the
+frozen file (the one deliberate exception to this whole project's "v35 is immutable" rule --
+not a design change, a correction of a real typo in a cell range). Real backup preserved at
+`prediction_audit/frozen_baselines/backups/NFL_Prediction_Model_v35.pre_rb_range_fix.xlsx`
+before the edit. Verified via a real LibreOffice headless recalculation: Croskey-Merritt's real
+Matchup Differential/Projected Yards now compute (3.83 / 68.03 for Week 1, previously blank),
+zero `#VALUE!` errors remain file-wide, and the full 10,721-test project suite still passes
+unchanged.
+
+Also confirmed via the same Phase 0 audit (real, verified, not new news): Team-Specific HFA
+(the "failed 3 times" component named in that same audit) IS correctly wired into the real
+Season Matchups formula on the file currently in this repo -- 272/272 real rows populated, 32
+distinct real per-team values, zero formula mismatches. No file named "v37" exists anywhere in
+this project; that audit's own premise was reconciled with the user directly rather than
+assumed.

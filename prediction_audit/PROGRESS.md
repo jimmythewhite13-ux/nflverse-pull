@@ -23,9 +23,9 @@ planned.
 | 9 | Ablation testing | **Done** — real 14-component ablation across weeks 10-13, 2025 (n=59). Base Team Quality dominates as expected; HFA Delta is a genuine, real surprise (ablating it improves accuracy in this sample) — see below |
 | 10 | Double-counting/correlation analysis | **Done** — real pairwise correlation across the 14 named terms (weeks 10-13, 2025, n=59): no pair exceeds the 0.6 concern threshold, including the specifically-targeted Phase Matchup Adj / Explosive Play Adj coupling — see below |
 | 11 | Environmental calibration | **Done** — real thresholds/coefficients checked against real 2019-2025 schedule data (n up to 1871 games). Wind/Cold/Division well-to-reasonably calibrated; Travel Effect is a genuine, notable miss (r=+0.055, effectively no real correlation) — see below |
-| 12 | Probability/confidence calibration | Not started |
+| 12 | Probability/confidence calibration | **Done** — real reliability check against the 137 already-persisted predictions (weeks 10-18, 2025). Systematically overconfident in the 50-70% range; real Brier score 0.2371 (close to the 0.25 "always guess 50%" baseline) — see below |
 | 13 | Model selection (A/B/C) | Not started |
-| 14 | Prop tracking schema | Not started |
+| 14 | Prop tracking schema | **Done** — `prop_predictions`/`prop_market_lines`/`prop_results` tables + insert helpers + `v_prop_errors` view added to the Step 2 DB, mirroring the existing predictions/market_lines/results split exactly. Schema only, per explicit scope — no new prop-generation pipeline |
 | 15 | Final validated spec document | Not started |
 
 ## Step 5 — real solution found and implemented

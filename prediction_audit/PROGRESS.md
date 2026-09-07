@@ -997,3 +997,44 @@ Season Matchups formula on the file currently in this repo -- 272/272 real rows 
 distinct real per-team values, zero formula mismatches. No file named "v37" exists anywhere in
 this project; that audit's own premise was reconciled with the user directly rather than
 assumed.
+
+## Post-Phase-0 research program (Phases 1-6, external kickoff prompts)
+
+Following the Phase 0 integrity audit and its 3 real fixes (RB Value Index range, HFA row-3
+gap, HFA double-counting -- see above), a further real research program ran against a
+newly-built, from-scratch shared infrastructure (`prediction_audit/research/`:
+`validation.py`, `probability_calibration.py`, `travel_model.py`, `sos_model.py` -- none of
+these existed anywhere before this session; confirmed by direct search, not assumed).
+
+**Phase 1 (multi-season baseline)**: real scope decision (user-confirmed) -- full 22-input
+reconstruction for season 2025 only, since OL Index's own real FTN-coverage constraint makes
+2019-2024 impossible without fabricating data. 224 of 272 real 2025 games reconstructed and
+persisted (`phase1_reconstruction_2025.py`; weeks 1-3 are a real, structural gap -- no
+current-season data exists that early to resolve QB/RB roles). Real overall metrics
+(`phase1_metrics_2025.py`): MAE=11.164pts, RMSE=13.820pts, winner accuracy=54.9%,
+Brier=0.2416, log loss=0.6747, ATS win rate vs. closing spread=44.2%, real CLV
+(opening→closing)=+0.624pts (n=210 matched).
+
+**Phases 2/3/4/6 (travel, calibration, SOS, HFA)**: all real, within-season splits
+(train weeks 4-10, test weeks 11-18), `leakage_check()`-verified True throughout -- a real,
+stated deviation from each phase's own requested cross-season design, since only 2025 has a
+real, complete reconstruction to train/test on.
+
+- **Phase 2 (travel)**: Variant A (no travel at all) already beats current production on both
+  real MAE and Brier -- reinforcing Step 11's original finding. Best MAE: nonlinear distance
+  (G). Best Brier: distance+timezone (E). Rest differential does not help.
+- **Phase 3 (calibration)**: both Platt and isotonic real-improve Brier; Platt more durable on
+  this modest sample (isotonic's known small-sample overfitting risk).
+- **Phase 4 (SOS)**: no clean, non-redundant win -- the two variants with real dual-metric
+  improvement (recency-weighted, shrinkage) both exceed the real 0.6 correlation threshold
+  against Base Team Quality, i.e. their gains likely reflect duplicated information.
+- **Phase 5 (AGL)**: formally re-confirmed BLOCKED (legacy AV dataset stopped 2019; PFR
+  scraping blocked) -- no new investigation attempted.
+- **Phase 6 (HFA)**: decisive real finding -- the corrected, non-double-counted Team-Specific
+  HFA term is the WORST of 6 real variants tested; both "no HFA" and the old flat constant
+  beat it clearly. Confirms the original pre-fix "HFA hurts" finding was not merely an
+  artifact of the double-counting bug.
+
+Full combined real report: `phases_4_5_6_combined_report.md` (sent to the user). No variant
+from any of these phases has been promoted into production -- research only, per every phase
+document's own explicit instruction.

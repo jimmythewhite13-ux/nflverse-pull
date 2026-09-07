@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-06 (All 15 master-spec steps done. Real weeks 10-18, 2025 backtested and persisted (n=137); ablation, correlation, environmental and probability calibration, and model selection all complete; Step 15 synthesis report published)
+**Last updated**: 2026-09-07 (Phases 1-10 of the post-audit research program complete. Phase 9 graduation table and Phase 10 model selection done; Phase 11 untouched-holdout blocker identified and flagged, not yet resolved)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -1038,3 +1038,67 @@ real, complete reconstruction to train/test on.
 Full combined real report: `phases_4_5_6_combined_report.md` (sent to the user). No variant
 from any of these phases has been promoted into production -- research only, per every phase
 document's own explicit instruction.
+
+## Phase 7 (correlation/double-counting recheck)
+
+No new backtest (per that phase document's own instruction) -- real correlation analysis
+against the full 224-game Phase 1 dataset (`phase7_run.py`), plus real team-season EPA/Success
+Rate/NY-A (`compute_team_season_efficiency()`) for the SOS-specific checks. Key real results:
+Travel vs. Rest r=-0.102, Travel vs. TZ r=+0.027 (both clean); HFA (corrected) vs. Base Team
+Quality r=-0.038 (clean -- confirms the double-counting fix removed the artifact, not just the
+inflated number); Phase Matchup vs. Explosive Play r=+0.366/+0.396 on the real 224-game set
+(down from the original audit's +0.49, still under the 0.6 concern threshold). SOS variant D
+exceeds 0.6 against all 4 real metrics; F/G exceed against EPA/NY-A; H exceeds against 3 of 4;
+A/B are negative (not redundant, but they're also the two worst-performing variants from
+Phase 4). AGL vs. AV-based metrics: N/A, still BLOCKED.
+
+## Phase 8 (champion/challenger matrix)
+
+Real component-zero-check via direct SQL against `component_contributions` confirmed only
+`injury_adj`/`qb_replacement` are permanently zero across all 224 real games this season --
+`weather_adj_value` (26/224 nonzero), `road_fatigue_home` (3/224), etc. are rare but real, not
+dead code. 8 real candidates evaluated on the same real out-of-sample test weeks 11-18 (n=123)
+used throughout Phases 2-6 (`phase8_run.py`). Real finding: Model 5 (Travel-G + HFA-A combined)
+is the best real MAE/Win%/RMSE of everything tested (MAE=10.546, Win%=61.0%); Model 4 (HFA-A
+alone) is the best real Brier/log-loss (0.2363/0.6641) -- stacking Platt calibration on top of
+either (Models 6/7) makes Brier *worse* (+0.0014), a real methodological finding that a
+calibrator fit on the champion's own win-probability distribution doesn't transfer cleanly to a
+different margin model. Model 8 (Simplified) is numerically identical to the champion by
+construction.
+
+## Phase 9 (feature graduation table)
+
+Synthesis document, not new code: `phase9_graduation_table.md` (sent to the user, not yet
+committed to this repo). Every new-research candidate from Phases 2-8 assigned a real status
+(TESTED / REJECTED / REJECTED-redundant / BLOCKED) against Phase 9's own 7 criteria, using every
+real number computed in Phases 1-8 -- no new claims made. Structural finding stated once and
+applied to every row: criterion 2 (season stability) is unverifiable for anything right now,
+since only one real season (2025) has been reconstructed -- so no new candidate can reach full
+VALIDATED status; the honest ceiling is TESTED. Net real result: Travel (nonlinear distance, G)
+and HFA (revised, no-HFA, A) are the only two new candidates with a real, positive,
+non-redundant, non-BLOCKED signal. Every SOS variant is REJECTED (either underperforms, or is
+redundant with Base Team Quality/EPA). AGL remains BLOCKED.
+
+## Phase 10 (model selection)
+
+`phase10_model_selection.md` (sent to the user, not yet committed). Real comparison of the 5
+required candidates on the same real test set (weeks 11-18, n=123): frozen champion
+(MAE=11.074, Brier=0.2410), HFA-A alone (MAE=10.670, Brier=0.2363 -- corrected from Phase 8's
+own framing, which had led with Travel as the "best individual" example even though HFA-A beats
+it on every metric), Travel-G+HFA-A combined (MAE=10.546, Brier=0.2369), Simplified (identical
+to champion), and "full v38" (collapses to the Travel+HFA combination, since Phase 9 found zero
+features fully VALIDATED to combine). **Selected: HFA-A alone** -- not the best on every metric
+(Travel+HFA combined has better real MAE/RMSE/Win%/ATS), but the best real Brier/log-loss of
+all 5, and the simplest single change, per the selection principle ("simplest model with
+durable improvement, not the most feature-complete option by default"). Explicitly still
+provisional: durability across seasons is unverified (see Phase 9's structural note).
+
+## Phase 11 blocker -- flagged, not yet resolved
+
+Phase 11 requires a historical period never touched by any feature/coefficient/calibration/
+model-selection decision in Phases 1-10. Real problem: every week of the only real reconstructed
+dataset (2025, weeks 4-18) has already been used for either training (4-10) or
+testing/selection (11-18) across Phases 2-10. No genuinely untouched real data currently exists.
+Flagged to the user rather than worked around -- the real options are (a) reserve a slice of a
+*future* real season as it accumulates, decided now, before any more model-selection work uses
+it, or (b) treat this as a hard blocker on Phase 11 until then. Not yet decided.

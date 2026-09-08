@@ -1,5 +1,15 @@
 # Phase 9 — Feature Graduation Table (Real Evidence Only)
 
+**2026-09-08 correction**: every HFA-A number below was originally computed on a real,
+confirmed bug in `phase6_run.py`/`phase8_run.py` — margin's real HFA effect is symmetric
+(home +net, away −net), so a true "replace with zero" requires removing *twice* the champion's
+own real per-game net, not once. The original code removed it once, leaving roughly half the
+real signal still embedded. Caught by Phase 13's own self-consistency check, confirmed
+empirically against real persisted data, fixed in both scripts, and every number below
+re-verified against the corrected runs (Phase 6 and Phase 8's real "No HFA"/"HFA-A" now agree
+exactly: MAE=10.626, Brier=0.2363, independently cross-checked against the corrected Phase 13
+production pipeline too). SOS/Travel/Calibration rows were unaffected (different code paths).
+
 ## A structural constraint that applies to every row below, stated once rather than repeated
 
 Criterion 2 ("improvement is reasonably stable across seasons") **cannot be verified for any
@@ -30,11 +40,11 @@ source, (6) reproducible, (7) leakage-checkable cutoff.
 | **SOS — F (iterative, main impl.)** | **REJECTED** | 5, 6, 7 | 1 (not a clean improvement — MAE +0.065), 4 (r=+0.621 vs. EPA, +0.631 vs. NY/A) | Phase 4/7 |
 | **SOS — G (recency-weighted)** | **REJECTED — redundant, not wrong** | 1 (real dual-metric improvement, MAE −0.023/Brier −0.0125), 3, 5, 6, 7 | 4 (r=+0.605 vs. Base Team Quality, +0.621 vs. EPA, +0.631 vs. NY/A — exceeds threshold on 3 of 4 real checks) | Phase 4/7 |
 | **SOS — H (shrinkage)** | **REJECTED — redundant, not wrong** | 1 (real dual-metric improvement, MAE −0.091/Brier −0.0042), 3, 5, 6, 7 | 4 (r=+0.624 vs. Base Team Quality, +0.674 vs. EPA, +0.614 vs. Success Rate, +0.671 vs. NY/A — exceeds threshold on all 4) | Phase 4/7 |
-| **HFA — revised (A, no HFA)** | **TESTED** | 1 (best of 6 real variants: MAE −0.599/−0.404 depending on comparison base, Brier −0.0076/−0.0047, Phase 6/8), 4 (r=−0.038 vs. Base Team Quality — confirmed NOT a double-counting artifact, Phase 7), 5, 6, 7 | 2 (unverifiable) | Phase 6/7/8 |
-| **HFA — flat constant (B, 1.5)** | **TESTED, second-best** | 1 (beats corrected C: MAE −0.459, Brier −0.0057), 5, 6, 7 | 2 (unverifiable) | Phase 6 |
+| **HFA — revised (A, no HFA)** | **TESTED, strongest real second-season evidence of any candidate** | 1 (best of 6 real variants: MAE −0.448, Brier −0.0047 vs. champion, corrected Phase 6/8 numbers), 2 (real, corrected 2024 secondary check: HFA-A alone is the single best candidate on EVERY metric — MAE=10.121/Brier=0.2071/Win%=76.7%, beating even the combined Travel+HFA candidate — first real, meaningful second-season evidence, though still a degraded-OL-Index run, so ceiling stays TESTED not VALIDATED), 4 (r=−0.038 vs. Base Team Quality — confirmed NOT a double-counting artifact, Phase 7), 5, 6, 7 | 2 (fully VALIDATED still blocked on a real, full-fidelity second season) | Phase 6/7/8, 2024 secondary check |
+| **HFA — flat constant (B, 1.5)** | **TESTED, competitive with A** | 1 (corrected: MAE=10.642/Brier=0.2360 vs. champion — narrowly better Brier than A, narrowly worse MAE), 5, 6, 7 | 2 (unverifiable) | Phase 6 |
 | **HFA — existing Team-Specific (C, corrected, current champion)** | **REJECTED as currently implemented** | 4, 5, 6, 7 | 1 (worst of all 6 real variants tested — beaten by both simpler alternatives) | Phase 6/8 |
-| **HFA — shrunk (D) / shrinkage+recency (F)** | **TESTED, partial** | 1 (real but smaller improvement than A/B), 5, 6, 7 | 2 (unverifiable) | Phase 6 |
-| **HFA — recency-weighted alone (E)** | **REJECTED** | 5, 6, 7 | 1 (essentially indistinguishable from C — real delta ≈ 0) | Phase 6 |
+| **HFA — shrunk (D) / shrinkage+recency (F)** | **TESTED, partial** | 1 (corrected: real but smaller improvement than A/B — MAE_delta≈−0.20, Brier_delta≈−0.0025), 5, 6, 7 | 2 (unverifiable) | Phase 6 |
+| **HFA — recency-weighted alone (E)** | **REJECTED** | 5, 6, 7 | 1 (corrected: essentially indistinguishable from C — real MAE_delta=−0.002, Brier_delta≈0.0000) | Phase 6 |
 | **AGL (all variants)** | **BLOCKED** | n/a | 5 (no sustainable free data source exists — the one real prerequisite this status exists to name) | Phase 5, reconfirmed Phase 7 |
 
 ## Existing baseline components (the original 14 named Z/AA terms, already in the frozen champion)

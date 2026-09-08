@@ -124,7 +124,9 @@ def main() -> None:
     )
     travel_model.fit(train, train["residual"])
     test["travel_G_away_adj"] = travel_model.predict(test)
-    test["hfa_A_home_net_delta"] = -(flat_hfa / 2 + test["hfa_delta_home"].fillna(0))
+    # Real fix (2026-09-08, same bug as phase6_run.py/phase8_run.py -- margin's real HFA
+    # effect is symmetric, so a true zero requires removing TWICE the champion's own real net).
+    test["hfa_A_home_net_delta"] = -2 * (flat_hfa / 2 + test["hfa_delta_home"].fillna(0))
 
     def real_home_wp(margin: pd.Series) -> pd.Series:
         return margin.apply(lambda m: win_probability_home(m, logistic_slope))

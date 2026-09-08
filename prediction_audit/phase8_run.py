@@ -134,7 +134,14 @@ def main() -> None:
     test["travel_G_away_adj"] = travel_model.predict(test)
 
     # ---- Real HFA "no HFA" candidate: home-side net HFA contribution set to 0 -------------
-    test["hfa_A_home_net_delta"] = -(flat_hfa / 2 + test["hfa_delta_home"].fillna(0))
+    # Real fix (2026-09-08, caught by Phase 13's own consistency check -- see PROGRESS.md):
+    # margin's real HFA effect is symmetric (home gets +net, away gets -net), so a true
+    # zero-HFA margin requires removing TWICE the champion's own real net, not once. The
+    # original `-(flat_hfa/2 + hfa_delta_home)` (single, not doubled) left roughly half the
+    # real per-game HFA signal still embedded in every "HFA-A" result below. Verified against
+    # phase6_run.py's independently real-fixed number: both now agree exactly
+    # (MAE=10.626, Brier=0.2363 on this same real test set).
+    test["hfa_A_home_net_delta"] = -2 * (flat_hfa / 2 + test["hfa_delta_home"].fillna(0))
 
     # ---- Real Platt calibration, fit on train, applied to test ----------------------------
     # Champion's own real win probability first (needed as the calibrator's real training

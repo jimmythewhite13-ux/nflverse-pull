@@ -2,7 +2,7 @@
 
 **Frozen baseline**: `NFL_Prediction_Model_v35.xlsx`
 **SHA-256**: `fdd0b971df91cae905e8884258d99d4a562ebdbf8c2122259b02a54955ec3c17`
-**Last updated**: 2026-09-07 (Phases 1-10 of the post-audit research program complete. Phase 9 graduation table and Phase 10 model selection done; Phase 11 untouched-holdout blocker identified and flagged, not yet resolved)
+**Last updated**: 2026-09-08 (Phases 0-13 all have real work done; Phase 11's real evaluation is pending real 2026 data; Phase 13 self-verified against 2025 after finding and fixing a real HFA-margin bug spanning Phase 6/8/9/10 -- see "Real bug found and fixed" section below)
 
 This tracks progress against the master validation/audit spec's own 15-step plan. Steps are
 listed in the spec's own order; status reflects what's actually built and verified, not
@@ -1102,3 +1102,61 @@ testing/selection (11-18) across Phases 2-10. No genuinely untouched real data c
 Flagged to the user rather than worked around -- the real options are (a) reserve a slice of a
 *future* real season as it accumulates, decided now, before any more model-selection work uses
 it, or (b) treat this as a hard blocker on Phase 11 until then. Not yet decided.
+
+User asked whether 2024 could be used for Phase 8's matrix. Real answer: no, not with the exact
+production formula (OL Index's FTN-coverage constraint applies to 2024 the same as 2019-2023) --
+but a real, narrowly-scoped, documented workaround was approved and built
+(`research/ol_index_degraded_pre2025.py`): traced every real consumer of OL Index's output,
+confirmed only `z_scores["pass_protection"]` is ever read downstream, so the FTN-dependent
+Sack-Free Rate metric can be given an inert placeholder with zero effect on any real production
+number. Real 2024 reconstruction persisted (220 games, weeks 4-18,
+`data_version="phase8_2024_secondary_check_degraded_olindex"`). Two real bugs hit and fixed
+along the way: an FTN fetch crashing on 2021 (predates its own real 2022+ coverage), and a real
+`ZeroDivisionError` from the placeholder's degenerate zero-variance league std.
+
+Phase 12 (final spec) and Phase 13 (production pipeline) built: the Phase 10-selected model is
+v35 exactly as Phase 0 validated it, with net home-field advantage forced to 0.0 (both sides,
+every game) as the only deviation -- see `phase_reports/phase12_final_specification.md`.
+Phase 11's holdout formally reserved: the entire 2026 REG season, committed to git BEFORE any
+2026 game was played (verified live: 0/272 real 2026 games had a score as of 2026-09-07, two
+days before Week 1's real kickoff) -- see `phase_reports/phase11_holdout_reservation.md`.
+
+## Real bug found and fixed (2026-09-08) -- a genuine "reported complete before it actually was"
+
+Phase 13's own required self-consistency check (run the new production pipeline against 2025,
+confirm it reproduces Phase 8's already-computed HFA-A numbers exactly) caught TWO real, chained
+bugs, not one -- exactly the failure pattern this whole audit program exists to catch.
+
+**Bug 1 (production_pipeline_v35_hfa_a.py's first version)**: `compute_model_home_away_score()`
+sums `flat_hfa / 2` as a real, SEPARATE additive term from `hfa_delta_home`/`hfa_delta_away` --
+confirmed by direct read of `engine/season_matchups.py`, not assumed. The pipeline's HFA
+override zeroed only the two delta keys, leaving a residual +/-0.75 flat home-field advantage in
+every game. The Phase 12 spec document had independently made the same false claim
+("`flat_hfa`... is not a separate additive term") -- both fixed.
+
+**Bug 2 (phase6_run.py and phase8_run.py, both research scripts, found while chasing down why
+Bug 1's fix still didn't produce an EXACT match)**: margin's real HFA effect is symmetric --
+home gets `+ (flat_hfa/2 + hfa_delta_home)`, away gets the exact negative -- so margin's real net
+HFA effect is TWICE that quantity, not once. Both scripts' "no HFA"/"HFA-A" comparison margin
+only removed the champion's real HFA contribution once, understating the real improvement.
+Confirmed empirically against real persisted 2025 data (not by algebra alone): `hfa_delta_home +
+hfa_delta_away` sums to exactly 0.0 in all 224 real games (they're defined as exact negatives),
+which meant `phase6_run.py`'s own attempted "subtract the champion's real HFA back out" step was
+a complete no-op -- confirmed by finding that script's own in-code "CHAMPION" reproduction
+differed from the real champion margin by up to 2.99 points per game.
+
+**Real, corrected numbers** (all cross-verified three independent ways -- `phase6_run.py`,
+`phase8_run.py`, and the corrected `production_pipeline_v35_hfa_a.py` now agree exactly:
+MAE=10.626, Brier=0.2363 on the real 2025 weeks-11-18 test set):
+- HFA-A alone vs. champion: MAE_delta=-0.448 (was reported as -0.404), Brier_delta=-0.0047 (same).
+- Travel-G + HFA-A combined vs. champion: MAE_delta=-0.483 (was -0.528), Brier_delta=-0.0024 (was -0.0041).
+- The corrected 2024 secondary check now shows HFA-A alone as the clear best candidate on EVERY
+  metric in that season too (MAE=10.121, Brier=0.2071, Win%=76.7%), beating even the combined
+  candidate -- a cleaner, more consistent real second-season result than originally reported.
+
+**What this changed**: Phase 10's selection (HFA-A alone) did NOT change -- the corrected
+numbers make that selection's case stronger, not weaker (HFA-A now wins or ties on 3 of 6
+primary metrics outright, versus 2 of 6 under the buggy numbers). Phase 9's graduation table,
+Phase 10's selection doc, and the Phase 8 2024 secondary-check report were all updated with the
+real, corrected numbers and an explicit correction note rather than silently rewritten. Full test
+suite (10752 tests) re-verified green after every fix.

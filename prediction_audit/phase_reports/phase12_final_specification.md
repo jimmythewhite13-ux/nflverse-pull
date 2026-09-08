@@ -1,8 +1,10 @@
 # Phase 12 — Final Mathematical Specification
 
 **Model**: v35 baseline (tag `v35-audit-passed-hfa-fix`), exactly as validated in the Phase 0
-integrity audit, with **exactly one deviation**: the HFA Delta term (Z/AA column) is fixed at
-**0.0** for every game, both sides — the Phase 10-selected candidate ("HFA-A, revised, no HFA").
+integrity audit, with **exactly one deviation**: net home-field advantage (Z/AA column, real
+`flat_hfa` + `hfa_delta_home`/`away` terms combined — see §2 for a real correction to this
+section) is fixed at **0.0** for every game, both sides — the Phase 10-selected candidate
+("HFA-A, revised, no HFA").
 Every other one of the 22 real named terms — Travel, OL Index, all Z-score composite tabs,
 Rest/Weather/Division/Injury/QB Replacement — is **unchanged from frozen production**. This is
 deliberately the smallest possible spec deviation from a document this project has already
@@ -26,15 +28,46 @@ one term is exactly subtracting its own value (Step 9's own real finding, still 
 
 ## 2. The one deviation, precisely
 
-**HFA Delta (home) = 0.0, HFA Delta (away) = 0.0, unconditionally, every game.**
+**Net home-field advantage = 0.0, unconditionally, every game, both sides.**
 
-Production v35 (post Phase 0's double-counting fix) computes this as
-`hfa_delta_home = regressed_team_hfa / 2` (using each home team's own real, decay-weighted,
+**Correction (caught by this project's own real Phase 13 consistency check, 2026-09-08 — the
+first version of this section was wrong, and is left visible in git history rather than quietly
+rewritten):** `compute_model_home_away_score()` (`engine/season_matchups.py`) sums **two, real,
+separately-additive** HFA terms, not one — `flat_hfa / 2` (home) / `- flat_hfa / 2` (away), AND
+`hfa_delta_home` / `hfa_delta_away`. The first draft of this document claimed `flat_hfa` "is
+likewise never applied — it fed the now-removed team-specific regression, not a separate
+additive term." That claim was false — confirmed false by direct read of the real source, not
+by inference. `flat_hfa` (C3 = 1.5) is genuinely summed on its own, independent of
+`hfa_delta_home`/`away`. Zeroing only the delta terms leaves a residual **+/-0.75** flat
+home-field advantage in every game — a real bug that shipped in the first Phase 13 pipeline run
+and was caught only because that run's real weeks-11-18 metrics (MAE=10.642, Brier=0.2360)
+didn't exactly match Phase 8's already-computed HFA-A numbers (MAE=10.670, Brier=0.2363).
+
+**Correct specification**: all three real keys `resolve_historical_model_components()` returns
+must be forced to 0.0 — `flat_hfa`, `hfa_delta_home`, `hfa_delta_away`. `hfa_delta_home` is
+computed in production (`engine/core_formula_simple_terms.py::hfa_delta_home()`) as
+`(regressed_team_hfa - flat_hfa) / 2` (using each home team's own real, decay-weighted,
 regressed historical HFA, via `TeamSpecificHFAConstants`: decay_factor=0.5 [C20],
-regression_weight=0.4 [C21], last_year_emphasis=0.3 [C22]) and `hfa_delta_away = -hfa_delta_home`.
-Under this spec, both are replaced by a literal constant zero. The flat baseline constant
-(`flat_hfa`, C3 = 1.5) is likewise never applied — it fed the now-removed team-specific
-regression, not a separate additive term.
+regression_weight=0.4 [C21], last_year_emphasis=0.3 [C22]) — **not** `regressed_team_hfa / 2` as
+an even earlier draft of this section said; corrected against the real source, not memory.
+`hfa_delta_away = -hfa_delta_home`. Under this spec, all three keys are replaced by a literal
+constant zero, confirmed sufficient (verified: `flat_hfa/2 + hfa_delta_home` algebraically
+simplifies to exactly `regressed_team_hfa / 2`, so home_score's real HFA contribution reduces to
+that single quantity, and zeroing all three inputs is equivalent to zeroing it directly).
+
+**A second, related real bug — found downstream of this spec, not in it** (Phase 6/8's own
+research scripts, 2026-09-08): margin's real HFA effect is *symmetric* — home gets
+`+ (flat_hfa/2 + hfa_delta_home)`, away gets the exact negative — so margin's real net HFA
+effect equals `2 * (flat_hfa/2 + hfa_delta_home)`, not that quantity once. Two research scripts
+(`phase6_run.py`, `phase8_run.py`) removed it only once when constructing their "no HFA"
+comparison margin, understating the real improvement. This spec's own production pipeline
+(`production_pipeline_v35_hfa_a.py`) was never affected by *this* particular bug, because it
+recomputes `home_score`/`away_score` from scratch with all three real keys forced to zero,
+rather than algebraically adjusting an already-computed margin — but it independently shipped
+the *first* bug above (only zeroing the two delta keys, not `flat_hfa`) in its very first run,
+which is what this section already documents. Both are now fixed everywhere; see
+`PROGRESS.md` and `phase9_graduation_table.md`/`phase10_model_selection.md`'s own 2026-09-08
+correction notes for the real, corrected numbers this produced.
 
 **Real justification** (Phase 6/7/8/9/10, already delivered): the corrected, non-double-counted
 team-specific HFA was the worst of 6 real variants tested on real out-of-sample 2025 data; "no

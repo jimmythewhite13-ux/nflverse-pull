@@ -116,20 +116,32 @@ def main() -> None:
     sched_3yr = fetch_schedules([SEASON - 3, SEASON - 2, SEASON - 1])
     print("fetched.")
 
-    # Real "baseline_home_margin": champion's own home margin with its own already-applied
-    # real hfa_delta_home/away subtracted back out.
-    test["baseline_home_margin"] = (
-        test["home_projected_points"] - test["away_projected_points"]
-        - test["hfa_delta_home"].fillna(0) - test["hfa_delta_away"].fillna(0)
+    # Real, CORRECTED "baseline_home_margin" (2026-09-08 fix -- see PROGRESS.md's real bug
+    # report): the original version subtracted `hfa_delta_home + hfa_delta_away`, which is
+    # ALWAYS exactly 0.0 by construction (hfa_delta_away := -hfa_delta_home, confirmed against
+    # real persisted data) -- a real no-op that left the champion's own real per-game HFA
+    # fully embedded in every "variant" below, including the in-script CHAMPION reproduction
+    # itself (confirmed empirically off by up to 2.99pts/game from the real champion margin).
+    #
+    # Real, correct derivation: margin's real total HFA contribution is symmetric --
+    # home_score gets `+home_hfa_net`, away_score gets `-home_hfa_net` (confirmed:
+    # away_contribution = -flat_hfa/2 - hfa_delta_home = -(flat_hfa/2 + hfa_delta_home) =
+    # -home_hfa_net exactly), so margin's real HFA effect is `2 * home_hfa_net`, not
+    # `home_hfa_net`. A true "swap the champion's real HFA for variant X's own value" must
+    # subtract twice the champion's own real home_hfa_net and add twice the variant's.
+    original_home_margin = test["home_projected_points"] - test["away_projected_points"]
+    champion_home_hfa_net = flat_hfa / 2 + test["hfa_delta_home"].fillna(0)
+    test["baseline_home_margin_true_zero_hfa"] = (
+        original_home_margin - 2 * champion_home_hfa_net
     )
     actual_home_margin = test["home_final_score"] - test["away_final_score"]
 
     def evaluate_variant(name: str, home_hfa_net: pd.Series) -> None:
         """`home_hfa_net`: the real, TOTAL home-side HFA contribution for this variant
-        (flat_hfa/2 + hfa_delta_home, i.e. what a real, single-counted formula would add) --
-        subtracts the champion's own flat_hfa/2 baseline component since
-        `baseline_home_margin` already includes it."""
-        home_margin = test["baseline_home_margin"] + (home_hfa_net - flat_hfa / 2)
+        (flat_hfa/2 + hfa_delta_home, i.e. what a real, single-counted formula would add).
+        Margin-level effect is symmetric (2x this value, home minus away) -- see the real fix
+        note above `baseline_home_margin_true_zero_hfa`."""
+        home_margin = test["baseline_home_margin_true_zero_hfa"] + 2 * home_hfa_net
         home_win_probability = home_margin.apply(
             lambda m: win_probability_home(m, logistic_slope),
         )

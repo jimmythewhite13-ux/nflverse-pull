@@ -62,20 +62,30 @@ FTN_MIN_SEASON_FOR_FULL_OL_INDEX = 2025  # real, unchanged constraint -- see Pha
 
 
 def _apply_hfa_a_override(components: dict[str, float]) -> dict[str, float]:
-    """The ONE production-code change Phase 12 specifies (Section 2): HFA Delta fixed at 0.0,
-    both sides, every game. Every other one of the 22 real terms
-    `resolve_historical_model_components()` returns is passed through completely unmodified --
-    this function does not touch, inspect, or recompute anything else.
-    `hfa_delta_home`/`hfa_delta_away` are the real, confirmed dict keys `compute_model_home_
-    away_score()` sums (same keys already verified persisted under these exact names in every
-    Phase 1/7/8 `component_contributions` row this session)."""
+    """The ONE production-code change Phase 12 specifies (Section 2): net home-field advantage
+    fixed at 0.0, both sides, every game.
+
+    Real correction (caught by this script's own 2025 consistency check, not assumed correct):
+    `compute_model_home_away_score()` (season_matchups.py) sums `flat_hfa / 2` as a SEPARATE
+    additive term from `hfa_delta_home`/`hfa_delta_away` (`+ flat_hfa/2` home, `- flat_hfa/2`
+    away) -- confirmed by direct read of the real source, not the Phase 12 doc's own prior
+    (WRONG) claim that flat_hfa "is not a separate additive term." Zeroing only
+    hfa_delta_home/away leaves a residual +/-0.75 (flat_hfa/2, C3=1.5) home-field advantage in
+    every game -- a real bug, now fixed here and in the Phase 12 spec doc. All three real keys
+    must be zeroed to reach true "no HFA": `flat_hfa`, `hfa_delta_home`, `hfa_delta_away`.
+    Every other one of the 22 real terms `resolve_historical_model_components()` returns is
+    passed through completely unmodified -- this function does not touch, inspect, or recompute
+    anything else."""
     components = dict(components)
-    if "hfa_delta_home" not in components or "hfa_delta_away" not in components:
+    required = ("flat_hfa", "hfa_delta_home", "hfa_delta_away")
+    missing = [k for k in required if k not in components]
+    if missing:
         raise KeyError(
-            "resolve_historical_model_components() did not return hfa_delta_home/"
-            "hfa_delta_away -- the production formula's real shape has changed since this "
-            "spec was written (Phase 12). Flagging rather than silently skipping the override."
+            f"resolve_historical_model_components() did not return {missing} -- the "
+            f"production formula's real shape has changed since this spec was written "
+            f"(Phase 12). Flagging rather than silently skipping the override."
         )
+    components["flat_hfa"] = 0.0
     components["hfa_delta_home"] = 0.0
     components["hfa_delta_away"] = 0.0
     return components

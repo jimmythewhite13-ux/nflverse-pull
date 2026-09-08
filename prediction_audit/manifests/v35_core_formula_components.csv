@@ -1,0 +1,18 @@
+Component_ID,Component_Name,Description,Worksheet,Cell,Term,Data_Source,Applies_To
+Z01,Base Team Quality (Home),(Home Off PPG + Away Def PPG)/2 -- current-season-blended team scoring rate,Season Matchups,Z (I/L),(I+L)/2,YoY Baseline Engine / Team Ratings PPG,Home Score
+Z02,Flat HFA (pre-fix),Model Assumptions C3 flat home-field-advantage constant,Season Matchups,Z ('Model Assumptions'!$C$3),C3/2,Model Assumptions C3 (manual tunable),Home Score
+Z03,Rest Effect,Tiered lookup (Short Week/Normal/Bye) on real Home/Away Rest days,Season Matchups,Z (O),O/2,season_schedule.py real schedule dates,Home Score
+Z04,Weather Adj,"Wind/Cold/Precip or Snow (mutually exclusive)/Humidity additive thresholds",Season Matchups,Z (U),U/2,Real weather pulled per game,Home Score
+Z05,Home Injury Adj,Additional real injury-driven point adjustment (Home),Season Matchups,Z (V),V,Real injury reports,Home Score
+Z06,Division Adj,Real divisional-game flag adjustment,Season Matchups,Z (Y),Y/2,Real schedule divisional flag,Home Score
+Z07,QB Status/Replacement Adj (Home),Real Replacement Value swap if a real backup QB is starting,Season Matchups,Z (AS),AS,QB Index Section 6 Replacement Value,Home Score
+Z08,Phase Matchup Adj (Home),Home QB Index Score - Away Pass Defense Matchup Score (+ Run equivalent via BG composite),Season Matchups,Z (BG),BG,QB Index / RB Value Index / Pass Defense Matchup / Run Defense Matchup,Home Score
+Z09,OL Pressure Adj (Home),Real OL pass-block vs. opposing pass-rush matchup adjustment,Season Matchups,Z (BO),BO,Offensive Line Index / Pass Rush Generation Index,Home Score
+Z10,Explosive Play Adj (Home),Real explosive-play-rate matchup adjustment,Season Matchups,Z (CO),CO,Explosive Play Matchup tab,Home Score
+Z11,HFA Delta (Home),(Team-Specific real regressed HFA - flat C3)/2 -- nets Z02 to the real team-specific value,Season Matchups,Z (CR),CR,Team-Specific HFA tab (3-Yr decay-weighted real margin data),Home Score
+Z12,Road Fatigue Adj (Home),Applies if Home team has >= threshold real consecutive road games,Season Matchups,Z (CV),CV,Availability Index Section 2b (real trailing-3-game road count),Home Score
+AA01,Base Team Quality (Away),(Away Off PPG + Home Def PPG)/2,Season Matchups,AA (K/J),(K+J)/2,YoY Baseline Engine / Team Ratings PPG,Away Score
+AA02,Flat HFA subtracted (pre-fix),Away side of Z02,Season Matchups,AA ('Model Assumptions'!$C$3),-C3/2,Model Assumptions C3,Away Score
+AA03,Travel Effect,Real away-team travel-miles adjustment,Season Matchups,AA (Q),Q,season_schedule.py real travel-miles calc,Away Score
+AA04,HFA Delta (Away),Mirror of Z11 -- negated,Season Matchups,AA (CS),CS,Team-Specific HFA tab,Away Score
+AA05,Travel Direction Adj (Away),Real eastward-travel penalty using real Stadium UTC Offset data,Season Matchups,AA (DA),DA,Team-Specific HFA Section 4 UTC offset table,Away Score

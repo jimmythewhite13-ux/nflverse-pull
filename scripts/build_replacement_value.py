@@ -35,7 +35,7 @@ TEAM_ORDER = [
 
 QB_INDEX_SHEET = "QB Index"
 TEAM_RATINGS_SHEET = "Team Ratings"
-MATCHUPS_SHEET = "Week 1 Matchups"
+MATCHUPS_SHEET = "Season Matchups"
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
 TITLE_FILL = PatternFill("solid", fgColor="FFD9E1F2")
@@ -51,14 +51,28 @@ NOTE_FONT = Font(name="Arial", size=9, color="FF808080")
 def append_term_once(formula: str, term: str) -> str:
     """
     Pure function. Appends `term` (e.g. "+AS3") to the end of `formula` exactly once,
-    stripping any number of pre-existing trailing copies first. Makes re-running this
-    script against a workbook it already touched idempotent instead of re-appending and
-    silently multiplying the term on every run -- this bit the ongoing automated pipeline
-    for real (see commit history): three manual test runs left Z3 reading
-    "...+AS3+AS3+AS3" before this existed.
+    stripping any number of pre-existing copies first. Makes re-running this script (or any
+    other script that appends its OWN different term the same way -- see
+    build_defensive_matchup_wiring.py, which imports this function rather than
+    reimplementing it) against a workbook it already touched idempotent instead of
+    re-appending and silently multiplying the term on every run -- this bit the ongoing
+    automated pipeline for real (see commit history): three manual test runs left Z3
+    reading "...+AS3+AS3+AS3" before this existed.
+
+    UPDATED: originally only stripped a TRAILING run of `term` (anchored with `$`), which
+    was correct as long as `term` was always the LAST thing ever appended to the formula.
+    That assumption broke for real once a second script started appending its OWN different
+    term after this one (build_defensive_matchup_wiring.py's "+BG{r}"/"+BH{r}", appended
+    after Replacement Value's own "+AS{r}"/"+AT{r}") -- re-running BOTH scripts left Z
+    reading "...+AS3+BG3+AS3+BG3+AS3+BG3" (each script's trailing-anchored strip found
+    nothing to remove, since its own term was no longer at the very end). Now strips every
+    occurrence of `term` ANYWHERE in the formula (with a negative lookahead so "+AS3" can't
+    accidentally eat the leading digits of a different row's "+AS30"), not just a trailing
+    run, before re-appending it once at the end -- correct regardless of what other terms
+    were appended after it, and regardless of run order between multiple appending scripts.
     """
     escaped = re.escape(term)
-    stripped = re.sub(rf"({escaped})+$", "", formula)
+    stripped = re.sub(rf"{escaped}(?!\d)", "", formula)
     return f"{stripped}{term}"
 
 
@@ -198,9 +212,14 @@ def build(workbook_path: str) -> None:
     for row in range(3, 3 + len(TEAM_ORDER)):
         status = tr.cell(row=row, column=15, value="Starter In")
         status.font = INPUT_FONT
+        # IFERROR wraps the NEGATION too, not just INDEX/MATCH -- INDEX can succeed and
+        # still return "" (a team whose Starter/Backup never reached the qualifying
+        # threshold, per Section 6's own IF(...,"",...) formula), and unary-minus on a
+        # blank string throws #VALUE! that a narrower IFERROR(INDEX(...),0) would not
+        # catch, since that error only occurs OUTSIDE its envelope.
         adj = tr.cell(row=row, column=16, value=(
             f'=IF(O{row}="Backup In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(A{row},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(A{row},{rv_team_range},0)),0),0)'
         ))
         adj.font = LINK_FONT
         adj.number_format = "0.00;(0.00)"
@@ -249,13 +268,14 @@ def build(workbook_path: str) -> None:
         home_status.font = INPUT_FONT
         away_status.font = INPUT_FONT
 
+        # Same IFERROR-wraps-the-negation fix as the Team Ratings adjustment above.
         home_adj = wm.cell(row=r, column=45, value=(
             f'=IF(AQ{r}="Backup In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(D{r},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(D{r},{rv_team_range},0)),0),0)'
         ))
         away_adj = wm.cell(row=r, column=46, value=(
             f'=IF(AR{r}="Backup In",'
-            f'-IFERROR(INDEX({rv_game_range},MATCH(C{r},{rv_team_range},0)),0),0)'
+            f'IFERROR(-INDEX({rv_game_range},MATCH(C{r},{rv_team_range},0)),0),0)'
         ))
         home_adj.font = LINK_FONT
         away_adj.font = LINK_FONT

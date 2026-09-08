@@ -1,0 +1,295 @@
+{
+  "constants": {
+    "rv_conversion": 0.15
+  },
+  "teams": [
+    {
+      "team": "Buffalo Bills",
+      "starter_name": "Josh Allen",
+      "starter_score": 1.74011520711091,
+      "backup_name": "Kyle Allen",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 2.59070762857072,
+      "excel_rv_game_points": 0.388606144285608
+    },
+    {
+      "team": "Miami Dolphins",
+      "starter_name": "Malik Willis",
+      "starter_score": -0.850592421459814,
+      "backup_name": "Kyle McCord",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 0,
+      "excel_rv_game_points": 0
+    },
+    {
+      "team": "New England Patriots",
+      "starter_name": "Drake Maye",
+      "starter_score": 2.39657244363884,
+      "backup_name": "Tommy DeVito",
+      "backup_score": -0.939483940721272,
+      "excel_rv_index_points": 3.33605638436011,
+      "excel_rv_game_points": 0.500408457654016
+    },
+    {
+      "team": "New York Jets",
+      "starter_name": "Geno Smith",
+      "starter_score": -0.296813353694382,
+      "backup_name": "Cade Klubnik",
+      "backup_score": -0.592695473473425,
+      "excel_rv_index_points": 0.295882119779043,
+      "excel_rv_game_points": 0.0443823179668564
+    },
+    {
+      "team": "Baltimore Ravens",
+      "starter_name": "Lamar Jackson",
+      "starter_score": 1.49433633528093,
+      "backup_name": "Tyler Huntley",
+      "backup_score": -0.764896718695655,
+      "excel_rv_index_points": 2.25923305397658,
+      "excel_rv_game_points": 0.338884958096488
+    },
+    {
+      "team": "Cincinnati Bengals",
+      "starter_name": "Joe Burrow",
+      "starter_score": 1.33475889204966,
+      "backup_name": "Joe Flacco",
+      "backup_score": -0.420056731386899,
+      "excel_rv_index_points": 1.75481562343655,
+      "excel_rv_game_points": 0.263222343515483
+    },
+    {
+      "team": "Cleveland Browns",
+      "starter_name": "Deshaun Watson",
+      "starter_score": -0.993523704181959,
+      "backup_name": "Shedeur Sanders",
+      "backup_score": -1.71224500049679,
+      "excel_rv_index_points": 0.718721296314833,
+      "excel_rv_game_points": 0.107808194447225
+    },
+    {
+      "team": "Pittsburgh Steelers",
+      "starter_name": "Aaron Rodgers",
+      "starter_score": 0.242787410635059,
+      "backup_name": "Mason Rudolph",
+      "backup_score": -0.657830200368002,
+      "excel_rv_index_points": 0.90061761100306,
+      "excel_rv_game_points": 0.135092641650459
+    },
+    {
+      "team": "Houston Texans",
+      "starter_name": "C.J. Stroud",
+      "starter_score": 0.734882269023246,
+      "backup_name": "Davis Mills",
+      "backup_score": -0.950268410860508,
+      "excel_rv_index_points": 1.68515067988375,
+      "excel_rv_game_points": 0.252772601982563
+    },
+    {
+      "team": "Indianapolis Colts",
+      "starter_name": "Daniel Jones",
+      "starter_score": 0.813123556603085,
+      "backup_name": "Riley Leonard",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 1.6637159780629,
+      "excel_rv_game_points": 0.249557396709435
+    },
+    {
+      "team": "Jacksonville Jaguars",
+      "starter_name": "Trevor Lawrence",
+      "starter_score": 0.396484149408687,
+      "backup_name": "Quinn Ewers",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 1.2470765708685,
+      "excel_rv_game_points": 0.187061485630275
+    },
+    {
+      "team": "Tennessee Titans",
+      "starter_name": "Cam Ward",
+      "starter_score": -1.17822466215683,
+      "backup_name": "Mitchell Trubisky",
+      "backup_score": -0.896774109215788,
+      "excel_rv_index_points": -0.281450552941042,
+      "excel_rv_game_points": -0.0422175829411562
+    },
+    {
+      "team": "Denver Broncos",
+      "starter_name": "Bo Nix",
+      "starter_score": 0.526847625780479,
+      "backup_name": "Jarrett Stidham",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 1.37744004724029,
+      "excel_rv_game_points": 0.206616007086044
+    },
+    {
+      "team": "Kansas City Chiefs",
+      "starter_name": "Patrick Mahomes",
+      "starter_score": 1.13698281124969,
+      "backup_name": "Justin Fields",
+      "backup_score": -0.271827166078423,
+      "excel_rv_index_points": 1.40880997732811,
+      "excel_rv_game_points": 0.211321496599217
+    },
+    {
+      "team": "Las Vegas Raiders",
+      "starter_name": "Kirk Cousins",
+      "starter_score": 0.0839953906358796,
+      "backup_name": "Fernando Mendoza",
+      "backup_score": 0.0746701784129067,
+      "excel_rv_index_points": 0.00932521222297289,
+      "excel_rv_game_points": 0.00139878183344593
+    },
+    {
+      "team": "Los Angeles Chargers",
+      "starter_name": "Justin Herbert",
+      "starter_score": 0.732707884816165,
+      "backup_name": "Trey Lance",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 1.58330030627598,
+      "excel_rv_game_points": 0.237495045941397
+    },
+    {
+      "team": "Dallas Cowboys",
+      "starter_name": "Dak Prescott",
+      "starter_score": 1.29195326392702,
+      "backup_name": "Sam Howell",
+      "backup_score": -0.862199890276286,
+      "excel_rv_index_points": 2.15415315420331,
+      "excel_rv_game_points": 0.323122973130496
+    },
+    {
+      "team": "New York Giants",
+      "starter_name": "Jaxson Dart",
+      "starter_score": -0.0139029980032617,
+      "backup_name": "Jameis Winston",
+      "backup_score": -0.785161971868299,
+      "excel_rv_index_points": 0.771258973865037,
+      "excel_rv_game_points": 0.115688846079756
+    },
+    {
+      "team": "Philadelphia Eagles",
+      "starter_name": "Jalen Hurts",
+      "starter_score": 1.32684792442554,
+      "backup_name": "Andy Dalton",
+      "backup_score": -0.860729093169161,
+      "excel_rv_index_points": 2.1875770175947,
+      "excel_rv_game_points": 0.328136552639206
+    },
+    {
+      "team": "Washington Commanders",
+      "starter_name": "Jayden Daniels",
+      "starter_score": 0.200907829762167,
+      "backup_name": "Marcus Mariota",
+      "backup_score": 0.232173484558799,
+      "excel_rv_index_points": -0.0312656547966325,
+      "excel_rv_game_points": -0.00468984821949487
+    },
+    {
+      "team": "Chicago Bears",
+      "starter_name": "Caleb Williams",
+      "starter_score": 0.274128608828407,
+      "backup_name": "Tyson Bagent",
+      "backup_score": -0.886894755970079,
+      "excel_rv_index_points": 1.16102336479849,
+      "excel_rv_game_points": 0.174153504719773
+    },
+    {
+      "team": "Detroit Lions",
+      "starter_name": "Jared Goff",
+      "starter_score": 1.86079732510424,
+      "backup_name": "Joshua Dobbs",
+      "backup_score": -0.803491986300678,
+      "excel_rv_index_points": 2.66428931140492,
+      "excel_rv_game_points": 0.399643396710738
+    },
+    {
+      "team": "Green Bay Packers",
+      "starter_name": "Jordan Love",
+      "starter_score": 2.1485480292409,
+      "backup_name": "Tyrod Taylor",
+      "backup_score": -0.618371603352897,
+      "excel_rv_index_points": 2.7669196325938,
+      "excel_rv_game_points": 0.41503794488907
+    },
+    {
+      "team": "Minnesota Vikings",
+      "starter_name": "Kyler Murray",
+      "starter_score": 0.283097770409565,
+      "backup_name": "J.J. McCarthy",
+      "backup_score": -1.41358903861515,
+      "excel_rv_index_points": 1.69668680902472,
+      "excel_rv_game_points": 0.254503021353708
+    },
+    {
+      "team": "Atlanta Falcons",
+      "starter_name": "Tua Tagovailoa",
+      "starter_score": 0.772212505793672,
+      "backup_name": "Michael Penix Jr.",
+      "backup_score": 0.175007058054363,
+      "excel_rv_index_points": 0.597205447739309,
+      "excel_rv_game_points": 0.0895808171608964
+    },
+    {
+      "team": "Carolina Panthers",
+      "starter_name": "Bryce Young",
+      "starter_score": -0.101394244026566,
+      "backup_name": "Kenny Pickett",
+      "backup_score": -0.843213520988462,
+      "excel_rv_index_points": 0.741819276961896,
+      "excel_rv_game_points": 0.111272891544284
+    },
+    {
+      "team": "New Orleans Saints",
+      "starter_name": "Tyler Shough",
+      "starter_score": -0.0332808323329557,
+      "backup_name": "Spencer Rattler",
+      "backup_score": -0.769477026636549,
+      "excel_rv_index_points": 0.736196194303593,
+      "excel_rv_game_points": 0.110429429145539
+    },
+    {
+      "team": "Tampa Bay Buccaneers",
+      "starter_name": "Baker Mayfield",
+      "starter_score": 0.628211326478162,
+      "backup_name": "Jalon Daniels",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 1.47880374793798,
+      "excel_rv_game_points": 0.221820562190696
+    },
+    {
+      "team": "Arizona Cardinals",
+      "starter_name": "Jacoby Brissett",
+      "starter_score": -0.139200098729309,
+      "backup_name": "Gardner Minshew II",
+      "backup_score": -0.755592650541307,
+      "excel_rv_index_points": 0.616392551811997,
+      "excel_rv_game_points": 0.0924588827717996
+    },
+    {
+      "team": "Los Angeles Rams",
+      "starter_name": "Matthew Stafford",
+      "starter_score": 1.7167871618602,
+      "backup_name": "Stetson Bennett IV",
+      "backup_score": -0.850592421459814,
+      "excel_rv_index_points": 2.56737958332002,
+      "excel_rv_game_points": 0.385106937498002
+    },
+    {
+      "team": "San Francisco 49ers",
+      "starter_name": "Brock Purdy",
+      "starter_score": 2.24897986293959,
+      "backup_name": "Mac Jones",
+      "backup_score": 0.84867037637782,
+      "excel_rv_index_points": 1.40030948656177,
+      "excel_rv_game_points": 0.210046422984265
+    },
+    {
+      "team": "Seattle Seahawks",
+      "starter_name": "Sam Darnold",
+      "starter_score": 1.46339844410206,
+      "backup_name": "Drew Lock",
+      "backup_score": -0.963514151228808,
+      "excel_rv_index_points": 2.42691259533087,
+      "excel_rv_game_points": 0.36403688929963
+    }
+  ]
+}

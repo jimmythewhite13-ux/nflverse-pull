@@ -4,6 +4,8 @@ import pytest
 from nflverse_pull.qb_stats import (
     MIN_QUALIFYING_DROPBACKS,
     SEASON_STATS_COLUMNS,
+    compute_player_season_qb_extended_stats,
+    compute_player_season_qb_ngs_context,
     compute_qb_roles,
     compute_team_season_qb_stats,
 )
@@ -171,3 +173,129 @@ def test_qb_roles_resolves_traded_qb_to_season_of_record_team():
     assert list(jets["Player Name"]) == ["E.Traded", "F.Bench"]
     assert list(jets["Role"]) == ["Starter", "Backup"]
     assert "Miami Dolphins" not in set(roles["Team"])  # not double-counted on his old team
+
+
+def _ngs_row(player_id, season, team_abbr, week, time_to_throw, aggressiveness):
+    return {
+        "player_gsis_id": player_id, "season": season, "team_abbr": team_abbr,
+        "week": week, "avg_time_to_throw": time_to_throw, "aggressiveness": aggressiveness,
+    }
+
+
+def test_qb_ngs_context_uses_real_season_aggregate_rows_only():
+    # week=0 is the real season aggregate; weekly rows must be ignored, not averaged
+    # manually -- NGS already computes the season total itself.
+    rows = [
+        _ngs_row("P1", 2025, "BUF", 0, 2.65, 12.4),
+        _ngs_row("P1", 2025, "BUF", 1, 2.40, 10.0),
+        _ngs_row("P1", 2025, "BUF", 2, 2.90, 15.0),
+    ]
+    out = compute_player_season_qb_ngs_context(pd.DataFrame(rows)).set_index("Player ID")
+    assert len(out) == 1
+    assert out.loc["P1", "Avg Time to Throw"] == pytest.approx(2.65)
+    # NGS's raw "aggressiveness" of 12.4 means 12.4% -- normalized to a 0-1 fraction (0.124)
+    # to match every other rate/percentage in this project (Excel's "0.00%" format expects
+    # a fraction, not a raw percentage number).
+    assert out.loc["P1", "Aggressiveness"] == pytest.approx(0.124)
+    assert out.loc["P1", "Team"] == "Buffalo Bills"
+
+
+def test_qb_ngs_context_remaps_ngs_lar_to_la():
+    rows = [_ngs_row("P1", 2025, "LAR", 0, 2.7, 14.0)]
+    out = compute_player_season_qb_ngs_context(pd.DataFrame(rows))
+    assert out.iloc[0]["Team"] == "Los Angeles Rams"
+
+
+def test_qb_ngs_context_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_ngs_row("P1", 2025, "ZZZ", 0, 2.7, 14.0)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_qb_ngs_context(df)
+
+
+def test_qb_ngs_context_skips_rows_with_no_real_player_id():
+    rows = [_ngs_row(None, 2025, "BUF", 0, 2.7, 14.0), _ngs_row("P1", 2025, "BUF", 0, 2.6, 13.0)]
+    out = compute_player_season_qb_ngs_context(pd.DataFrame(rows))
+    assert len(out) == 1
+    assert out.iloc[0]["Player ID"] == "P1"
+
+
+def _pass_row(passer_id, passer, season, posteam, success, yards_gained,
+              sack=0, pass_attempt=1, td=0, interception=0):
+    return {
+        "season_type": "REG", "season": season, "posteam": posteam,
+        "passer_id": passer_id, "passer": passer,
+        "qb_dropback": 1, "play_type": "pass",
+        "pass_attempt": pass_attempt, "sack": sack, "qb_scramble": 0,
+        "success": success, "yards_gained": yards_gained,
+        "pass_touchdown": td, "interception": interception,
+    }
+
+
+def _scramble_row(passer_id, passer, season, posteam):
+    return {
+        "season_type": "REG", "season": season, "posteam": posteam,
+        "passer_id": passer_id, "passer": passer,
+        "qb_dropback": 1, "play_type": "run",
+        "pass_attempt": 0, "sack": 0, "qb_scramble": 1,
+        "success": 1, "yards_gained": 8,
+        "pass_touchdown": 0, "interception": 0,
+    }
+
+
+def _fake_extended_pbp():
+    """
+    QB1 "T.Star" (BUF, 2025), 100 real dropbacks:
+      - 70 plain completions: yards=5, success=1
+      - 10 explosive TD completions: yards=20 (>= EXPLOSIVE_PASS_YARDS=15), success=1, td=1
+      - 10 incompletions: yards=0, success=0 -- 2 of these also have interception=1
+      - 5 sacks: play_type="pass" (real quirk), yards=-6, success=0, pass_attempt=0
+      - 5 scrambles: play_type="run" -- excluded from Success Rate/Explosive Pass Rate's
+        play_type=="pass" population, but still real dropbacks for Sack Rate's denominator
+
+    pass_plays (play_type=="pass") = 70+10+10+5 = 95
+    Success Rate = (70*1 + 10*1 + 10*0 + 5*0) / 95 = 80/95
+    Explosive Pass Rate = 10/95 (only the 10 explosive-TD completions clear 15 yards)
+    Sack Rate = 5 sacks / 100 total dropbacks = 0.05
+    TD = 10, INT = 2, TD/INT Ratio = 5.0
+
+    QB2 "B.Zero" (BUF, 2025): 100 plain completions, TD=0 and INT=0 -- TD/INT Ratio must be
+    blank (None), not a fabricated infinity or a silent 0.
+    """
+    qb1 = (
+        [_pass_row("00-1111111", "T.Star", 2025, "BUF", 1, 5) for _ in range(70)]
+        + [_pass_row("00-1111111", "T.Star", 2025, "BUF", 1, 20, td=1) for _ in range(10)]
+        + [_pass_row("00-1111111", "T.Star", 2025, "BUF", 0, 0) for _ in range(8)]
+        + [_pass_row("00-1111111", "T.Star", 2025, "BUF", 0, 0, interception=1) for _ in range(2)]
+        + [_pass_row("00-1111111", "T.Star", 2025, "BUF", 0, -6, sack=1, pass_attempt=0)
+           for _ in range(5)]
+        + [_scramble_row("00-1111111", "T.Star", 2025, "BUF") for _ in range(5)]
+    )
+    qb2 = [_pass_row("00-2222222", "B.Zero", 2025, "BUF", 1, 5) for _ in range(100)]
+    return pd.DataFrame(qb1 + qb2)
+
+
+def test_qb_extended_stats_computes_expected_metrics():
+    out = compute_player_season_qb_extended_stats(_fake_extended_pbp()).set_index("Player ID")
+
+    qb1 = out.loc["00-1111111"]
+    assert qb1["Team"] == "Buffalo Bills"
+    assert qb1["Success Rate"] == pytest.approx(80 / 95)
+    assert qb1["Explosive Pass Rate"] == pytest.approx(10 / 95)
+    assert qb1["Sack Rate"] == pytest.approx(0.05)
+    assert qb1["TD"] == 10
+    assert qb1["INT"] == 2
+    assert qb1["TD/INT Ratio"] == pytest.approx(5.0)
+
+
+def test_qb_extended_stats_blanks_td_int_ratio_when_int_is_zero():
+    out = compute_player_season_qb_extended_stats(_fake_extended_pbp()).set_index("Player ID")
+    qb2 = out.loc["00-2222222"]
+    assert qb2["TD"] == 0
+    assert qb2["INT"] == 0
+    assert pd.isna(qb2["TD/INT Ratio"])
+
+
+def test_qb_extended_stats_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_pass_row("00-9999999", "Z.Zed", 2025, "ZZZ", 1, 5)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_player_season_qb_extended_stats(df)

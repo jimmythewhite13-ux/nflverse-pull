@@ -177,6 +177,259 @@ def compute_team_season_efficiency(pbp: pd.DataFrame) -> pd.DataFrame:
     return out[SEASON_OUTPUT_COLUMNS]
 
 
+# claude_code_spec_defensive_matchup_engine.md Part A. Named, tunable thresholds -- judgment
+# calls like every other one in this project (QB's 100-dropback minimum, RB's 50-carry
+# minimum), not magic numbers buried in a formula.
+EXPLOSIVE_PASS_YARDS = 15
+EXPLOSIVE_RUN_YARDS = 10
+
+MATCHUP_SEASON_OUTPUT_COLUMNS = [
+    "Team", "Season",
+    "EPA/Dropback Allowed (Def)", "Pass Success Rate Allowed (Def)",
+    "Completion % Allowed (Def)",
+    "Explosive Pass Rate (Off)", "Explosive Pass Rate Allowed (Def)",
+    "EPA/Rush Allowed (Def)", "Run Success Rate Allowed (Def)",
+    "Yards/Carry Allowed (Def)",
+    "Explosive Run Rate (Off)", "Explosive Run Rate Allowed (Def)",
+    "Stuff Rate (Off)", "Stuff Rate Allowed (Def)",
+]
+
+
+def compute_team_season_matchup_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Team-season Completion % Allowed, Explosive Pass/Run Rate
+    (both sides of the ball), and Stuff Rate (both sides) -- feeds the Pass/Run Defense
+    Matchup tabs (claude_code_spec_defensive_matchup_engine.md Part A). Same fetch-once/
+    pure-transform pattern as compute_team_season_efficiency() above; extends efficiency.py
+    rather than a parallel pipeline, per the spec's own instruction.
+
+    Completion % Allowed uses real pass attempts EXCLUDING sacks (pass_attempt==1 AND
+    sack==0 -- nflverse's pass_attempt flag is TRUE on a sack too, the same quirk documented
+    in receiving_stats.py; a sack was never a real thrown-and-caught/incomplete opportunity).
+    Explosive Pass/Run Rate and Stuff Rate use the same "meaningful snap" play_type filter
+    (pass/run) compute_team_season_efficiency() already uses -- an incomplete pass still
+    counts as a real attempt in the denominator (0 yards, not explosive), same convention as
+    every rate stat in this project. Deliberately DIFFERENT from Completion %'s sack
+    exclusion: play_type=="pass" INCLUDES sacks (verified live, same quirk documented
+    throughout this project), which is correct here -- a sack is a real negative dropback
+    outcome that should dilute Explosive Pass Rate the same way a 0-yard incompletion does
+    (matches EPA/Success Rate's own snap-count convention above), whereas "was this pass
+    COMPLETED" is a question a sack was never a candidate to answer at all.
+
+    ALSO adds the real PHASE-SPLIT defense-allowed metrics Pass/Run Defense Matchup need
+    (EPA/Dropback Allowed, Pass/Run Success Rate Allowed, Yards/Carry Allowed) -- deliberately
+    NOT reusing compute_team_season_efficiency()'s epa_def/success_def, which are COMBINED
+    across pass AND run plays (play_type.isin(["pass","run"])). Using that combined number
+    for both the Pass and Run Defense Matchup tabs would put the identical non-split figure
+    in both tabs, defeating the entire point of splitting the matchup by phase -- confirmed
+    with the user before building this. NY/A Allowed (Def) is NOT duplicated here: efficiency
+    .py's existing `nya_def` is ALREADY pass-only (built from pass_attempt/sack plays, no rush
+    yardage), so Pass Defense Matchup's build script references that column directly rather
+    than recomputing it.
+
+    Columns: Team | Season | EPA/Dropback Allowed (Def) | Pass Success Rate Allowed (Def) |
+    Completion % Allowed (Def) | Explosive Pass Rate (Off) |
+    Explosive Pass Rate Allowed (Def) | EPA/Rush Allowed (Def) |
+    Run Success Rate Allowed (Def) | Yards/Carry Allowed (Def) | Explosive Run Rate (Off) |
+    Explosive Run Rate Allowed (Def) | Stuff Rate (Off) | Stuff Rate Allowed (Def)
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    axis_names = ["team_abbr", "season"]
+
+    attempts = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0)]
+    comp_pct_def = (
+        attempts.groupby(["defteam", "season"])["complete_pass"].mean()
+        .rename_axis(axis_names).rename("Completion % Allowed (Def)")
+    )
+
+    pass_plays = reg[reg["play_type"] == "pass"].copy()
+    pass_plays["explosive"] = pass_plays["yards_gained"] >= EXPLOSIVE_PASS_YARDS
+    exp_pass_off = (
+        pass_plays.groupby(["posteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Pass Rate (Off)")
+    )
+    exp_pass_def = (
+        pass_plays.groupby(["defteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Pass Rate Allowed (Def)")
+    )
+    epa_dropback_def = (
+        pass_plays.groupby(["defteam", "season"])["epa"].mean()
+        .rename_axis(axis_names).rename("EPA/Dropback Allowed (Def)")
+    )
+    pass_success_def = (
+        pass_plays.groupby(["defteam", "season"])["success"].mean()
+        .rename_axis(axis_names).rename("Pass Success Rate Allowed (Def)")
+    )
+
+    run_plays = reg[reg["play_type"] == "run"].copy()
+    run_plays["explosive"] = run_plays["yards_gained"] >= EXPLOSIVE_RUN_YARDS
+    run_plays["stuffed"] = run_plays["yards_gained"] <= 0
+    exp_run_off = (
+        run_plays.groupby(["posteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Run Rate (Off)")
+    )
+    exp_run_def = (
+        run_plays.groupby(["defteam", "season"])["explosive"].mean()
+        .rename_axis(axis_names).rename("Explosive Run Rate Allowed (Def)")
+    )
+    stuff_off = (
+        run_plays.groupby(["posteam", "season"])["stuffed"].mean()
+        .rename_axis(axis_names).rename("Stuff Rate (Off)")
+    )
+    stuff_def = (
+        run_plays.groupby(["defteam", "season"])["stuffed"].mean()
+        .rename_axis(axis_names).rename("Stuff Rate Allowed (Def)")
+    )
+    epa_rush_def = (
+        run_plays.groupby(["defteam", "season"])["epa"].mean()
+        .rename_axis(axis_names).rename("EPA/Rush Allowed (Def)")
+    )
+    run_success_def = (
+        run_plays.groupby(["defteam", "season"])["success"].mean()
+        .rename_axis(axis_names).rename("Run Success Rate Allowed (Def)")
+    )
+    ypc_def = (
+        run_plays.groupby(["defteam", "season"])["yards_gained"].mean()
+        .rename_axis(axis_names).rename("Yards/Carry Allowed (Def)")
+    )
+
+    out = (
+        epa_dropback_def.to_frame()
+        .join(pass_success_def, how="outer").join(comp_pct_def, how="outer")
+        .join(exp_pass_off, how="outer").join(exp_pass_def, how="outer")
+        .join(epa_rush_def, how="outer").join(run_success_def, how="outer")
+        .join(ypc_def, how="outer")
+        .join(exp_run_off, how="outer").join(exp_run_def, how="outer")
+        .join(stuff_off, how="outer").join(stuff_def, how="outer")
+        .reset_index()
+    )
+    out = out.rename(columns={"season": "Season"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[MATCHUP_SEASON_OUTPUT_COLUMNS]
+
+
+DEEP_PASS_AIR_YARDS = 20
+
+DEEP_YAC_OUTPUT_COLUMNS = [
+    "Team", "Season", "Deep Pass Completion Rate Allowed (Def)", "YAC Allowed (Def)",
+]
+
+
+def compute_team_season_deep_pass_yac_metrics(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real Deep Pass Completion Rate Allowed and YAC Allowed --
+    claude_code_spec_explosive_play_engine.md Part B. Both GENUINELY DISTINCT from
+    Explosive Pass Rate Allowed (already computed above): Deep Pass Completion Rate Allowed
+    measures "how often is a defense beaten deep" (completions / attempts on throws with
+    real air_yards >= DEEP_PASS_AIR_YARDS=20, regardless of total yards gained after the
+    catch) -- a short pass that turns into a 25-yard gain via YAC is "explosive" but was
+    never actually a deep throw, and a deep incompletion (pass defensed, e.g.) still counts
+    in this rate's denominator even though it produced zero explosive yardage. YAC Allowed
+    (real, from pbp's own `yards_after_catch` field, verified live: 1 null out of 11,217
+    real 2025 completions) is a genuine, free, DIFFERENT signal again -- how many yards a
+    defense gives up AFTER the catch specifically, a real proxy for "not making a play in
+    space" (missed tackles themselves require charting/tracking data this project doesn't
+    have access to -- NOT attempted here, see this module's own docstring / claude_code_
+    spec_explosive_play_engine.md's own "confirmed not buildable" note).
+
+    Deep Pass Completion Rate Allowed = real completions / real attempts among throws with
+    air_yards >= 20 (excludes sacks -- no air_yards concept applies to a sack). YAC Allowed
+    = mean real yards_after_catch across real completions, same per-play-average convention
+    every other rate stat in this project uses (not a total).
+
+    Columns: Team | Season | Deep Pass Completion Rate Allowed (Def) | YAC Allowed (Def)
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    axis_names = ["team_abbr", "season"]
+
+    deep_attempts = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0) &
+                         (reg["air_yards"] >= DEEP_PASS_AIR_YARDS)]
+    deep_comp_def = (
+        deep_attempts.groupby(["defteam", "season"])["complete_pass"].mean()
+        .rename_axis(axis_names).rename("Deep Pass Completion Rate Allowed (Def)")
+    )
+
+    completions = reg[reg["complete_pass"] == 1]
+    yac_def = (
+        completions.groupby(["defteam", "season"])["yards_after_catch"].mean()
+        .rename_axis(axis_names).rename("YAC Allowed (Def)")
+    )
+
+    out = deep_comp_def.to_frame().join(yac_def, how="outer").reset_index()
+    out = out.rename(columns={"season": "Season"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[DEEP_YAC_OUTPUT_COLUMNS]
+
+
+EXPLOSIVE_TIER_OUTPUT_COLUMNS = [
+    "Team", "Season", "Pass 20+ Rate (Off)", "Pass 30+ Rate (Off)", "Pass 40+ Rate (Off)",
+    "Run 15+ Rate (Off)", "Run 20+ Rate (Off)",
+]
+
+
+def compute_team_season_explosive_tiers(pbp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real, CONTEXT-ONLY reference tiers -- claude_code_spec_
+    explosive_play_engine.md's own "design trap to avoid" section. 15+/10+ yards
+    (EXPLOSIVE_PASS_YARDS/EXPLOSIVE_RUN_YARDS above) are already the SINGLE scored
+    Explosive Rate threshold per phase (used by compute_team_season_matchup_metrics's own
+    Explosive Pass/Run Rate columns) -- these additional 20+/30+/40+ (passing) and 15+/20+
+    (rushing) tiers exist ONLY so a reader can see how big a team's real big plays actually
+    run, without ever being fed into a Z-score or weighted composite anywhere. A 40-yard
+    completion IS also a 30+/20+/15+ yard completion -- nested, not independent, categories;
+    weighting all of them would double- (triple-, quadruple-) count the same real play.
+
+    Columns: Team | Season | Pass 20+ Rate (Off) | Pass 30+ Rate (Off) | Pass 40+ Rate (Off)
+    | Run 15+ Rate (Off) | Run 20+ Rate (Off)
+    """
+    reg = pbp[pbp["season_type"] == "REG"]
+    axis_names = ["team_abbr", "season"]
+
+    pass_plays = reg[reg["play_type"] == "pass"].copy()
+    run_plays = reg[reg["play_type"] == "run"].copy()
+
+    series = []
+    for threshold in (20, 30, 40):
+        pass_plays[f"p{threshold}"] = pass_plays["yards_gained"] >= threshold
+        s = (
+            pass_plays.groupby(["posteam", "season"])[f"p{threshold}"].mean()
+            .rename_axis(axis_names).rename(f"Pass {threshold}+ Rate (Off)")
+        )
+        series.append(s)
+    for threshold in (15, 20):
+        run_plays[f"r{threshold}"] = run_plays["yards_gained"] >= threshold
+        s = (
+            run_plays.groupby(["posteam", "season"])[f"r{threshold}"].mean()
+            .rename_axis(axis_names).rename(f"Run {threshold}+ Rate (Off)")
+        )
+        series.append(s)
+
+    out = series[0].to_frame()
+    for s in series[1:]:
+        out = out.join(s, how="outer")
+    out = out.reset_index().rename(columns={"season": "Season"})
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[EXPLOSIVE_TIER_OUTPUT_COLUMNS]
+
+
 def compute_league_stats(raw: pd.DataFrame) -> pd.DataFrame:
     """Pure function. Section 2 equivalent: league average and population std-dev per metric."""
     return pd.DataFrame(

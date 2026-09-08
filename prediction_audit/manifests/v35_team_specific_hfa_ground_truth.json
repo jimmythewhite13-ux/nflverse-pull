@@ -1,0 +1,265 @@
+{
+  "constants": {
+    "decay_factor": 0.5,
+    "regression_weight": 0.4,
+    "last_year_emphasis": 0.3
+  },
+  "teams": [
+    {
+      "team": "Buffalo Bills",
+      "y1": 2.02777777777778,
+      "y2": 13.9583333333333,
+      "y3": 9.18055555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.56182291666667
+    },
+    {
+      "team": "Miami Dolphins",
+      "y1": 4.66666666666667,
+      "y2": 5.41666666666667,
+      "y3": 17.8055555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.96237847222222
+    },
+    {
+      "team": "New England Patriots",
+      "y1": 0,
+      "y2": 0.527777777777778,
+      "y3": -2.40277777777778,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 2.45626736111111
+    },
+    {
+      "team": "New York Jets",
+      "y1": 3.65277777777778,
+      "y2": 12.2916666666667,
+      "y3": 6.86111111111111,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.79071180555556
+    },
+    {
+      "team": "Baltimore Ravens",
+      "y1": -10.8055555555556,
+      "y2": 5.69444444444445,
+      "y3": 4.61111111111111,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 0.124600694444443
+    },
+    {
+      "team": "Cincinnati Bengals",
+      "y1": 4.55555555555556,
+      "y2": -3.98611111111111,
+      "y3": 11.9305555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.94404513888889
+    },
+    {
+      "team": "Cleveland Browns",
+      "y1": 12.5,
+      "y2": 3.84722222222222,
+      "y3": 13.6944444444444,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 6.86571180555556
+    },
+    {
+      "team": "Pittsburgh Steelers",
+      "y1": 3,
+      "y2": 3.65277777777778,
+      "y3": 0.611111111111111,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.66682291666667
+    },
+    {
+      "team": "Houston Texans",
+      "y1": 3.84722222222222,
+      "y2": -3.06944444444445,
+      "y3": 5.97222222222222,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.58071180555556
+    },
+    {
+      "team": "Indianapolis Colts",
+      "y1": 8.125,
+      "y2": 4.375,
+      "y3": 2.84722222222222,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 5.24904513888889
+    },
+    {
+      "team": "Jacksonville Jaguars",
+      "y1": 5.88888888888889,
+      "y2": 13.4861111111111,
+      "y3": -0.513888888888889,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 5.21737847222222
+    },
+    {
+      "team": "Tennessee Titans",
+      "y1": 4.88888888888889,
+      "y2": 3.33333333333333,
+      "y3": 14.8333333333333,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.73904513888889
+    },
+    {
+      "team": "Denver Broncos",
+      "y1": 5.27777777777778,
+      "y2": 14.0138888888889,
+      "y3": 13.1388888888889,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 5.63460069444444
+    },
+    {
+      "team": "Kansas City Chiefs",
+      "y1": 10.3888888888889,
+      "y2": 3.125,
+      "y3": 3.83333333333333,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 5.82237847222222
+    },
+    {
+      "team": "Las Vegas Raiders",
+      "y1": 9,
+      "y2": -0.513888888888889,
+      "y3": 16.1666666666667,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 5.63571180555556
+    },
+    {
+      "team": "Los Angeles Chargers",
+      "y1": 5,
+      "y2": -7.20833333333333,
+      "y3": 3.19444444444445,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.46126736111111
+    },
+    {
+      "team": "Dallas Cowboys",
+      "y1": 3.5,
+      "y2": -13.5833333333333,
+      "y3": 19.0555555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.16571180555556
+    },
+    {
+      "team": "New York Giants",
+      "y1": 5.5,
+      "y2": -6.33333333333333,
+      "y3": 7.16666666666667,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.83015625
+    },
+    {
+      "team": "Philadelphia Eagles",
+      "y1": 5.09722222222222,
+      "y2": -0.638888888888889,
+      "y3": 2.27777777777778,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.97737847222222
+    },
+    {
+      "team": "Washington Commanders",
+      "y1": 2.52777777777778,
+      "y2": 7.84722222222222,
+      "y3": -13,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.32571180555556
+    },
+    {
+      "team": "Chicago Bears",
+      "y1": 12.2222222222222,
+      "y2": 11.75,
+      "y3": 11.5555555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 7.33460069444445
+    },
+    {
+      "team": "Detroit Lions",
+      "y1": 10.3888888888889,
+      "y2": 0.819444444444445,
+      "y3": 9.43055555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 5.86182291666667
+    },
+    {
+      "team": "Green Bay Packers",
+      "y1": 4.34722222222222,
+      "y2": 6,
+      "y3": -4.84722222222222,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.01348958333333
+    },
+    {
+      "team": "Minnesota Vikings",
+      "y1": 13.6527777777778,
+      "y2": 8.04166666666667,
+      "y3": -5.55555555555556,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 6.75404513888889
+    },
+    {
+      "team": "Atlanta Falcons",
+      "y1": -3.16666666666667,
+      "y2": 3.77777777777778,
+      "y3": 12.8611111111111,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 2.44015625
+    },
+    {
+      "team": "Carolina Panthers",
+      "y1": 3.88888888888889,
+      "y2": 9.25,
+      "y3": 6.77777777777778,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.61015625
+    },
+    {
+      "team": "New Orleans Saints",
+      "y1": 5.25,
+      "y2": 4.66666666666667,
+      "y3": 3.47222222222222,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 4.49237847222222
+    },
+    {
+      "team": "Tampa Bay Buccaneers",
+      "y1": 3.91666666666667,
+      "y2": -1.875,
+      "y3": -1.61111111111111,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.39237847222222
+    },
+    {
+      "team": "Arizona Cardinals",
+      "y1": 0.611111111111111,
+      "y2": 13.1944444444444,
+      "y3": 2.08333333333333,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 3.82015625
+    },
+    {
+      "team": "Los Angeles Rams",
+      "y1": 1.19444444444445,
+      "y2": -0.222222222222222,
+      "y3": 3.61111111111111,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 2.97126736111111
+    },
+    {
+      "team": "San Francisco 49ers",
+      "y1": -5.44444444444445,
+      "y2": 14.1388888888889,
+      "y3": -6.09722222222222,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 1.87293402777778
+    },
+    {
+      "team": "Seattle Seahawks",
+      "y1": -1.625,
+      "y2": -8.19444444444445,
+      "y3": 1.38888888888889,
+      "league_baseline_y1": 4.18359375,
+      "excel_regressed_hfa": 1.45515625
+    }
+  ]
+}

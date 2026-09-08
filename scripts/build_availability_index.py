@@ -4,6 +4,18 @@ Builds Part E of claude_code_spec_qb_index.md: a new "Availability Index" workbo
 index dimensions that are actually sourceable; ACWR, GPS/load, and wellness surveys are
 not, and are deliberately absent here), applied to this season's Starters + Backups.
 
+UPDATED (claude_code_spec_game_environment_upgrades.md Part C): Section 2b now also carries
+a real "Consecutive Road Games (Trailing 3)" column -- checked first per the spec's own
+explicit instruction ("this overlaps with the Availability Index's Schedule Density concept
+... check whether that already tracks this before building a duplicate mechanism") -- it did
+NOT already exist (Section 2b previously tracked real game FREQUENCY in a trailing DATE
+window, not real HOME/AWAY sequence), so this extends the SAME real game log
+(availability.compute_team_game_log's own new "Is Away" column) rather than adding a new
+data source. Computed in PYTHON, not a live Excel formula, like RB Value Index's own Carry
+Share (Y-1) -- "how many away games among a team's most recent N real games" has no clean
+single-cell Excel formula without a large helper range (COUNTIFS works over a DATE window,
+not "the N most recent rows"), same reasoning that precedent already established.
+
 Requires "QB Index" to already exist (run build_qb_index.py first).
 
 Usage:
@@ -30,6 +42,24 @@ from nflverse_pull.qb_stats import compute_qb_roles, compute_team_season_qb_stat
 YEARS = [2023, 2024, 2025]
 QB_INDEX_SHEET = "QB Index"
 SHEET_NAME = "Availability Index"
+
+# Real trailing-game window for the Consecutive Road Games count -- claude_code_spec_game_
+# environment_upgrades.md Part C.
+TRAILING_ROAD_GAMES_WINDOW = 3
+
+
+def _compute_trailing_road_games(game_log, window: int = TRAILING_ROAD_GAMES_WINDOW) -> dict:
+    """
+    Pure function, no network. Real count of away games among each team's most recent
+    `window` real games (by real game date), from availability.compute_team_game_log's own
+    real Is Away column. A team with fewer than `window` real games pulled counts whatever
+    real games it has (not padded to a fabricated full window).
+    """
+    out: dict[str, int] = {}
+    for team, grp in game_log.groupby("Team"):
+        recent = grp.sort_values("Game Date", ascending=False).head(window)
+        out[team] = int(recent["Is Away"].sum())
+    return out
 
 TITLE_FONT = Font(name="Arial", size=10, bold=True)
 TITLE_FILL = PatternFill("solid", fgColor="FFD9E1F2")
@@ -111,6 +141,7 @@ def build(workbook_path: str) -> None:
 
     game_log = compute_team_game_log(sched)
     print(f"{len(current_qbs)} current Starters/Backups; {len(game_log)} team-game rows pulled.")
+    trailing_road_games = _compute_trailing_road_games(game_log)
 
     wb = openpyxl.load_workbook(workbook_path)
     add_model_assumptions_weights(wb)
@@ -192,15 +223,20 @@ def build(workbook_path: str) -> None:
     sec2b_first = sec2b_header_row + 1
     sec2b_last = sec2b_first + len(team_order) - 1
     _section_title(
-        ws, sec2b_title_row, 4,
+        ws, sec2b_title_row, 5,
         "Section 2b \u2014 Rolling Schedule Density, as of the last pulled game date "
         f"({as_of_date.date()}). For an upcoming season opener (Week 1) every team's "
         "trailing window is empty by definition -- this demonstrates the mechanism against "
-        "real recent-season data, not a Week 1 snapshot.",
+        "real recent-season data, not a Week 1 snapshot. Consecutive Road Games (E, "
+        "claude_code_spec_game_environment_upgrades.md Part C) is a real, Python-computed "
+        f"count of away games among each team's most recent {TRAILING_ROAD_GAMES_WINDOW} "
+        "real games -- not a live formula (no clean single-cell Excel formula exists for "
+        "'the N most recent rows', unlike the trailing-DATE-window columns to its left).",
     )
     _header_row(ws, sec2b_header_row, [
         "Team", "Games in Trailing\n7 Days", "Games in Trailing\n14 Days",
         "Miles Traveled,\nTrailing 14 Days",
+        f"Consecutive Road\nGames (Trailing {TRAILING_ROAD_GAMES_WINDOW})",
     ], height=20)
     for i, team in enumerate(team_order):
         row = sec2b_first + i
@@ -222,6 +258,10 @@ def build(workbook_path: str) -> None:
         ))
         for cell in (g7, g14, m14):
             cell.font = FORMULA_FONT
+        road_games = ws.cell(
+            row=row, column=5, value=int(trailing_road_games.get(team, 0))
+        )
+        road_games.font = INPUT_FONT
 
     # ==== Section 3: Z-score + weighted Availability Score, per QB ========================
     sec3_title_row = sec2b_last + 2

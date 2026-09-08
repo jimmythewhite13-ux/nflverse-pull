@@ -1,0 +1,32 @@
+Worksheet,Max_Row,Max_Column,A1_Title_Text
+Instructions,12,2,NFL Prediction Model vs. Sportsbook Lines — Starter Workbook
+Season Matchups,285,160,"Season Matchups -- Model Prediction vs. Sportsbook Line, ALL 18 real weeks in ONE long-format table (Week is a column, not a tab boundary). Retired 'Week 1 Matchups' -- this is the single source of tr"
+Market Comparison & Confidence,277,73,"Market Comparison & Confidence -- Version 8 (partial): consolidated market comparison + Win Probability (Part A), real-signal Confidence Score (Part B), mechanical Explanation Engine (Part C). Full 6-"
+Season Win Totals,38,8,Season Win Totals -- claude_code_spec_season_win_total_moneyline.md Part A. Expected Win Total = real SUM of a team's own per-game Win Probability across all 18 real games (Market Comparison & Confide
+Player Prop Projections,3411,27,"Player Prop Projections -- deterministic Volume x Per-Unit-Efficiency point estimates for every current QB/RB/WR1-3/TE1 starter's own real game this season. NO scraped sportsbook data, NO Monte Carlo/"
+Simple Summary Page,277,74,"Simple Summary Page -- plain-language view of the model's real predictions. Every number here is a direct reference to a real calculation on Season Matchups, Market Comparison & Confidence, or Player "
+Model Assumptions,189,4,Model Assumptions & Coefficients
+YoY Baseline Engine,143,15,Year-over-Year Historical Baseline Engine (replicates YearOverYearDataEngine.py)
+Advanced Efficiency Metrics,183,44,"Advanced Efficiency Metrics (EPA/play, Success Rate, NY/A) -- Multi-Year Decay-Weighted Engine, mirrors YoY Baseline Engine"
+QB Index,380,44,"QB Index -- Multi-Year Decay-Weighted QB Rating (EPA/Play, CPOE, ANY/A), mirrors Advanced Efficiency Metrics / YoY Baseline Engine"
+QB Environment Model,363,25,"QB Environment Model -- Talent Extension (Success Rate, Explosive Pass Rate; real Sack Rate tracked separately) + real Situational Adjustments (New Team, Recently Returned from Injury). QB Index's own"
+Availability Index,1768,8,"Availability Index -- Injury History + Schedule Density (a PARTIAL index: 2 of the 5 originally-envisioned dimensions -- ACWR, GPS/load, and wellness-survey data are not publicly sourceable and are de"
+RB Value Index,472,52,"RB Value Index -- Multi-Year Decay-Weighted RUSHING Rating (Rushing EPA/Play, Rushing Success Rate, YPC from nflverse pbp; RYOE/Att from real, official NFL Next Gen Stats). Receiving work out of the b"
+WR-TE Value Index,863,89,"WR/TE Value Index -- Multi-Year Decay-Weighted Receiving Rating (Receiving EPA/Target, Reception Success Rate, YPT, real NGS Avg Separation / YAC Over Expectation). Scores WR1/WR2/WR3 and TE1 per team"
+Kicking Index,256,34,"Kicking Index -- Multi-Year Decay-Weighted Kicking Rating (FG% Over Expected, distance-adjusted; FG%; XP%). Scores ONE role per team (K1) -- see the closing note below for why Section 6 is a direct qu"
+Offensive Line Index,416,31,Offensive Line Index -- Multi-Year Decay-Weighted TEAM-Level Blocking Rating (Pass Protection and Run Blocking from Pro Football Reference; Sack-Free Rate Fault-Adjusted from real nflverse pbp + FTN D
+Front Seven Index,425,31,"Front Seven & D-Line Index -- Multi-Year Decay-Weighted TEAM-Level Pass-Rush/Run-Stop Rating (Sack Rate, TFL Rate, QB Hit Rate; real nflverse play-by-play counting stats), plus real Blitz Rate / Avg B"
+EDGE-IDL Index,2270,26,"EDGE/IDL Index -- Real, Individual, Per-Snap-Rate Pass-Rush Production (Sack Rate, TFL Rate, QB Hit Rate) for the 4 real front-line slots (EDGE1/EDGE2/IDL1/IDL2). COMPLEMENTARY to Front Seven Index (t"
+LB Index,3064,19,"LB Index -- Real, Individual, Per-Snap-Rate Off-Ball-Linebacker Production (Tackle Rate, TFL Rate) for up to 3 real linebacker slots (LB1/LB2/LB3). COMPLEMENTARY to Front Seven Index (team-level, unch"
+CB-S Index,2349,19,"CB/S Index -- Real, Individual, Per-Snap-Rate Coverage Production (INT Rate, PBU Rate) for the 5 real secondary slots (LCB/RCB/NB/FS/SS). COMPLEMENTARY to Secondary Index (team-level, unchanged) -- ad"
+Special Teams Player Index,891,13,"Special Teams Player Index -- Real, Individual Punt/Return Production for P, KR, PR. COMPLEMENTARY to Special Teams Index (team-level, unchanged). Each real role is scored against ONLY its own real po"
+Secondary Index,540,22,"Secondary Index -- Multi-Year Decay-Weighted TEAM-Level Coverage Rating (INT Rate, PBU Rate; real nflverse play-by-play counting stats). Completes the defense alongside Front Seven & D-Line Index. NO "
+Special Teams Index,394,16,"Special Teams Index -- Multi-Year Decay-Weighted TEAM-Level Punting/Return-Game Rating (Net Punt Average, Return Average; real nflverse play-by-play stats). Placekicking is covered separately by 'Kick"
+Pass Defense Matchup,183,37,"Pass Defense Matchup -- Multi-Year Decay-Weighted TEAM-Level Pass Defense Rating (EPA/Dropback, Pass Success Rate, Completion %, NY/A, Explosive Pass Rate, all ALLOWED; real, phase-SPLIT pbp metrics)."
+Run Defense Matchup,183,37,"Run Defense Matchup -- Multi-Year Decay-Weighted TEAM-Level Run Defense Rating (EPA/Rush, Run Success Rate, Yards/Carry, Explosive Run Rate, Stuff Rate, all ALLOWED; real, phase-SPLIT pbp metrics). NO"
+Explosive Play Matchup,183,30,"Explosive Play Matchup -- Multi-Year Decay-Weighted Explosive-Play Offense/Prevention Rating (real nflverse pbp; ONE scored threshold per phase -- 15+ passing, 10+ rushing, same as Pass/Run Defense Ma"
+Turnover & Red-Zone Regression,110,17,"Turnover & Red-Zone Regression -- Real 2025 Season Turnover/Red-Zone Components, Regressed Toward the League Average Using a Well-Established Real Statistical Technique (fumble recovery is close to a "
+Pass Rush Generation Index,183,23,"Pass Rush Generation Index -- claude_code_spec_ol_vs_pass_rush_matchup.md. Real, team-level Sack Rate / Pressure Proxy (QB Hit Rate) / Blitz Rate, LIVE-REFERENCED from Pass Defense Matchup (itself ref"
+Team-Specific HFA,178,8,"Team-Specific HFA -- Real 3-Yr Decay-Weighted, Regressed Home/Away Scoring Margin Split (replaces the flat Home Field Advantage constant, Model Assumptions C3, with a team-specific one). Reuses the SA"
+Coaching Index,188,33,"Coaching Index -- Real Coach-Tenure-Aware 3-Yr Decay-Weighted Composite (4th Down Aggressiveness, 1Q Scripting EPA, Regressed Penalty Discipline, 2H EPA Delta). Blended by COACH, not team history -- s"
+Team Ratings,51,31,Team Ratings — YoY-Engine Historical Baseline + Current Season Blend + Efficiency Adjustment

@@ -5,6 +5,7 @@ import pytest
 
 from nflverse_pull.availability import (
     STADIUM_COORDS,
+    STADIUM_TIMEZONE_UTC_OFFSET,
     _haversine_miles,
     compute_player_injury_history,
     compute_team_game_log,
@@ -41,6 +42,14 @@ def test_team_game_log_home_game_is_zero_miles_away_game_is_symmetric():
     expected_dist = _haversine_miles(STADIUM_COORDS["BAL"], STADIUM_COORDS["KC"])
     assert bal["Miles Traveled (This Game)"] == pytest.approx(expected_dist)
     assert expected_dist > 500  # sanity bound -- KC/BAL are genuinely far apart
+
+    assert kc["Is Away"] == False  # noqa: E712 (real boolean flag, not a numpy quirk here)
+    assert bal["Is Away"] == True  # noqa: E712
+
+
+def test_stadium_timezone_covers_all_32_teams_exactly():
+    assert len(STADIUM_TIMEZONE_UTC_OFFSET) == 32
+    assert set(STADIUM_TIMEZONE_UTC_OFFSET) == set(STADIUM_COORDS)
 
 
 def test_team_game_log_raises_on_unmapped_team_abbreviation():

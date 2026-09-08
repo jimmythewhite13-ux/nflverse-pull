@@ -73,6 +73,55 @@ def transform_to_team_season(sched: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+def compute_team_season_home_away_splits(sched: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure function, no network. Real per-team-season home/away SCORING MARGIN split --
+    claude_code_spec_game_environment_upgrades.md Part A. Reuses the SAME real
+    home_score/away_score columns transform_to_team_season() already uses, just kept as a
+    real per-game MARGIN (scored - allowed) rather than collapsed into separate PPG scored/
+    allowed averages.
+
+    Home Margin = mean(home_score - away_score) over that team's real home games that
+    season. Away Margin = mean(away_score - home_score) over that team's real away games.
+    A team missing either side entirely for a season (bye-adjacent scheduling artifact --
+    should not happen in a real completed season, but handled honestly) gets a real blank,
+    not a fabricated 0.
+
+    Columns: Team | Season | Home Margin | Away Margin | Games Home | Games Away
+    """
+    missing = [c for c in REQUIRED_SCHED_COLS if c not in sched.columns]
+    if missing:
+        raise ValueError(f"Input schedule data is missing expected columns: {missing}")
+
+    reg = sched[sched["game_type"] == "REG"].dropna(subset=["home_score", "away_score"])
+
+    home = reg[["season", "home_team", "home_score", "away_score"]].copy()
+    home["margin"] = home["home_score"] - home["away_score"]
+    home_agg = (
+        home.groupby(["home_team", "season"])["margin"].agg(["mean", "size"])
+        .rename(columns={"mean": "Home Margin", "size": "Games Home"})
+        .rename_axis(["team_abbr", "Season"])
+    )
+
+    away = reg[["season", "away_team", "away_score", "home_score"]].copy()
+    away["margin"] = away["away_score"] - away["home_score"]
+    away_agg = (
+        away.groupby(["away_team", "season"])["margin"].agg(["mean", "size"])
+        .rename(columns={"mean": "Away Margin", "size": "Games Away"})
+        .rename_axis(["team_abbr", "Season"])
+    )
+
+    out = home_agg.join(away_agg, how="outer").reset_index()
+
+    unmapped = sorted(set(out["team_abbr"]) - set(TEAM_NAMES))
+    if unmapped:
+        raise ValueError(f"No full-name mapping for team abbreviation(s): {unmapped}")
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+
+    out = out.sort_values(["Team", "Season"]).reset_index(drop=True)
+    return out[["Team", "Season", "Home Margin", "Away Margin", "Games Home", "Games Away"]]
+
+
 def main(years: list[int] | None = None, output_path: str = "team_season_ppg.csv") -> pd.DataFrame:
     years = years or [2023, 2024, 2025]
     raw = fetch_schedules(years)

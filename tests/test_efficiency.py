@@ -2,10 +2,17 @@ import pandas as pd
 import pytest
 
 from nflverse_pull.efficiency import (
+    DEEP_PASS_AIR_YARDS,
+    EXPLOSIVE_PASS_YARDS,
+    EXPLOSIVE_RUN_YARDS,
+    MATCHUP_SEASON_OUTPUT_COLUMNS,
     SEASON_OUTPUT_COLUMNS,
     compute_league_stats,
     compute_raw_efficiency,
+    compute_team_season_deep_pass_yac_metrics,
     compute_team_season_efficiency,
+    compute_team_season_explosive_tiers,
+    compute_team_season_matchup_metrics,
     compute_weighted_efficiency,
 )
 
@@ -153,3 +160,193 @@ def test_team_season_efficiency_raises_on_unmapped_team_abbreviation():
     ])
     with pytest.raises(ValueError, match="No full-name mapping"):
         compute_team_season_efficiency(df)
+
+
+def _matchup_row(posteam, defteam, season, play_type, yards_gained, pass_attempt=0, sack=0,
+                  complete_pass=None, epa=0.0, success=0):
+    return {
+        "season_type": "REG", "play_type": play_type, "posteam": posteam, "defteam": defteam,
+        "season": season, "yards_gained": yards_gained, "pass_attempt": pass_attempt,
+        "sack": sack, "complete_pass": complete_pass, "epa": epa, "success": success,
+    }
+
+
+def _fake_matchup_pbp():
+    """
+    BUF offense vs MIA defense, 2025:
+      - 4 real pass attempts (sack=0): 2 completions (10 yd/epa 1.0/success 1, 20 yd/epa
+        2.0/success 1 -- the 20-yd one is explosive, EXPLOSIVE_PASS_YARDS=15), 2
+        incompletions (0 yd/epa -1.0/success 0 each).
+        Completion % Allowed (MIA) = 2/4 = 0.5.
+        Explosive Pass Rate (Off, BUF) -- denominator is ALL play_type=="pass" rows,
+        which includes the 1 sack below (5 total) = 1/5 = 0.2.
+        EPA/Dropback Allowed (MIA) = mean(1.0, 2.0, -1.0, -1.0, sack's -3.0) = -0.4.
+        Pass Success Rate Allowed (MIA) = mean(1, 1, 0, 0, sack's 0) = 2/5 = 0.4.
+      - 1 sack (play_type=="pass", pass_attempt=0, sack=1, -7 yards, epa=-3.0, success=0) --
+        excluded from Completion % (not a real attempt), included in Explosive Pass Rate's
+        AND EPA/Dropback Allowed's denominator (a real dropback outcome).
+      - 3 runs: 12 yd/epa 1.5/success 1 (explosive, EXPLOSIVE_RUN_YARDS=10), 3 yd/epa
+        0.1/success 0 (neither), -1 yd/epa -1.2/success 0 (stuffed).
+        Explosive Run Rate (Off, BUF) = 1/3. Stuff Rate (Off, BUF) = 1/3.
+        EPA/Rush Allowed (MIA) = mean(1.5, 0.1, -1.2) = 0.1333...
+        Run Success Rate Allowed (MIA) = mean(1, 0, 0) = 1/3.
+        Yards/Carry Allowed (MIA) = mean(12, 3, -1) = 14/3.
+    """
+    rows = [
+        _matchup_row("BUF", "MIA", 2025, "pass", 10, pass_attempt=1, complete_pass=1,
+                     epa=1.0, success=1),
+        _matchup_row("BUF", "MIA", 2025, "pass", 20, pass_attempt=1, complete_pass=1,
+                     epa=2.0, success=1),
+        _matchup_row("BUF", "MIA", 2025, "pass", 0, pass_attempt=1, complete_pass=0,
+                     epa=-1.0, success=0),
+        _matchup_row("BUF", "MIA", 2025, "pass", 0, pass_attempt=1, complete_pass=0,
+                     epa=-1.0, success=0),
+        _matchup_row("BUF", "MIA", 2025, "pass", -7, pass_attempt=0, sack=1,
+                     epa=-3.0, success=0),
+        _matchup_row("BUF", "MIA", 2025, "run", 12, epa=1.5, success=1),
+        _matchup_row("BUF", "MIA", 2025, "run", 3, epa=0.1, success=0),
+        _matchup_row("BUF", "MIA", 2025, "run", -1, epa=-1.2, success=0),
+    ]
+    return pd.DataFrame(rows)
+
+
+def test_matchup_metrics_epa_dropback_and_pass_success_allowed_include_sacks():
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["EPA/Dropback Allowed (Def)"] == pytest.approx((1.0 + 2.0 - 1.0 - 1.0 - 3.0) / 5)
+    assert mia["Pass Success Rate Allowed (Def)"] == pytest.approx(2 / 5)
+
+
+def test_matchup_metrics_epa_rush_success_and_ypc_allowed():
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["EPA/Rush Allowed (Def)"] == pytest.approx((1.5 + 0.1 - 1.2) / 3)
+    assert mia["Run Success Rate Allowed (Def)"] == pytest.approx(1 / 3)
+    assert mia["Yards/Carry Allowed (Def)"] == pytest.approx((12 + 3 - 1) / 3)
+
+
+def test_matchup_metrics_computes_completion_pct_allowed_excluding_sacks():
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    assert list(out.columns) == MATCHUP_SEASON_OUTPUT_COLUMNS
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["Completion % Allowed (Def)"] == pytest.approx(0.5)
+
+
+def test_matchup_metrics_explosive_pass_rate_denominator_includes_sacks():
+    # Denominator is play_type=="pass" (5 rows: 4 attempts + 1 sack), not just real attempts
+    # -- a sack dilutes the rate the same way a 0-yard incompletion does.
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    buf = out[out["Team"] == "Buffalo Bills"].iloc[0]
+    assert buf["Explosive Pass Rate (Off)"] == pytest.approx(1 / 5)
+    mia_def = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia_def["Explosive Pass Rate Allowed (Def)"] == pytest.approx(1 / 5)
+
+
+def test_matchup_metrics_explosive_run_rate_and_stuff_rate():
+    out = compute_team_season_matchup_metrics(_fake_matchup_pbp())
+    buf = out[out["Team"] == "Buffalo Bills"].iloc[0]
+    assert buf["Explosive Run Rate (Off)"] == pytest.approx(1 / 3)
+    assert buf["Stuff Rate (Off)"] == pytest.approx(1 / 3)
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["Explosive Run Rate Allowed (Def)"] == pytest.approx(1 / 3)
+    assert mia["Stuff Rate Allowed (Def)"] == pytest.approx(1 / 3)
+
+
+def test_matchup_metrics_thresholds_are_named_constants():
+    assert EXPLOSIVE_PASS_YARDS == 15
+    assert EXPLOSIVE_RUN_YARDS == 10
+
+
+def test_matchup_metrics_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_matchup_row("ZZZ", "MIA", 2025, "run", 5)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_matchup_metrics(df)
+
+
+def _deep_pass_row(defteam, season, pass_attempt, sack, air_yards, complete_pass, yac=None):
+    return {
+        "season_type": "REG", "defteam": defteam, "season": season,
+        "pass_attempt": pass_attempt, "sack": sack, "air_yards": air_yards,
+        "complete_pass": complete_pass, "yards_after_catch": yac,
+    }
+
+
+def _fake_deep_pass_pbp():
+    """
+    MIA defense, 2025:
+      - 2 deep attempts (air_yards=25,30), both completed (yac=10,20)
+      - 1 deep attempt (air_yards=22), incomplete (no yac -- no catch)
+      Deep Pass Completion Rate Allowed = 2/3 (the incompletion still counts in the
+      denominator -- it was a real deep attempt that produced zero explosive yardage)
+      - 1 shallow attempt (air_yards=5), completed (yac=3) -- excluded from the deep rate's
+        denominator, but its real YAC still counts toward YAC Allowed (any real completion)
+      YAC Allowed = mean(10, 20, 3) = 11.0
+      - 1 sack (sack=1, no air_yards) -- excluded from the deep rate (sack==0 filter) and
+        irrelevant to YAC (not a completion)
+    """
+    rows = [
+        _deep_pass_row("MIA", 2025, 1, 0, 25, 1, yac=10),
+        _deep_pass_row("MIA", 2025, 1, 0, 30, 1, yac=20),
+        _deep_pass_row("MIA", 2025, 1, 0, 22, 0),
+        _deep_pass_row("MIA", 2025, 1, 0, 5, 1, yac=3),
+        _deep_pass_row("MIA", 2025, 0, 1, None, 0),
+    ]
+    return pd.DataFrame(rows)
+
+
+def test_deep_pass_yac_metrics_computes_expected_rates():
+    out = compute_team_season_deep_pass_yac_metrics(_fake_deep_pass_pbp())
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+    assert mia["Deep Pass Completion Rate Allowed (Def)"] == pytest.approx(2 / 3)
+    assert mia["YAC Allowed (Def)"] == pytest.approx(11.0)
+
+
+def test_deep_pass_air_yards_threshold_is_named_constant():
+    assert DEEP_PASS_AIR_YARDS == 20
+
+
+def test_deep_pass_yac_metrics_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_deep_pass_row("ZZZ", 2025, 1, 0, 25, 1, yac=10)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_deep_pass_yac_metrics(df)
+
+
+def _tier_row(posteam, season, play_type, yards_gained):
+    return {
+        "season_type": "REG", "posteam": posteam, "season": season,
+        "play_type": play_type, "yards_gained": yards_gained,
+    }
+
+
+def _fake_tier_pbp():
+    """
+    BUF offense, 2025:
+      5 real pass plays: yards = 45, 25, 15, 5, 5
+        Pass 20+ Rate = 2/5 (45, 25), Pass 30+ Rate = 1/5 (45), Pass 40+ Rate = 1/5 (45)
+      4 real run plays: yards = 25, 16, 8, 1
+        Run 15+ Rate = 2/4 (25, 16), Run 20+ Rate = 1/4 (25)
+    """
+    rows = (
+        [_tier_row("BUF", 2025, "pass", 45), _tier_row("BUF", 2025, "pass", 25),
+         _tier_row("BUF", 2025, "pass", 15), _tier_row("BUF", 2025, "pass", 5),
+         _tier_row("BUF", 2025, "pass", 5)]
+        + [_tier_row("BUF", 2025, "run", 25), _tier_row("BUF", 2025, "run", 16),
+           _tier_row("BUF", 2025, "run", 8), _tier_row("BUF", 2025, "run", 1)]
+    )
+    return pd.DataFrame(rows)
+
+
+def test_explosive_tiers_computes_expected_rates():
+    out = compute_team_season_explosive_tiers(_fake_tier_pbp())
+    buf = out[out["Team"] == "Buffalo Bills"].iloc[0]
+    assert buf["Pass 20+ Rate (Off)"] == pytest.approx(2 / 5)
+    assert buf["Pass 30+ Rate (Off)"] == pytest.approx(1 / 5)
+    assert buf["Pass 40+ Rate (Off)"] == pytest.approx(1 / 5)
+    assert buf["Run 15+ Rate (Off)"] == pytest.approx(2 / 4)
+    assert buf["Run 20+ Rate (Off)"] == pytest.approx(1 / 4)
+
+
+def test_explosive_tiers_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([_tier_row("ZZZ", 2025, "pass", 45)])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_explosive_tiers(df)

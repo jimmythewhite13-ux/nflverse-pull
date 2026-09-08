@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from nflverse_pull.pull import TEAM_NAMES, transform_to_team_season
+from nflverse_pull.pull import (
+    TEAM_NAMES,
+    compute_team_season_home_away_splits,
+    transform_to_team_season,
+)
 
 
 def test_team_names_covers_all_32_teams():
@@ -93,3 +97,41 @@ def test_transform_raises_on_unmapped_team_abbreviation():
     ])
     with pytest.raises(ValueError, match="No full-name mapping"):
         transform_to_team_season(df)
+
+
+def test_home_away_splits_computes_expected_margins():
+    out = compute_team_season_home_away_splits(_fake_schedule())
+
+    buf = out[out["Team"] == "Buffalo Bills"].iloc[0]
+    mia = out[out["Team"] == "Miami Dolphins"].iloc[0]
+
+    # BUF: home game 24-10 (margin +14); away game (at MIA) 17-20 (margin -3)
+    assert buf["Home Margin"] == pytest.approx(14.0)
+    assert buf["Away Margin"] == pytest.approx(-3.0)
+    assert buf["Games Home"] == 1
+    assert buf["Games Away"] == 1
+
+    # MIA: home game 20-17 (margin +3); away game (at BUF) 10-24 (margin -14)
+    assert mia["Home Margin"] == pytest.approx(3.0)
+    assert mia["Away Margin"] == pytest.approx(-14.0)
+
+
+def test_home_away_splits_excludes_postseason_and_unplayed_games():
+    out = compute_team_season_home_away_splits(_fake_schedule())
+    nyj = out[out["Team"] == "New York Jets"]
+    assert len(nyj) == 0  # the unplayed BUF-NYJ game must not create a phantom row
+
+
+def test_home_away_splits_raises_on_missing_columns():
+    bad_df = pd.DataFrame([{"season": 2025, "game_type": "REG"}])
+    with pytest.raises(ValueError, match="missing expected columns"):
+        compute_team_season_home_away_splits(bad_df)
+
+
+def test_home_away_splits_raises_on_unmapped_team_abbreviation():
+    df = pd.DataFrame([
+        {"season": 2025, "game_type": "REG", "home_team": "ZZZ", "away_team": "MIA",
+         "home_score": 20, "away_score": 10},
+    ])
+    with pytest.raises(ValueError, match="No full-name mapping"):
+        compute_team_season_home_away_splits(df)

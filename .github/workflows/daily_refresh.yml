@@ -1,0 +1,57 @@
+name: Daily refresh (injuries, rosters, schedule)
+
+# Real, single scheduled cadence for these 3 real input pulls -- see Section 3 of
+# "NFL Model — Automated Agent Specification". Deliberately a SEPARATE workflow from
+# line_capture.yml (different real cadence -- CLV needs many pulls/day, this needs one).
+on:
+  schedule:
+    - cron: '0 13 * * *'   # once daily, 13:00 UTC
+  workflow_dispatch: {}    # real manual trigger, for testing/on-demand refresh
+
+permissions:
+  contents: write   # real, required: this job commits real ingested data back to the repo
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Self-enforcement check (BEFORE)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
+
+      - name: Resolve current NFL season
+        id: season
+        run: echo "season=$(uv run python -m prediction_audit.ingestion.season)" >> "$GITHUB_OUTPUT"
+
+      - name: Injuries
+        run: uv run python -m prediction_audit.ingestion.injuries --season ${{ steps.season.outputs.season }}
+
+      - name: Rosters
+        run: uv run python -m prediction_audit.ingestion.players --season ${{ steps.season.outputs.season }}
+
+      - name: Schedule confirmation
+        run: uv run python -m prediction_audit.ingestion.schedule --season ${{ steps.season.outputs.season }}
+
+      - name: Self-enforcement check (AFTER)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
+
+      - name: Commit real ingested data
+        run: |
+          git config user.name "nfl-model-agent[bot]"
+          git config user.email "actions@github.com"
+          git add prediction_audit/db/prediction_audit.sqlite3
+          git diff --cached --quiet && echo "No real data changes to commit." || \
+            git commit -m "chore(ingestion): daily refresh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push

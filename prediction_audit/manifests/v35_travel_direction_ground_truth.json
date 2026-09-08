@@ -1,0 +1,2455 @@
+{
+  "constants": {
+    "west_to_east_penalty": -0.5
+  },
+  "games": [
+    {
+      "week": 1,
+      "away": "Arizona Cardinals",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Atlanta Falcons",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Baltimore Ravens",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Buffalo Bills",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Chicago Bears",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 1,
+      "away": "Cleveland Browns",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Dallas Cowboys",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 1,
+      "away": "Denver Broncos",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 1,
+      "away": "Green Bay Packers",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Miami Dolphins",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "New England Patriots",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "New Orleans Saints",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 1,
+      "away": "New York Jets",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "San Francisco 49ers",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 1,
+      "away": "Washington Commanders",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Carolina Panthers",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Cincinnati Bengals",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Cleveland Browns",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Detroit Lions",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Green Bay Packers",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 2,
+      "away": "Indianapolis Colts",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Jacksonville Jaguars",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Las Vegas Raiders",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Miami Dolphins",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Minnesota Vikings",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "New Orleans Saints",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 2,
+      "away": "New York Giants",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Philadelphia Eagles",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Pittsburgh Steelers",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 2,
+      "away": "Seattle Seahawks",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 2,
+      "away": "Washington Commanders",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Arizona Cardinals",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Atlanta Falcons",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Baltimore Ravens",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Carolina Panthers",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Cincinnati Bengals",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Houston Texans",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "Kansas City Chiefs",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "Las Vegas Raiders",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "Los Angeles Chargers",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "Los Angeles Rams",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "Minnesota Vikings",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "New England Patriots",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "New York Jets",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Philadelphia Eagles",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 3,
+      "away": "Seattle Seahawks",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 3,
+      "away": "Tennessee Titans",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 4,
+      "away": "Arizona Cardinals",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 4,
+      "away": "Atlanta Falcons",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Dallas Cowboys",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Denver Broncos",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Detroit Lions",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Green Bay Packers",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 4,
+      "away": "Indianapolis Colts",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Jacksonville Jaguars",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Kansas City Chiefs",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Los Angeles Chargers",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Los Angeles Rams",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 4,
+      "away": "Miami Dolphins",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "New England Patriots",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "New York Jets",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Pittsburgh Steelers",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 4,
+      "away": "Tennessee Titans",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 5,
+      "away": "Baltimore Ravens",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Buffalo Bills",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Chicago Bears",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Cincinnati Bengals",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Cleveland Browns",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Denver Broncos",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Detroit Lions",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Houston Texans",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Indianapolis Colts",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Las Vegas Raiders",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 5,
+      "away": "Minnesota Vikings",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "New York Giants",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Philadelphia Eagles",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "San Francisco 49ers",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 5,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Arizona Cardinals",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Baltimore Ravens",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Buffalo Bills",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Carolina Panthers",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Chicago Bears",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 6,
+      "away": "Dallas Cowboys",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Houston Texans",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 6,
+      "away": "Los Angeles Chargers",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 6,
+      "away": "New Orleans Saints",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 6,
+      "away": "New York Jets",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Pittsburgh Steelers",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 6,
+      "away": "Seattle Seahawks",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 6,
+      "away": "Tennessee Titans",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 6,
+      "away": "Washington Commanders",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Cincinnati Bengals",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Cleveland Browns",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Dallas Cowboys",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 7,
+      "away": "Denver Broncos",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Green Bay Packers",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 7,
+      "away": "Indianapolis Colts",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Kansas City Chiefs",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Los Angeles Rams",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Miami Dolphins",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "New England Patriots",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "New York Giants",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "Pittsburgh Steelers",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 7,
+      "away": "San Francisco 49ers",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 7,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Arizona Cardinals",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 8,
+      "away": "Atlanta Falcons",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Baltimore Ravens",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Carolina Panthers",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Chicago Bears",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Cleveland Browns",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Indianapolis Colts",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Kansas City Chiefs",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Las Vegas Raiders",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 8,
+      "away": "Los Angeles Chargers",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Minnesota Vikings",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 8,
+      "away": "New England Patriots",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Philadelphia Eagles",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 8,
+      "away": "Tennessee Titans",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 9,
+      "away": "Arizona Cardinals",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Buffalo Bills",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Cincinnati Bengals",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Cleveland Browns",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Dallas Cowboys",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 9,
+      "away": "Denver Broncos",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 9,
+      "away": "Detroit Lions",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Green Bay Packers",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 9,
+      "away": "Houston Texans",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Jacksonville Jaguars",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Las Vegas Raiders",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Los Angeles Rams",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 9,
+      "away": "New York Giants",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "New York Jets",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 9,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Buffalo Bills",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Carolina Panthers",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Houston Texans",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 10,
+      "away": "Jacksonville Jaguars",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Kansas City Chiefs",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 10,
+      "away": "Los Angeles Chargers",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 10,
+      "away": "Los Angeles Rams",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 10,
+      "away": "Miami Dolphins",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Minnesota Vikings",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "New England Patriots",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Pittsburgh Steelers",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "San Francisco 49ers",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 10,
+      "away": "Seattle Seahawks",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 10,
+      "away": "Washington Commanders",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Arizona Cardinals",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 11,
+      "away": "Baltimore Ravens",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Cincinnati Bengals",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Indianapolis Colts",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Jacksonville Jaguars",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Las Vegas Raiders",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 11,
+      "away": "Miami Dolphins",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Minnesota Vikings",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "New Orleans Saints",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "New York Jets",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Pittsburgh Steelers",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 11,
+      "away": "Tennessee Titans",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Atlanta Falcons",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Baltimore Ravens",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Carolina Panthers",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Chicago Bears",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 12,
+      "away": "Denver Broncos",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 12,
+      "away": "Green Bay Packers",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Kansas City Chiefs",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 12,
+      "away": "Las Vegas Raiders",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 12,
+      "away": "New England Patriots",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "New Orleans Saints",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 12,
+      "away": "New York Giants",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "New York Jets",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Philadelphia Eagles",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Seattle Seahawks",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 12,
+      "away": "Tennessee Titans",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 12,
+      "away": "Washington Commanders",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Buffalo Bills",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Carolina Panthers",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Cincinnati Bengals",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Dallas Cowboys",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Detroit Lions",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Green Bay Packers",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Houston Texans",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 13,
+      "away": "Jacksonville Jaguars",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Kansas City Chiefs",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Los Angeles Chargers",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 13,
+      "away": "Miami Dolphins",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "Philadelphia Eagles",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 13,
+      "away": "San Francisco 49ers",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 13,
+      "away": "Washington Commanders",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Atlanta Falcons",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Buffalo Bills",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Chicago Bears",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 14,
+      "away": "Denver Broncos",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 14,
+      "away": "Houston Texans",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 14,
+      "away": "Indianapolis Colts",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Kansas City Chiefs",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 14,
+      "away": "Los Angeles Chargers",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Los Angeles Rams",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Minnesota Vikings",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 14,
+      "away": "New Orleans Saints",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 14,
+      "away": "New York Giants",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Pittsburgh Steelers",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 14,
+      "away": "Tennessee Titans",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 15,
+      "away": "Atlanta Falcons",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Baltimore Ravens",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Chicago Bears",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 15,
+      "away": "Cincinnati Bengals",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Cleveland Browns",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Dallas Cowboys",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Denver Broncos",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -7,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Detroit Lions",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Indianapolis Colts",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Jacksonville Jaguars",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Miami Dolphins",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "New England Patriots",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "New Orleans Saints",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 15,
+      "away": "New York Jets",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "San Francisco 49ers",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 15,
+      "away": "Seattle Seahawks",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 16,
+      "away": "Arizona Cardinals",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 16,
+      "away": "Buffalo Bills",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Carolina Panthers",
+      "home": "Pittsburgh Steelers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Cincinnati Bengals",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Cleveland Browns",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Green Bay Packers",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Houston Texans",
+      "home": "Philadelphia Eagles",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 16,
+      "away": "Jacksonville Jaguars",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Los Angeles Chargers",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 16,
+      "away": "Los Angeles Rams",
+      "home": "Seattle Seahawks",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "New England Patriots",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "New York Giants",
+      "home": "Detroit Lions",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "San Francisco 49ers",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 16,
+      "away": "Tampa Bay Buccaneers",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Tennessee Titans",
+      "home": "Las Vegas Raiders",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 16,
+      "away": "Washington Commanders",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Baltimore Ravens",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Buffalo Bills",
+      "home": "Miami Dolphins",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Denver Broncos",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -7,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 17,
+      "away": "Detroit Lions",
+      "home": "Chicago Bears",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Houston Texans",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Indianapolis Colts",
+      "home": "Cleveland Browns",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Kansas City Chiefs",
+      "home": "Los Angeles Chargers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -6,
+      "excel_cz_delta": -2,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Las Vegas Raiders",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 17,
+      "away": "Los Angeles Rams",
+      "home": "Tampa Bay Buccaneers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 17,
+      "away": "Minnesota Vikings",
+      "home": "New York Jets",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 17,
+      "away": "New Orleans Saints",
+      "home": "Atlanta Falcons",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 17,
+      "away": "New York Giants",
+      "home": "Dallas Cowboys",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Philadelphia Eagles",
+      "home": "San Francisco 49ers",
+      "home_utc_offset": -8,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -3,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Pittsburgh Steelers",
+      "home": "Tennessee Titans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 17,
+      "away": "Seattle Seahawks",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 3,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 17,
+      "away": "Washington Commanders",
+      "home": "Jacksonville Jaguars",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Atlanta Falcons",
+      "home": "Carolina Panthers",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Chicago Bears",
+      "home": "Minnesota Vikings",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Cleveland Browns",
+      "home": "Cincinnati Bengals",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Dallas Cowboys",
+      "home": "Washington Commanders",
+      "home_utc_offset": -5,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 18,
+      "away": "Detroit Lions",
+      "home": "Green Bay Packers",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Jacksonville Jaguars",
+      "home": "Indianapolis Colts",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Las Vegas Raiders",
+      "home": "Kansas City Chiefs",
+      "home_utc_offset": -6,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 2,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 18,
+      "away": "Los Angeles Chargers",
+      "home": "Denver Broncos",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 18,
+      "away": "Miami Dolphins",
+      "home": "New England Patriots",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "New York Jets",
+      "home": "Buffalo Bills",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Philadelphia Eagles",
+      "home": "New York Giants",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Pittsburgh Steelers",
+      "home": "Baltimore Ravens",
+      "home_utc_offset": -5,
+      "away_utc_offset": -5,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "San Francisco 49ers",
+      "home": "Arizona Cardinals",
+      "home_utc_offset": -7,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 1,
+      "excel_da_travel_direction_adj": -0.5
+    },
+    {
+      "week": 18,
+      "away": "Seattle Seahawks",
+      "home": "Los Angeles Rams",
+      "home_utc_offset": -8,
+      "away_utc_offset": -8,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Tampa Bay Buccaneers",
+      "home": "New Orleans Saints",
+      "home_utc_offset": -6,
+      "away_utc_offset": -5,
+      "excel_cz_delta": -1,
+      "excel_da_travel_direction_adj": 0
+    },
+    {
+      "week": 18,
+      "away": "Tennessee Titans",
+      "home": "Houston Texans",
+      "home_utc_offset": -6,
+      "away_utc_offset": -6,
+      "excel_cz_delta": 0,
+      "excel_da_travel_direction_adj": 0
+    }
+  ]
+}

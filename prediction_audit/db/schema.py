@@ -184,6 +184,98 @@ CREATE INDEX IF NOT EXISTS idx_contrib_run ON component_contributions(run_id);
 CREATE INDEX IF NOT EXISTS idx_market_run ON market_lines(run_id);
 CREATE INDEX IF NOT EXISTS idx_prop_run ON prop_predictions(run_id);
 CREATE INDEX IF NOT EXISTS idx_prop_market_prop ON prop_market_lines(prop_id);
+
+-- ==== Automated agent layer (2026-09-08) -- real, INPUT-ONLY ingestion logging =============
+-- Deliberately NOT keyed off prediction_runs/run_id: the automated agent's whole real purpose
+-- is refreshing raw input data (injuries, rosters, schedule, market lines), never generating or
+-- touching a model prediction. Tying this to run_id would require a prediction_runs row to
+-- exist for every upcoming 2026 game before ingestion could even log a value -- i.e. it would
+-- require "running the model" on 2026 data before Phase 11's single, official holdout
+-- evaluation, which is exactly what the governance spec forbids. These tables are real,
+-- standalone, timestamped ingestion logs -- structurally incapable of touching a coefficient,
+-- formula, or prediction, by construction, not merely by convention.
+
+-- One row per real scheduled ingestion job invocation -- the audit trail for Section 4's
+-- "never skip silently" rule. status='MISSING' + source=NULL is a REAL, valid, expected
+-- outcome (a genuinely unavailable source), not an error to hide.
+CREATE TABLE IF NOT EXISTS ingestion_runs (
+    ingestion_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_name        TEXT NOT NULL,    -- 'injuries'/'rosters'/'schedule'/'stats'/'market_lines'
+    run_timestamp   TEXT NOT NULL,    -- ISO8601, real
+    status          TEXT NOT NULL CHECK (status IN ('SUCCESS', 'MISSING', 'FAILURE', 'SKIPPED')),
+    source          TEXT,             -- real source name, or NULL if genuinely unavailable
+    rows_written    INTEGER NOT NULL DEFAULT 0,
+    detail          TEXT              -- free text: real error message, or a real note
+);
+
+CREATE TABLE IF NOT EXISTS raw_injury_reports (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id    INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    season          INTEGER NOT NULL,
+    week            INTEGER,
+    team            TEXT NOT NULL,
+    player_name     TEXT NOT NULL,
+    position        TEXT,
+    report_status   TEXT,             -- real 'Out'/'Doubtful'/'Questionable'/etc, or NULL
+    practice_status TEXT,
+    pulled_at       TEXT NOT NULL,    -- ISO8601, real
+    source          TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS raw_roster_snapshots (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id    INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    season          INTEGER NOT NULL,
+    team            TEXT NOT NULL,
+    player_name     TEXT NOT NULL,
+    position        TEXT,
+    depth_rank      INTEGER,
+    roster_status   TEXT,
+    pulled_at       TEXT NOT NULL,
+    source          TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS raw_schedule_checks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id    INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    game_id         TEXT NOT NULL,
+    season          INTEGER NOT NULL,
+    week            INTEGER NOT NULL,
+    home_team       TEXT NOT NULL,
+    away_team       TEXT NOT NULL,
+    kickoff_time    TEXT,
+    change_detected INTEGER NOT NULL DEFAULT 0,
+    change_detail   TEXT,
+    checked_at      TEXT NOT NULL,
+    source          TEXT NOT NULL
+);
+
+-- Real market-line captures for CLV -- deliberately NOT tagged 'opening'/'closing' at write
+-- time (a capture can't know it's the real LAST one before kickoff until kickoff has already
+-- happened). Every capture is a real, timestamped snapshot; `v_ingestion_market_tiers` below
+-- classifies opening/prediction_time/closing dynamically, same real pattern this project's
+-- own v_clv view already uses for the prediction-linked market_lines table.
+CREATE TABLE IF NOT EXISTS raw_market_captures (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id        INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    game_id             TEXT NOT NULL,
+    sportsbook          TEXT NOT NULL,
+    market_type         TEXT NOT NULL,   -- 'spread' / 'total' / 'moneyline'
+    line_value          REAL,
+    odds                REAL,
+    captured_at         TEXT NOT NULL,   -- ISO8601, real
+    kickoff_time        TEXT,            -- real, for real elapsed-time tier classification
+    source              TEXT NOT NULL,
+    market_data_status  TEXT NOT NULL DEFAULT 'MISSING'
+                         CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_runs_job ON ingestion_runs(job_name, run_timestamp);
+CREATE INDEX IF NOT EXISTS idx_raw_injury_ingestion ON raw_injury_reports(ingestion_id);
+CREATE INDEX IF NOT EXISTS idx_raw_roster_ingestion ON raw_roster_snapshots(ingestion_id);
+CREATE INDEX IF NOT EXISTS idx_raw_schedule_ingestion ON raw_schedule_checks(ingestion_id);
+CREATE INDEX IF NOT EXISTS idx_raw_market_game
+    ON raw_market_captures(game_id, sportsbook, market_type);
 """
 
 VIEWS_SQL = """
@@ -226,6 +318,25 @@ JOIN market_lines close_line
    AND close_line.market_data_status = 'VERIFIED'
 WHERE open_line.line_stage = 'prediction_time'
   AND open_line.market_data_status = 'VERIFIED';
+
+-- Real dynamic opening/prediction_time/closing classification for raw_market_captures --
+-- same real principle as v_clv: never store a tier label that could go stale, compute it fresh.
+-- Opening = the real earliest capture for that (game, book, market). Closing = the real latest
+-- capture that happened before kickoff. Everything else is prediction_time.
+CREATE VIEW IF NOT EXISTS v_ingestion_market_tiers AS
+SELECT
+    m.*,
+    CASE
+        WHEN m.captured_at = MIN(m.captured_at) OVER (
+            PARTITION BY m.game_id, m.sportsbook, m.market_type
+        ) THEN 'opening'
+        WHEN m.kickoff_time IS NOT NULL AND m.captured_at < m.kickoff_time
+             AND m.captured_at = MAX(m.captured_at) OVER (
+                 PARTITION BY m.game_id, m.sportsbook, m.market_type
+             ) THEN 'closing'
+        ELSE 'prediction_time'
+    END AS line_stage
+FROM raw_market_captures m;
 
 -- Real prop error -- same pure-function-of-prediction+result pattern as v_prediction_errors,
 -- computed fresh every query so a later real result correction never leaves a stale cached

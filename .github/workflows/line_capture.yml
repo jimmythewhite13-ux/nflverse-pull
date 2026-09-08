@@ -1,0 +1,60 @@
+name: Line-movement capture (real CLV)
+
+# Real, deliberate fix vs. the governing spec's own literal 2-cron design (documented in
+# prediction_audit/ingestion/market_lines.py's own `_should_capture_now()` docstring): two
+# separate cron entries (`0 */6 * * *` and `0 * * * *`) in one schedule list double-fire at
+# every hour that's a multiple of 6 (both trigger independently), and cron itself has no way to
+# express "closer to a real kickoff = more frequent" at all. Real fix: ONE workflow, ONE hourly
+# cron trigger, and the SCRIPT decides each tick whether to actually spend a real API credit --
+# always within 24h of the real nearest kickoff (achieves real hourly cadence near kickoff),
+# otherwise only if >=6 real hours have passed since the last real capture (achieves real
+# 6-hourly cadence the rest of the week). Same real outcome the spec asked for, without the
+# double-fire bug or the "cron can't see the schedule" gap.
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour; the real cadence gate inside market_lines.py throttles it
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # real, required: this job commits real ingested data back to the repo
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Self-enforcement check (BEFORE)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
+
+      - name: Resolve current NFL season
+        id: season
+        run: echo "season=$(uv run python -m prediction_audit.ingestion.season)" >> "$GITHUB_OUTPUT"
+
+      - name: Real market-line capture (real cadence gate decides whether to actually call)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: uv run python -m prediction_audit.ingestion.market_lines --season ${{ steps.season.outputs.season }}
+
+      - name: Self-enforcement check (AFTER)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
+
+      - name: Commit real captured data (only if a real capture actually happened)
+        run: |
+          git config user.name "nfl-model-agent[bot]"
+          git config user.email "actions@github.com"
+          git add prediction_audit/db/prediction_audit.sqlite3
+          git diff --cached --quiet && echo "No real data changes to commit (real cadence gate skipped this tick)." || \
+            git commit -m "chore(ingestion): line capture $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push

@@ -35,23 +35,41 @@ jobs:
         id: season
         run: echo "season=$(uv run python -m prediction_audit.ingestion.season)" >> "$GITHUB_OUTPUT"
 
-      - name: Injuries
-        run: uv run python -m prediction_audit.ingestion.injuries --season ${{ steps.season.outputs.season }}
-
-      - name: Rosters
-        run: uv run python -m prediction_audit.ingestion.players --season ${{ steps.season.outputs.season }}
-
-      - name: Schedule confirmation
-        run: uv run python -m prediction_audit.ingestion.schedule --season ${{ steps.season.outputs.season }}
-
-      - name: Self-enforcement check (AFTER)
-        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
-
-      - name: Commit real ingested data
+      # Real, deliberate retry-the-whole-cycle design: this workflow and line_capture.yml both
+      # commit to the SAME binary sqlite file, and can run concurrently (a real race was hit and
+      # caught on the very first live run of this agent layer -- see PROGRESS.md). A binary file
+      # can't be git-merged/rebased across a real concurrent push, so on a push rejection this
+      # re-fetches the real latest state and RE-RUNS the actual ingestion (not just re-commits
+      # stale data) before retrying -- otherwise a naive retry would silently drop whichever
+      # job's real data lost the race.
+      - name: Ingest real data and push (retries on concurrent-push conflict)
         run: |
           git config user.name "nfl-model-agent[bot]"
           git config user.email "actions@github.com"
-          git add prediction_audit/db/prediction_audit.sqlite3
-          git diff --cached --quiet && echo "No real data changes to commit." || \
+          for attempt in 1 2 3 4 5; do
+            echo "=== Attempt $attempt ==="
+            git fetch origin main
+            git reset --hard origin/main
+            uv run python -m prediction_audit.ingestion.injuries --season ${{ steps.season.outputs.season }}
+            uv run python -m prediction_audit.ingestion.players --season ${{ steps.season.outputs.season }}
+            uv run python -m prediction_audit.ingestion.schedule --season ${{ steps.season.outputs.season }}
+            git add prediction_audit/db/prediction_audit.sqlite3
+            if git diff --cached --quiet; then
+              echo "No real data changes to commit."
+              break
+            fi
             git commit -m "chore(ingestion): daily refresh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push
+            if git push; then
+              echo "Real push succeeded on attempt $attempt."
+              break
+            fi
+            echo "Real push rejected (concurrent writer) -- retrying with fresh state."
+            sleep $(( (RANDOM % 10) + 2 ))
+            if [ "$attempt" = "5" ]; then
+              echo "::error::Real push failed after 5 attempts -- concurrent-writer contention did not clear."
+              exit 1
+            fi
+          done
+
+      - name: Self-enforcement check (AFTER)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check

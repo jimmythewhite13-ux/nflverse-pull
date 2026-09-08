@@ -42,19 +42,37 @@ jobs:
         id: season
         run: echo "season=$(uv run python -m prediction_audit.ingestion.season)" >> "$GITHUB_OUTPUT"
 
-      - name: Real market-line capture (real cadence gate decides whether to actually call)
+      # Real, deliberate retry-the-whole-cycle design -- see daily_refresh.yml's own comment
+      # for the full real rationale (a real concurrent-push race between these two workflows
+      # was hit and caught on the very first live run of this agent layer).
+      - name: Capture real market lines and push (retries on concurrent-push conflict)
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-        run: uv run python -m prediction_audit.ingestion.market_lines --season ${{ steps.season.outputs.season }}
-
-      - name: Self-enforcement check (AFTER)
-        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
-
-      - name: Commit real captured data (only if a real capture actually happened)
         run: |
           git config user.name "nfl-model-agent[bot]"
           git config user.email "actions@github.com"
-          git add prediction_audit/db/prediction_audit.sqlite3
-          git diff --cached --quiet && echo "No real data changes to commit (real cadence gate skipped this tick)." || \
+          for attempt in 1 2 3 4 5; do
+            echo "=== Attempt $attempt ==="
+            git fetch origin main
+            git reset --hard origin/main
+            uv run python -m prediction_audit.ingestion.market_lines --season ${{ steps.season.outputs.season }}
+            git add prediction_audit/db/prediction_audit.sqlite3
+            if git diff --cached --quiet; then
+              echo "No real data changes to commit (cadence gate skipped, or nothing new)."
+              break
+            fi
             git commit -m "chore(ingestion): line capture $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push
+            if git push; then
+              echo "Real push succeeded on attempt $attempt."
+              break
+            fi
+            echo "Real push rejected (concurrent writer) -- retrying with fresh state."
+            sleep $(( (RANDOM % 10) + 2 ))
+            if [ "$attempt" = "5" ]; then
+              echo "::error::Real push failed after 5 attempts -- concurrent-writer contention did not clear."
+              exit 1
+            fi
+          done
+
+      - name: Self-enforcement check (AFTER)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check

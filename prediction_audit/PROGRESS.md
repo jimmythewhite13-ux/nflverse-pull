@@ -1160,3 +1160,14 @@ primary metrics outright, versus 2 of 6 under the buggy numbers). Phase 9's grad
 Phase 10's selection doc, and the Phase 8 2024 secondary-check report were all updated with the
 real, corrected numbers and an explicit correction note rather than silently rewritten. Full test
 suite (10752 tests) re-verified green after every fix.
+
+## AGL reconfirmed BLOCKED via a third candidate source (2026-09-08)
+
+User-supplied `verify_nflverse_av_data.py` checked Lee Sharpe's `nfldata` repo (real
+`rosters.csv`, documented `av` column) as a possible new real AV data source for AGL. Real,
+live result: 28,617 rows, season range 2006-2019 only, 0 rows for 2020+, and even 2019 itself
+has 0.0% AV population (2,479 player rows, zero with a real value) -- AV had already stopped
+populating before that season's data collection ended. Last real season with any AV data: 2018.
+This is the same dead legacy dataset already confirmed BLOCKED in the v35 audit and reconfirmed
+in Phase 5, just rediscovered under a different filename/description -- not a new resolution.
+AGL and Injury Adj remain BLOCKED.

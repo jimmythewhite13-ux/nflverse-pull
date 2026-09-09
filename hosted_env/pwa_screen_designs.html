@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PWA Screen Designs</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<style>
+:root {
+  --surface-1: #f1efe8; --surface-2: #ffffff; --border: #ddd9cf;
+  --text-primary: #2c2c2a; --text-secondary: #5f5e5a; --text-muted: #888780; --text-disabled: #b4b2a9;
+  --bg-accent: #e6f1fb; --text-accent: #185fa5; --bg-success: #eaf3de; --text-success: #3b6d11;
+  --fill-primary: #2c2c2a; --on-primary: #ffffff; --radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+body { background: #e5e2d8; margin: 0; padding: 24px; }
+</style>
+</head>
+<body>
+<!-- Real Track 1 Part C deliverable: this is the same markup shown via the visualize tool,
+     saved as a standalone file so it exists as a real artifact alongside schema.sql /
+     schema_differences.md / api_spec.md, not only as an ephemeral chat widget. -->
+<div style="display:flex;flex-direction:column;gap:24px;max-width:380px;margin:0 auto">
+
+<div>
+<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">Screen 1 — this week's games</p>
+<div style="background:var(--surface-1);border-radius:16px;padding:12px">
+<div style="background:var(--surface-2);border-radius:12px;border:0.5px solid var(--border);overflow:hidden">
+
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--border)">
+<span style="font-size:16px;font-weight:500">Week 4</span>
+<span style="display:flex;align-items:center;gap:6px;background:var(--bg-accent);color:var(--text-accent);font-size:12px;padding:4px 10px;border-radius:var(--radius)">
+<i class="ti ti-chevron-down" style="font-size:14px" aria-hidden="true"></i>NFL</span>
+</div>
+
+<div style="padding:12px 14px;border-bottom:0.5px solid var(--border)">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="font-size:14px;font-weight:500">Steelers at Browns</span>
+<span style="font-size:12px;color:var(--text-success);background:var(--bg-success);padding:2px 8px;border-radius:var(--radius)">Predicted</span>
+</div>
+<p style="font-size:13px;color:var(--text-secondary);margin:6px 0 0">Browns favored by 3.5 — 58% win probability</p>
+</div>
+
+<div style="padding:12px 14px;border-bottom:0.5px solid var(--border)">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="font-size:14px;font-weight:500">Bills at Patriots</span>
+<span style="font-size:12px;color:var(--text-secondary);background:var(--surface-1);padding:2px 8px;border-radius:var(--radius)">Ready</span>
+</div>
+<p style="font-size:13px;color:var(--text-secondary);margin:6px 0 0">Prediction locks 48 hours before kickoff.</p>
+</div>
+
+<div style="padding:12px 14px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="font-size:14px;font-weight:500">Chargers at Seahawks</span>
+<span style="font-size:12px;color:var(--text-muted);background:var(--surface-1);padding:2px 8px;border-radius:var(--radius)">Not predictable</span>
+</div>
+<p style="font-size:13px;color:var(--text-secondary);margin:6px 0 0">Too early to resolve current-season rosters.</p>
+</div>
+
+</div>
+</div>
+</div>
+
+<div>
+<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">Screen 2 — model version indicator</p>
+<div style="background:var(--surface-1);border-radius:16px;padding:12px">
+<div style="background:var(--surface-2);border-radius:12px;border:0.5px solid var(--border);padding:14px">
+<div style="display:flex;align-items:center;gap:10px">
+<i class="ti ti-cpu" style="font-size:20px;color:var(--text-accent)" aria-hidden="true"></i>
+<div style="flex:1">
+<p style="font-size:14px;font-weight:500;margin:0">v35.0-live-production</p>
+<p style="font-size:13px;color:var(--text-secondary);margin:2px 0 0">Real team-specific HFA, no research candidates</p>
+</div>
+<span style="font-size:12px;font-weight:500;color:var(--text-success);background:var(--bg-success);padding:4px 10px;border-radius:var(--radius);white-space:nowrap">Production</span>
+</div>
+</div>
+</div>
+</div>
+
+<div>
+<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">Screen 3 — sport selector</p>
+<div style="background:var(--surface-1);border-radius:16px;padding:12px">
+<div style="display:flex;gap:8px">
+<button style="flex:1;background:var(--fill-primary);color:var(--on-primary);border:none;border-radius:var(--radius);padding:10px;font-size:14px;font-weight:500">NFL</button>
+<button disabled style="flex:1;background:var(--surface-2);color:var(--text-disabled);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px;font-size:14px">NHL</button>
+<button disabled style="flex:1;background:var(--surface-2);color:var(--text-disabled);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px;font-size:14px">NBA</button>
+</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

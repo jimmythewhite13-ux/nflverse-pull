@@ -194,3 +194,48 @@ def insert_data_quality(
          int(source_conflict_flag)),
     )
     conn.commit()
+
+
+def insert_prediction_audit_metrics(
+    conn: sqlite3.Connection, run_id: int, margin_error: float, brier_score: float,
+    computed_at: str, clv_movement: float | None = None,
+) -> None:
+    """INSERT OR REPLACE, deliberately -- unlike a prediction, an audit metric MAY legitimately
+    be recomputed for the same run_id (e.g. CLV becomes computable only once the closing tier
+    is durable, some time after margin_error/brier_score already were) without that being a
+    real correction of the underlying prediction itself, which stays immutable regardless."""
+    conn.execute(
+        "INSERT OR REPLACE INTO prediction_audit_metrics (run_id, margin_error, brier_score, "
+        "clv_movement, computed_at) VALUES (?, ?, ?, ?, ?)",
+        (run_id, margin_error, brier_score, clv_movement, computed_at),
+    )
+    conn.commit()
+
+
+def set_game_workflow_status(
+    conn: sqlite3.Connection, game_id: str, status: str, status_reason: str | None,
+    updated_at: str,
+) -> None:
+    """The one real, deliberate UPSERT in this module -- unlike a prediction, a game's own
+    workflow status legitimately transitions over time (PENDING -> READY -> PREDICTED ->
+    COMPLETED -> AUDITED, or -> NOT_PREDICTABLE / BLOCKED) for the SAME real game_id; keeping a
+    full history of every transition is real, additional scope not required by the governing
+    task (which asks for current status, not a transition log) -- `change_log`-style history is
+    covered separately via real git commit history on this table's own writers, not duplicated
+    here."""
+    valid = {"PENDING", "READY", "PREDICTED", "COMPLETED", "AUDITED", "NOT_PREDICTABLE",
+              "BLOCKED"}
+    if status not in valid:
+        raise ValueError(f"Unknown game workflow status {status!r}")
+    if status in ("NOT_PREDICTABLE", "BLOCKED") and not status_reason:
+        raise ValueError(
+            f"status_reason is required for status={status!r} -- never leave silently blank."
+        )
+    conn.execute(
+        "INSERT INTO game_workflow_status (game_id, status, status_reason, updated_at) "
+        "VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(game_id) DO UPDATE SET status=excluded.status, "
+        "status_reason=excluded.status_reason, updated_at=excluded.updated_at",
+        (game_id, status, status_reason, updated_at),
+    )
+    conn.commit()

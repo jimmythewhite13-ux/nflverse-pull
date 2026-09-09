@@ -1,0 +1,80 @@
+name: Prediction freeze (live weekly workflow)
+
+# Live Weekly Workflow, Steps 3+5. Distinct trigger condition from the other two workflows --
+# not just a different cadence: this one checks whether any real game has crossed its real
+# 48-hour-before-kickoff cutoff, which the daily-refresh/line-capture jobs never evaluate.
+# Folded together with Step 4 (results + audit) per the governing task's own suggestion --
+# both are cheap no-ops most ticks (see prediction_freeze.py/results_and_audit.py's own real
+# CadenceSkip checks) and share the same real self-enforcement + retry-on-push-conflict need.
+#
+# Explicit scope boundary, enforced structurally, not just by convention: this workflow's own
+# job runs the REAL, UNMODIFIED v35 champion formula only -- no HFA-A, no Travel-G, no research
+# candidate. The self-enforcement check below is not a courtesy here; it is the thing that
+# would catch this workflow's own future author trying to sneak a research variant in.
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # check every 6 hours for games crossing their real cutoff
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # real, required: this job commits real frozen predictions back to the repo
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Self-enforcement check (BEFORE)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
+
+      - name: Resolve current NFL season
+        id: season
+        run: echo "season=$(uv run python -m prediction_audit.ingestion.season)" >> "$GITHUB_OUTPUT"
+
+      # Real, deliberate retry-the-whole-cycle design -- same real rationale as
+      # daily_refresh.yml/line_capture.yml (a real concurrent-push race between the THREE
+      # workflows is a real possibility now that this one exists too; all three share the same
+      # binary sqlite file).
+      - name: Update game status, freeze due predictions, audit completed games, and push
+        run: |
+          git config user.name "nfl-model-agent[bot]"
+          git config user.email "actions@github.com"
+          for attempt in 1 2 3 4 5; do
+            echo "=== Attempt $attempt ==="
+            git fetch origin main
+            git reset --hard origin/main
+            uv run python -m prediction_audit.ingestion.game_status --season ${{ steps.season.outputs.season }}
+            uv run python -m prediction_audit.ingestion.prediction_freeze --season ${{ steps.season.outputs.season }}
+            uv run python -m prediction_audit.ingestion.results_and_audit --season ${{ steps.season.outputs.season }}
+            git add prediction_audit/db/prediction_audit.sqlite3
+            if git diff --cached --quiet; then
+              echo "No real data changes to commit (nothing due this tick)."
+              break
+            fi
+            git commit -m "chore(prediction-freeze): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if git push; then
+              echo "Real push succeeded on attempt $attempt."
+              break
+            fi
+            echo "Real push rejected (concurrent writer) -- retrying with fresh state."
+            sleep $(( (RANDOM % 10) + 2 ))
+            if [ "$attempt" = "5" ]; then
+              echo "::error::Real push failed after 5 attempts -- concurrent-writer contention did not clear."
+              exit 1
+            fi
+          done
+
+      - name: Self-enforcement check (AFTER)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check

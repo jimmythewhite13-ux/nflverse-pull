@@ -276,6 +276,42 @@ CREATE INDEX IF NOT EXISTS idx_raw_roster_ingestion ON raw_roster_snapshots(inge
 CREATE INDEX IF NOT EXISTS idx_raw_schedule_ingestion ON raw_schedule_checks(ingestion_id);
 CREATE INDEX IF NOT EXISTS idx_raw_market_game
     ON raw_market_captures(game_id, sportsbook, market_type);
+
+-- ==== Live Weekly Workflow (2026-09-08) -- two genuinely new tables this required ===========
+-- Every other piece of "2026 Game Schedule / Pre-Game Snapshot / Market Capture / Results /
+-- Prediction Audit / Data Quality" the governing task described already exists under a
+-- different name (predictions/component_contributions already ARE the immutable
+-- capture-snapshot mechanism; results/market_lines/raw_market_captures already exist; Margin
+-- Error already has a real view below). Two real gaps: (1) nothing tracked a GAME's own
+-- workflow status independent of whether a prediction_runs row exists for it yet -- a Week 1-3
+-- game that will NEVER get a real prediction run (NOT_PREDICTABLE, by design) had nowhere to
+-- record that fact; (2) no persisted home for real, computed-once audit metrics (Brier/CLV)
+-- against the live agent's own raw_market_captures table -- v_clv exists but is keyed to the
+-- OLDER market_lines table, not raw_market_captures.
+CREATE TABLE IF NOT EXISTS game_workflow_status (
+    game_id        TEXT PRIMARY KEY REFERENCES games(game_id),
+    status         TEXT NOT NULL CHECK (status IN (
+                       'PENDING', 'READY', 'PREDICTED', 'COMPLETED', 'AUDITED',
+                       'NOT_PREDICTABLE', 'BLOCKED'
+                   )),
+    status_reason  TEXT,             -- real, human-readable reason -- required whenever status
+                                      -- is NOT_PREDICTABLE or BLOCKED, never left silently blank
+    updated_at     TEXT NOT NULL     -- ISO8601, real
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_workflow_status ON game_workflow_status(status);
+
+-- Real, computed-once audit metrics per prediction run, once a game is COMPLETED. Computed
+-- fresh from real predictions+results+raw_market_captures at write time (never re-derived from
+-- a stale cache elsewhere) -- see ingestion/results_and_audit.py, the one real writer.
+CREATE TABLE IF NOT EXISTS prediction_audit_metrics (
+    run_id          INTEGER PRIMARY KEY REFERENCES prediction_runs(run_id),
+    margin_error    REAL NOT NULL,   -- projected_margin - actual_margin
+    brier_score     REAL NOT NULL,   -- (home_win_probability - actual_home_win)^2
+    clv_movement    REAL,            -- closing_line - opening_line, NULL if not yet durable
+                                      -- (see v_ingestion_market_tiers' own real caveat)
+    computed_at     TEXT NOT NULL    -- ISO8601, real
+);
 """
 
 VIEWS_SQL = """

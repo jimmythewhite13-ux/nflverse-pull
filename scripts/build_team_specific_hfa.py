@@ -15,11 +15,12 @@ toward the league-average HFA, don't let one weird year produce an extreme numbe
 mechanism the spec calls for -- no new Section 4/5 Z-score composite is needed here, since
 this feeds a direct points-value substitute for C3, not a matchup Z-score differential.
 
-Verified live before building this: real 2025 league-wide average HFA (Home Margin - Away
-Margin, single season, unregressed) is 4.18 points -- meaningfully higher than the model's
-flat 2.0pt assumption, illustrating exactly why a single season's raw HFA shouldn't be
-trusted at face value (real variance the 3-yr decay-weighted regression is meant to correct
-for).
+Real, fixed 2026-09-09 (PROGRESS.md's "Real bug found and fixed" entry): raw HFA is (Home
+Margin - Away Margin) / 2, not the unhalved difference -- a team's real Home Margin ~=
+strength + h and Away Margin ~= strength - h, so the unhalved difference is 2h, not h (team
+strength cancels out). The pre-fix, unhalved version put 2025's real league-wide average HFA
+at 4.18 points against a real published NFL figure near 2.0; halved, it lands at 2.09,
+matching real published figures for all three real historical seasons checked.
 
 Also carries a small, real reference table (Section 4: Team | Stadium UTC Offset) feeding
 Part C's travel-direction signal on Week 1 Matchups (build_game_environment_wiring.py) --
@@ -98,7 +99,16 @@ def _pull_data():
     sched = fetch_schedules(HISTORICAL_YEARS)
     splits = compute_team_season_home_away_splits(sched)
     splits = splits.copy()
-    splits["HFA"] = splits["Home Margin"] - splits["Away Margin"]
+    # Real, fixed 2026-09-09 (see PROGRESS.md's "Real bug found and fixed" entry): a team's
+    # real Home Margin ~= team_strength + h and real Away Margin ~= team_strength - h (h = true
+    # home-field advantage), so their real difference is ~2h, not h -- team_strength cancels,
+    # leaving DOUBLE the real per-game HFA signal. Confirmed against real league-wide averages
+    # (5.32/3.67/4.18 for 2023/2024/2025 pre-fix, landing on ~2.66/1.84/2.09 -- real, published
+    # NFL HFA figures -- once halved) and confirmed nothing in Section 2/3's own real formula
+    # chain downstream ever divided by 2. The real /2 belongs HERE, at the source, not scattered
+    # into Section 2/3's own formulas (which read this column directly and recompute correctly
+    # once it's fixed here).
+    splits["HFA"] = (splits["Home Margin"] - splits["Away Margin"]) / 2
     return splits
 
 
@@ -262,17 +272,20 @@ def build(workbook_path: str) -> dict:
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=8)
     note = ws.cell(row=note_row, column=1, value=(
         "claude_code_spec_game_environment_upgrades.md Part A (+ Part C's reference table "
-        "in Section 4). Verified live before building this: real 2025 league-wide average "
-        "HFA (Home Margin - Away Margin, single season, UNREGRESSED) is 4.18 points, "
-        "meaningfully higher than the model's own flat 2.0pt Home Field Advantage constant "
-        "(Model Assumptions C3, which stays in place as the model-wide fallback/reference "
-        "-- not deleted) -- real illustration of why a single season's raw HFA shouldn't be "
-        "trusted at face value. Section 3's Regressed Team-Specific HFA (col H) reuses the "
-        "IDENTICAL Team-History-blend (C22) + League-Baseline-blend (C21) regression-to-"
-        "mean mechanism every other tab's own Section 3 already uses -- no new constants, "
-        "per the spec's own explicit instruction. NOT wired into Team Ratings -- HFA is "
-        "inherently a per-game factor (whichever team is playing at home this specific "
-        "week), referenced directly by Week 1 Matchups' own wiring instead."
+        "in Section 4). Real, fixed 2026-09-09 (see PROGRESS.md's \"Real bug found and "
+        "fixed\" entry): Section 1's raw HFA is (Home Margin - Away Margin) / 2, not the "
+        "unhalved difference -- a team's real Home Margin ~= strength + h and Away Margin "
+        "~= strength - h, so their unhalved difference is 2h, not h (team strength cancels). "
+        "The earlier, unhalved version of this tab put 2025's real league-wide average at "
+        "4.18 points (vs. a real published NFL HFA near 2.0) -- halved, it lands at 2.09, "
+        "matching real published figures. Section 3's Regressed Team-Specific HFA (col H) "
+        "reuses the IDENTICAL Team-History-blend (C22) + League-Baseline-blend (C21) "
+        "regression-to-mean mechanism every other tab's own Section 3 already uses -- no new "
+        "constants, per the spec's own explicit instruction; the real /2 fix lives only in "
+        "Section 1's own raw estimator, not scattered into this regression machinery, which "
+        "was always correct given a correctly-scaled input. NOT wired into Team Ratings -- "
+        "HFA is inherently a per-game factor (whichever team is playing at home this "
+        "specific week), referenced directly by Week 1 Matchups' own wiring instead."
     ))
     note.font = NOTE_FONT
     note.alignment = Alignment(wrap_text=True, vertical="top")

@@ -109,7 +109,10 @@ def main(season: int, data_version: str | None = None) -> None:
         "fixed at 0.0 (both sides), every other real term unchanged. See "
         "prediction_audit/phase_reports/phase12_final_specification.md.",
         frozen_at=datetime.now(UTC).isoformat(),
-        workbook_sha256="ac54ed4b893a0aae818a5419496e2e69fe60614afee92dea40e8a4585acdcb7d",
+        # Real, updated 2026-09-09 after the real raw-HFA-estimator fix (PROGRESS.md's "Real
+        # bug found and fixed" entry) -- this is the frozen baseline's real, CURRENT SHA-256,
+        # tag v35-audit-passed-hfa-raw-estimator-fix.
+        workbook_sha256="372e54548a2c5e978aa464c557230c8a8c3091b8fffcdea310563bfc341e4c23",
     )
 
     print(f"Fetching real data for season {season - 3}-{season}...")

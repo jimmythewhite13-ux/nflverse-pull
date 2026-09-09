@@ -27,7 +27,7 @@ def resolve_team_specific_hfa_history(
     sched: pd.DataFrame, target_season: int, team: str,
 ) -> TeamSpecificHFAHistory:
     """
-    Real Y1/Y2/Y3 = raw HFA (Home Margin - Away Margin) for the 3 full real prior seasons.
+    Real Y1/Y2/Y3 = raw HFA ((Home Margin - Away Margin) / 2) for the 3 full real prior seasons.
     Real league_baseline_y1 = the real 32-team average raw HFA for target_season-1 (Section 2's
     own real AVERAGEIF-across-32-teams logic). Raises ValueError (never fabricates) if `team`
     has no real qualifying home/away split in any of the 3 real prior seasons.
@@ -35,7 +35,12 @@ def resolve_team_specific_hfa_history(
     normalized = normalize_relocated_abbreviations(sched)
     splits = compute_team_season_home_away_splits(normalized)
     splits = splits.copy()
-    splits["HFA"] = splits["Home Margin"] - splits["Away Margin"]
+    # Real, fixed 2026-09-09 (matches scripts/build_team_specific_hfa.py's own real fix, same
+    # PROGRESS.md entry): Home Margin - Away Margin structurally equals 2x true HFA (team
+    # strength cancels in the subtraction), confirmed against real league-wide averages and the
+    # complete absence of any compensating /2 anywhere downstream (Section 2/3's real formula
+    # chain, and this module's own compute_team_specific_hfa() call below).
+    splits["HFA"] = (splits["Home Margin"] - splits["Away Margin"]) / 2
 
     def _hfa_for(season: int) -> pd.DataFrame:
         return splits[splits["Season"] == season]

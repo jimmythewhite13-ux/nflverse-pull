@@ -30,9 +30,15 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-TAG = "v35-audit-passed-hfa-fix"
+# Real, deliberate re-tag (2026-09-09): the prior tag (v35-audit-passed-hfa-fix) reflected the
+# workbook BEFORE the real raw-HFA-estimator factor-of-2 fix (PROGRESS.md's "Real bug found and
+# fixed" entry) -- referencing it here after that real, authorized fix would make every future
+# self-enforcement run fail against a checkpoint that is now known to be wrong, not a real drift
+# alarm. Same real process Phase 0 itself established: fix, verify, re-tag, point here at the
+# new tag.
+TAG = "v35-audit-passed-hfa-raw-estimator-fix"
 FROZEN_XLSX = REPO_ROOT / "prediction_audit/frozen_baselines/NFL_Prediction_Model_v35.xlsx"
-REAL_TAGGED_SHA256 = "ac54ed4b893a0aae818a5419496e2e69fe60614afee92dea40e8a4585acdcb7d"
+REAL_TAGGED_SHA256 = "372e54548a2c5e978aa464c557230c8a8c3091b8fffcdea310563bfc341e4c23"
 PRODUCTION_PIPELINE = REPO_ROOT / "prediction_audit/production_pipeline_v35_hfa_a.py"
 ALLOWED_OVERRIDE_KEYS = {"flat_hfa", "hfa_delta_home", "hfa_delta_away"}
 

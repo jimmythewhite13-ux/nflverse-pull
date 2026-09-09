@@ -43,13 +43,16 @@ def _fake_schedule():
 def test_resolve_team_specific_hfa_history_uses_real_3yr_raw_hfa():
     sched = _fake_schedule()
     history = resolve_team_specific_hfa_history(sched, target_season=2024, team="Buffalo Bills")
-    # Away Margin = away_score - home_score (BUF's own real margin as the visitor).
-    # 2023 (Y1): home margin 24-10=14, BUF away margin 17-10=7 -> HFA=14-7=7
-    assert history.y1 == pytest.approx(7.0)
-    # 2022 (Y2): home margin 28-14=14, BUF away margin 20-13=7 -> HFA=14-7=7
-    assert history.y2 == pytest.approx(7.0)
-    # 2021 (Y3): home margin 30-10=20, BUF away margin 24-17=7 -> HFA=20-7=13
-    assert history.y3 == pytest.approx(13.0)
+    # Away Margin = away_score - home_score (BUF's own real margin as the visitor). Real, fixed
+    # 2026-09-09: raw HFA is (Home Margin - Away Margin) / 2, not the unhalved difference -- see
+    # PROGRESS.md's "Real bug found and fixed" entry (Home Margin ~= strength + h, Away Margin
+    # ~= strength - h, so their unhalved difference is 2h, not h).
+    # 2023 (Y1): home margin 24-10=14, BUF away margin 17-10=7 -> HFA=(14-7)/2=3.5
+    assert history.y1 == pytest.approx(3.5)
+    # 2022 (Y2): home margin 28-14=14, BUF away margin 20-13=7 -> HFA=(14-7)/2=3.5
+    assert history.y2 == pytest.approx(3.5)
+    # 2021 (Y3): home margin 30-10=20, BUF away margin 24-17=7 -> HFA=(20-7)/2=6.5
+    assert history.y3 == pytest.approx(6.5)
 
 
 def test_resolve_team_specific_hfa_history_raises_on_missing_team():

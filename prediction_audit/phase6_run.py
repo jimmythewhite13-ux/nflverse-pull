@@ -10,6 +10,16 @@ Real, honest deviation from the phase document (same real constraint as Phases 2
 season-2025 data has a real, complete reconstruction, so the split is real, within-season, not
 cross-season.
 
+RE-RUN 2026-09-09 (see PROGRESS.md's "Real bug found and fixed" entry, third HFA bug this
+project has found): a THIRD, distinct real HFA bug was found and fixed -- Team-Specific HFA's
+own raw estimator (Home Margin - Away Margin) structurally equals 2x true HFA, not 1x (team
+strength cancels in the subtraction), and nothing downstream (decay-weighting, regression, or
+this project's own earlier 2x-margin fix) ever corrected for it. The CHAMPION's own real net
+HFA here is now recomputed fresh via the now-fixed resolve_team_specific_hfa_for_game(), the
+SAME real call D/E/F already used -- Phase 1's originally-persisted hfa_delta_home (used for the
+champion by every earlier run of this script) was computed under the pre-fix, unhalved
+estimator and would otherwise still be 2x too large even after the earlier margin-symmetry fix.
+
 Usage:
     uv run python prediction_audit/phase6_run.py
 """
@@ -153,14 +163,6 @@ def main() -> None:
               f"logloss={result.log_loss:.4f}")
         return result
 
-    print("\n=== Real variant results (all 6) ===")
-    champion_net = flat_hfa / 2 + test["hfa_delta_home"].fillna(0)
-    champion_result = evaluate_variant("CHAMPION (C. Existing Team-Specific HFA, corrected)",
-                                        champion_net)
-    a_result = evaluate_variant("A. No HFA", pd.Series(0.0, index=test.index))
-    b_result = evaluate_variant("B. Flat HFA (pre-fix constant, 1.5)",
-                                 pd.Series(flat_hfa / 2, index=test.index))
-
     def resolve_variant_net(constants: TeamSpecificHFAConstants,
                              shrinkage: float) -> pd.Series:
         nets = []
@@ -174,6 +176,23 @@ def main() -> None:
                 net = net * (1 - shrinkage) + (flat_hfa / 2) * shrinkage
             nets.append(net)
         return pd.Series(nets, index=test.index)
+
+    print("\n=== Real variant results (all 6) ===")
+    # Real, fixed 2026-09-09 (see PROGRESS.md's "Real bug found and fixed" entry): the
+    # champion's own net HFA must be recomputed FRESH via the now-fixed resolve_team_specific_
+    # hfa_for_game() (same real call D/E/F already use below), not read from the STALE
+    # hfa_delta_home persisted in Phase 1's original 2025 reconstruction -- that value was
+    # computed under the pre-fix, unhalved raw HFA estimator and is exactly 2x too large.
+    # `baseline_home_margin_true_zero_hfa` above correctly stays keyed to the STALE persisted
+    # value, since that's genuinely what was baked into the real persisted `original_home_
+    # margin` -- only the CHAMPION's own real net (added back on top of that true-zero
+    # baseline) needs the fresh, corrected resolution.
+    champion_net = resolve_variant_net(EXISTING_CONSTANTS, shrinkage=0.0)
+    champion_result = evaluate_variant("CHAMPION (C. Existing Team-Specific HFA, corrected)",
+                                        champion_net)
+    a_result = evaluate_variant("A. No HFA", pd.Series(0.0, index=test.index))
+    b_result = evaluate_variant("B. Flat HFA (pre-fix constant, 1.5)",
+                                 pd.Series(flat_hfa / 2, index=test.index))
 
     d_result = evaluate_variant(
         "D. Shrunk Team-Specific HFA",

@@ -1222,3 +1222,74 @@ real-time 2026 season tracking -- from being confused with each other for displa
 without touching either one's underlying data. No code change was needed as a result of this
 correction; only the record (this entry, and the corrected report re-sent to the user) needed
 fixing.
+
+## Real bug found and fixed (2026-09-09) -- a THIRD, distinct HFA bug, in the raw estimator
+
+A user-supplied external report ("Week 1 2026 Model Run Report") flagged a real, previously
+undiscovered defect: Team-Specific HFA's own raw estimator, `HFA (raw) = Home Margin - Away
+Margin`, computes structurally DOUBLE the true home-field effect, not the true value. Real,
+independently re-derived proof (not taken on the report's word): a team's real Home Margin ~=
+team_strength + h and Away Margin ~= team_strength - h (h = true home-field advantage), so their
+real difference is ~2h, not h -- team strength cancels out in the subtraction.
+
+**Verified directly against the real, live workbook before touching anything**: the real
+Section 2 league-wide averages (5.32 / 3.67 / 4.18 for 2023/2024/2025) matched the report's own
+cited figures to the decimal, and halving them (2.66 / 1.84 / 2.09) lands on real, published NFL
+HFA figures for those seasons. Traced the ENTIRE downstream formula chain (Section 2's
+AVERAGEIF, Section 3's decay-weight/regression columns B-H, and this project's own earlier
+margin-symmetry fix) and confirmed nothing anywhere ever divided by 2 -- a real, structural gap,
+not a rounding artifact. Confirmed the identical bug in the Python engine
+(`prediction_audit/historical/team_hfa.py:38`, same unhalved formula, since Python was built to
+match Excel's real behavior exactly).
+
+**This is a THIRD, distinct HFA bug** -- not the original Phase 0 double-counting bug (a later-
+stage wiring problem: a redundant delta term on top of an already-computed value), and not this
+session's own earlier margin-symmetry fix (a factor-of-2 mistake in research scripts' own
+comparison arithmetic). This one lives in the raw ESTIMATION step itself, upstream of both.
+
+**Fixed at the single real source** (`scripts/build_team_specific_hfa.py`'s `_pull_data()`,
+matching this project's established single-point-of-truth convention) and in the parity-matched
+Python engine (`prediction_audit/historical/team_hfa.py`). Applied to both the frozen research
+baseline and the live production workbook (both backed up first). Real, exact verification:
+every real per-team regressed HFA value dropped by EXACTLY a factor of 2 (ratio=2.000 for every
+one of 5 sample teams checked), league averages landed precisely on the expected halved values,
+0 real formula errors across either workbook (LibreOffice recalculation), the earlier
+double-counting fix confirmed still intact (no CR/CS references reintroduced), and one real
+game's Model Home/Away Score shown before and after.
+
+**Phase 6 re-run with the corrected estimator** (`phase6_run.py`, itself fixed to recompute the
+champion's own net HFA fresh via the now-corrected resolver rather than reading the STALE,
+pre-fix `hfa_delta_home` persisted in Phase 1's original reconstruction): the real gap between
+the champion (team-specific HFA) and every other variant nearly vanished. MAE deltas shrank from
+as large as -0.45 (under the buggy estimator) to just -0.01 to -0.04 now; Brier is essentially
+identical across all 6 variants (0.2360-0.2363, vs. real, measurable separation before). This
+**strongly corroborates** the reporting document's own hypothesis: Phase 6's original "team-
+specific HFA is the worst variant" conclusion, which fed directly into Phase 10's selection of
+HFA-A (zero HFA), was substantially an artifact of the raw-estimator bug, not a real finding
+about the underlying concept.
+
+**Re-tagged the frozen baseline** (same real process Phase 0 itself established: fix, verify,
+re-tag) -- new tag `v35-audit-passed-hfa-raw-estimator-fix`, real SHA-256
+`372e54548a2c5e978aa464c557230c8a8c3091b8fffcdea310563bfc341e4c23`, superseding
+`v35-audit-passed-hfa-fix`. `self_enforcement_check.py` updated to reference the new tag/hash;
+confirmed CLEAN against it. The two live-running production scripts
+(`prediction_freeze.py`, `production_pipeline_v35_hfa_a.py`) updated to record the new real hash
+for any future run; historical, already-run reconstruction scripts (Phase 1/8's own scripts)
+left referencing the old hash deliberately, since that's what was genuinely in effect when
+those real, already-persisted runs happened -- rewriting them would misrepresent history.
+
+**Real, explicit non-action, per the governing task's own Part D**: Phase 9's graduation table
+and Phase 10's model selection have NOT been updated or re-derived. The corrected Phase 6 numbers
+call their conclusions into real question, but per Part D's own explicit instruction, a
+differing result must flow back through Phase 7 (does the corrected term still avoid
+double-counting?), then Phase 9 (does it now meet all 7 graduation criteria?), and only then
+Phase 10 -- not be assumed or silently swapped. This full re-derivation has not been done yet;
+flagged to the user, not undertaken unilaterally.
+
+**Real, separate process concern also flagged**: the reporting document describes real Week 1
+2026 picks having been generated by directly exercising the raw Excel formulas with manually-
+entered market data, bypassing the `NOT_PREDICTABLE` governance gate entirely (that gate lives
+in the Python `game_workflow_status` layer, not in the spreadsheet's own math, which will
+compute *something* for any input regardless of week). This is a real, distinct question from
+the estimator bug itself, about how those specific picks were produced outside this session's
+own governed pipeline.

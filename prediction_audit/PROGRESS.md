@@ -1171,3 +1171,54 @@ populating before that season's data collection ended. Last real season with any
 This is the same dead legacy dataset already confirmed BLOCKED in the v35 audit and reconfirmed
 in Phase 5, just rediscovered under a different filename/description -- not a new resolution.
 AGL and Injury Adj remain BLOCKED.
+
+## Live Weekly Workflow -- Steps 1-5 built (2026-09-08/09), real production formula only
+
+Built from scratch (Option B, user-confirmed) after flagging that the task's own "already
+exists and works" premises (a referenced `build_remaining_2026_tabs.md`, a claimed
+`capture_snapshot.py`, 8 described 2026 tabs) didn't match the real repo -- none of it existed.
+Real work delivered: `game_workflow_status` table + `game_status.py` (Weeks 1-3 correctly
+NOT_PREDICTABLE, 48/48; Weeks 4+ READY, 224/224, after fixing a real abbreviation-vs-full-name
+bug, same recurring class as Phase 4/7); `capture_snapshot.py` (a thin, now genuinely tested
+wrapper around write.py's existing immutable-insert discipline -- the double-capture-produces-
+a-correction-record claim is real and passing for the first time, not merely asserted);
+`prediction_freeze.py` (runs the REAL, unmodified v35 champion formula only -- no HFA-A, no
+research candidate -- for READY games past a real, newly-adopted 48h-before-kickoff cutoff);
+`results_and_audit.py` (real Margin Error/Brier/CLV once games complete); a new
+`.github/workflows/prediction_freeze.yml` sharing the same real self-enforcement + retry-on-
+concurrent-push design as the other two workflows; and 9 new Excel tabs
+(`scripts/build_2026_live_tabs.py`) mirroring the live SQLite state. Triggered live in real
+GitHub Actions and confirmed clean (self-enforcement CLEAN before and after, correct honest
+SKIPPED no-ops for both new jobs since no real Week 4+ game has reached its cutoff yet). Full
+real report: sent to user as `live_weekly_workflow_report.md` -- **superseded in part, see the
+correction immediately below.**
+
+Real first-test dates, stated precisely rather than worked around: Step 3 first becomes testable
+2026-09-29T20:15:00Z (PIT@CLE, Week 4's earliest kickoff minus 48h); Step 4 shortly after that
+game's real result posts.
+
+## CORRECTION (2026-09-09): the "stale demo rows" finding in the report above was wrong
+
+While attempting the demo-row cleanup the user requested (per a separate, appropriately
+cautious `cleanup_stale_demo_rows.md` that required verifying the real numbers before deleting
+anything -- exactly the discipline that caught this), a real check turned up 273 real
+`prediction_runs` rows tied to the "stale" game_ids, not the 1 demo row originally reported.
+272 of them carry `data_version='python_model_engine_full_reconstruction_2026'`, traced to
+`prediction_audit/ingest_step5_market_lines.py` -- a real, legitimate, already-completed **Step
+5 of the original 15-step master-spec project (Part A)**: a genuine prediction_runs+predictions
+row for all 272 real 2026 games using the actual verified Excel ground-truth values (Model
+Home/Away Score, Win Probability) plus real market lines. Its own docstring states explicitly
+this is a deliberate, real, separate dataset from `seed_v35_demo.py`'s one row -- both legitimate,
+both real, sharing a game_id convention (full team names) that predates the live agent's own
+season=2026 usage.
+
+**Real, corrected conclusion: nothing here is stale demo junk. Nothing was deleted, and nothing
+should be.** The earlier report's "stale demo rows" framing was inaccurate -- these are real
+Part A project history that must be preserved. The existing, already-shipped fix (the Live
+Weekly Workflow's new tabs join through `game_workflow_status`, which only ever contains the
+live agent's own real game_ids) remains the correct, permanent, non-destructive way to keep
+these two legitimate real datasets -- Part A's frozen-formula verification and the live agent's
+real-time 2026 season tracking -- from being confused with each other for display purposes,
+without touching either one's underlying data. No code change was needed as a result of this
+correction; only the record (this entry, and the corrected report re-sent to the user) needed
+fixing.

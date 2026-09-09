@@ -33,6 +33,17 @@ from prediction_audit.ingestion.log import CadenceSkip, SourceUnavailable, run_j
 BASE = "https://api.the-odds-api.com/v4"
 SOURCE = "The Odds API (api.the-odds-api.com)"
 
+# Real, fixed 2026-09-09 (see PROGRESS.md's real bug report): this ingestion had NO book
+# filtering at all -- confirmed live, raw_market_captures held 9 distinct real books, 6 of them
+# never approved for this project (betonlineag, betrivers, betus, bovada, lowvig, mybookieag --
+# Bovada/BetOnline explicitly refused earlier in this project, MyBookie explicitly "stays 100%
+# manual"). Real, deliberate ALLOW-list (default-deny), not a block-list of known-bad names --
+# a new or renamed offshore book can't sneak through just because it wasn't named in advance.
+# "williamhill_us" is Caesars' REAL Odds API bookmaker key (confirmed live in
+# check_odds_api_coverage.py's own real coverage check, not "caesars" literally -- that
+# string is never returned by the real API).
+APPROVED_BOOKMAKERS = {"draftkings", "fanduel", "betmgm", "williamhill_us"}
+
 
 def _load_env_key() -> str:
     # Real CI path first: GitHub Actions injects the real secret as an env var (no .env file
@@ -147,6 +158,8 @@ def _write(conn: sqlite3.Connection, ingestion_id: int, season: int) -> int:
         kickoff_time = event.get("commence_time")
         for bm in event.get("bookmakers", []):
             book = bm["key"]
+            if book not in APPROVED_BOOKMAKERS:
+                continue  # real, deliberate default-deny -- see APPROVED_BOOKMAKERS docstring
             for market in bm.get("markets", []):
                 mkey = market["key"]
                 market_type = {"h2h": "moneyline", "spreads": "spread",

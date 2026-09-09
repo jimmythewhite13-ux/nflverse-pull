@@ -3,7 +3,7 @@ Section 5 of the governing spec: before and after every scheduled ingestion run,
 production model hasn't drifted from what `v35-audit-passed-hfa-fix` validated. Fails LOUDLY
 (non-zero exit, printed to stdout so CI surfaces it) on ANY real drift -- never a silent pass.
 
-Three real, independent checks, not one broad "diff everything":
+Four real, independent checks, not one broad "diff everything":
 
 1. **Frozen workbook byte-for-byte integrity** -- the real mathematical source of truth. A
    real SHA-256 mismatch here means the actual formulas/coefficients changed, full stop.
@@ -17,6 +17,11 @@ Three real, independent checks, not one broad "diff everything":
    (`flat_hfa`, `hfa_delta_home`, `hfa_delta_away`) and nothing else. A direct, real source
    inspection (not a git diff, since this file postdates the tag) -- catches scope creep in the
    one intentional, documented deviation from frozen v35.
+4. **No un-flagged, unapproved sportsbook in the live agent's real market captures** -- every
+   real row in `raw_market_captures` not marked `flagged_excluded_source=1` (an acknowledged
+   historical exception) must reference an approved book. The database-level trigger
+   (schema.py) should make a new violation impossible; this check catches it anyway if it ever
+   somehow doesn't.
 
 Usage:
     uv run python -m prediction_audit.ingestion.self_enforcement_check
@@ -114,11 +119,45 @@ def check_production_override_scope() -> list[str]:
     return problems
 
 
+def check_no_unapproved_sportsbook_rows() -> list[str]:
+    """Real, fixed 2026-09-09 (see PROGRESS.md's real bug report on offshore books): every real
+    NON-flagged row in raw_market_captures must reference an approved sportsbook -- a flagged
+    row (flagged_excluded_source=1) is an acknowledged, preserved historical exception, not a
+    live compliance violation; this check only flags a NEW, un-flagged violation, which the
+    real database-level trigger (schema.py) should make impossible going forward regardless."""
+    import sqlite3
+
+    from prediction_audit.db.schema import DEFAULT_DB_PATH
+
+    db_path = Path(DEFAULT_DB_PATH)
+    if not db_path.exists():
+        return []  # a fresh checkout with no real DB yet -- nothing to check
+    conn = sqlite3.connect(db_path)
+    try:
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(raw_market_captures)")]
+        if "flagged_excluded_source" not in cols:
+            return ["CRITICAL: raw_market_captures.flagged_excluded_source column is missing "
+                    "-- the real sportsbook allow-list migration has not been applied."]
+        rows = conn.execute(
+            "SELECT DISTINCT sportsbook FROM raw_market_captures "
+            "WHERE flagged_excluded_source = 0 "
+            "AND sportsbook NOT IN (SELECT name FROM approved_sportsbooks)"
+        ).fetchall()
+    finally:
+        conn.close()
+    if rows:
+        return [f"CRITICAL: real, un-flagged row(s) reference unapproved sportsbook(s): "
+                f"{sorted(r[0] for r in rows)} -- the database-level trigger should have "
+                f"rejected these; investigate how they landed here."]
+    return []
+
+
 def main() -> int:
     all_problems: list[str] = []
     all_problems += check_workbook_integrity()
     all_problems += check_engine_files_unchanged()
     all_problems += check_production_override_scope()
+    all_problems += check_no_unapproved_sportsbook_rows()
 
     if all_problems:
         print("=== SELF-ENFORCEMENT CHECK FAILED -- real drift detected ===\n")
@@ -131,7 +170,8 @@ def main() -> int:
 
     print(f"Self-enforcement check: CLEAN. Frozen workbook SHA-256 matches tag {TAG} exactly "
           f"({REAL_TAGGED_SHA256}). All engine/historical files unchanged vs. tag. Production "
-          f"override zeroes exactly the 3 Phase-12-sanctioned keys, no more, no fewer.")
+          f"override zeroes exactly the 3 Phase-12-sanctioned keys, no more, no fewer. No "
+          f"un-flagged, unapproved sportsbook rows found.")
     return 0
 
 

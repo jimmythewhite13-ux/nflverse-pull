@@ -250,25 +250,56 @@ CREATE TABLE IF NOT EXISTS raw_schedule_checks (
     source          TEXT NOT NULL
 );
 
+-- Real, fixed 2026-09-09 (see PROGRESS.md's real bug report): the approved-sportsbook allow-
+-- list, database-level. A bare FK on raw_market_captures.sportsbook was considered and
+-- rejected -- SQLite FK enforcement is unconditional, so it would make it impossible to keep
+-- the already-captured offshore rows (bovada/mybookieag/betonlineag/betrivers/betus/lowvig) in
+-- the SAME table for audit visibility, which is the explicit, real requirement. A BEFORE
+-- INSERT trigger (below, after the table) achieves the same real "database rejects a bad
+-- INSERT, not just application code" guarantee for every FUTURE row, without touching
+-- historical ones.
+CREATE TABLE IF NOT EXISTS approved_sportsbooks (
+    name TEXT PRIMARY KEY   -- real Odds API bookmaker key, e.g. 'draftkings', 'williamhill_us'
+                             -- (Caesars' real key -- confirmed live, not the string 'caesars')
+);
+INSERT OR IGNORE INTO approved_sportsbooks (name) VALUES
+    ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us');
+
 -- Real market-line captures for CLV -- deliberately NOT tagged 'opening'/'closing' at write
 -- time (a capture can't know it's the real LAST one before kickoff until kickoff has already
 -- happened). Every capture is a real, timestamped snapshot; `v_ingestion_market_tiers` below
 -- classifies opening/prediction_time/closing dynamically, same real pattern this project's
 -- own v_clv view already uses for the prediction-linked market_lines table.
 CREATE TABLE IF NOT EXISTS raw_market_captures (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    ingestion_id        INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
-    game_id             TEXT NOT NULL,
-    sportsbook          TEXT NOT NULL,
-    market_type         TEXT NOT NULL,   -- 'spread' / 'total' / 'moneyline'
-    line_value          REAL,
-    odds                REAL,
-    captured_at         TEXT NOT NULL,   -- ISO8601, real
-    kickoff_time        TEXT,            -- real, for real elapsed-time tier classification
-    source              TEXT NOT NULL,
-    market_data_status  TEXT NOT NULL DEFAULT 'MISSING'
-                         CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING'))
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id           INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    game_id                TEXT NOT NULL,
+    sportsbook             TEXT NOT NULL,
+    market_type            TEXT NOT NULL,   -- 'spread' / 'total' / 'moneyline'
+    line_value             REAL,
+    odds                   REAL,
+    captured_at            TEXT NOT NULL,   -- ISO8601, real
+    kickoff_time           TEXT,            -- real, for real elapsed-time tier classification
+    source                 TEXT NOT NULL,
+    market_data_status     TEXT NOT NULL DEFAULT 'MISSING'
+                            CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING')),
+    flagged_excluded_source INTEGER NOT NULL DEFAULT 0   -- 1 = real historical row from a
+                             -- sportsbook never approved for this project (audit visibility
+                             -- only, not deleted); 0 for every real row from an approved book,
+                             -- including every row a fresh install ever writes going forward
 );
+
+-- Real, deliberate database-level guarantee (Layer 2): rejects any NEW row whose sportsbook
+-- isn't in approved_sportsbooks -- a future script that forgets to filter (or a bug in this
+-- one) cannot silently insert an offshore book's line, regardless of application-code intent.
+-- Confirmed by this project's own real test: a direct INSERT with sportsbook='bovada' fails
+-- with a real SQLite constraint-violation error, not a description of intended behavior.
+CREATE TRIGGER IF NOT EXISTS trg_reject_unapproved_sportsbook
+BEFORE INSERT ON raw_market_captures
+WHEN NEW.sportsbook NOT IN (SELECT name FROM approved_sportsbooks)
+BEGIN
+    SELECT RAISE(ABORT, 'Sportsbook not in approved_sportsbooks (see PROGRESS.md)');
+END;
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_job ON ingestion_runs(job_name, run_timestamp);
 CREATE INDEX IF NOT EXISTS idx_raw_injury_ingestion ON raw_injury_reports(ingestion_id);

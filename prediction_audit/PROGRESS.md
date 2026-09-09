@@ -1293,3 +1293,36 @@ in the Python `game_workflow_status` layer, not in the spreadsheet's own math, w
 compute *something* for any input regardless of week). This is a real, distinct question from
 the estimator bug itself, about how those specific picks were produced outside this session's
 own governed pipeline.
+
+## Real bug found and fixed (2026-09-09) -- live agent captured unapproved offshore sportsbooks
+
+A user-supplied task flagged a real gap: `raw_market_captures` held real data from `bovada`,
+`mybookieag`, and `betonlineag` -- all explicitly excluded earlier in this project. Verified
+directly: the real problem was WORSE than described -- 6 unapproved books total (also
+`betrivers`, `betus`, `lowvig`), and `williamhill_us` (Caesars' real Odds API key, confirmed
+against this project's own earlier `check_odds_api_coverage.py` verification -- NOT the literal
+string "caesars", which the task's own example code had wrong) had never been captured at all.
+Root cause: `market_lines.py` had no book filtering whatsoever -- it captured every real book
+the Odds API returned.
+
+**Layer 1 (application)**: real allow-list (`APPROVED_BOOKMAKERS = {"draftkings", "fanduel",
+"betmgm", "williamhill_us"}`), default-deny, added to `market_lines.py`.
+
+**Layer 2 (database)**: a bare foreign key was considered and rejected -- SQLite FK enforcement
+is unconditional, incompatible with the explicit, real requirement to keep the already-captured
+offshore rows in the same table for audit visibility. Used a `BEFORE INSERT` trigger instead
+(`trg_reject_unapproved_sportsbook`), which achieves the identical real guarantee (a genuine
+database-level rejection, not just an application filter) for every future row, without
+touching historical ones. Added `approved_sportsbooks` (4 real books) and
+`raw_market_captures.flagged_excluded_source` to `schema.py` for fresh installs, plus a
+real, idempotent one-time migration (`migrate_approved_sportsbooks.py`) applied to the live
+database.
+
+**Real, verified evidence**: 4,298 real existing rows flagged `flagged_excluded_source=1`
+(preserved, not deleted). A real, live, manually-triggered `market_lines` run captured 953 new
+rows, confirmed 100% from approved books only (draftkings/fanduel/betmgm; williamhill_us still
+genuinely absent from real API results -- not fabricated). A real, direct `INSERT` with
+`sportsbook='bovada'` against the actual live database was confirmed REJECTED with a real
+`IntegrityError`, not just an in-memory test. `self_enforcement_check.py` extended with a 4th
+real check (zero un-flagged rows reference an unapproved book) and confirmed CLEAN. Full test
+suite (10755 tests) green throughout.

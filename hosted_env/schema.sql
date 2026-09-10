@@ -236,6 +236,16 @@ CREATE TABLE raw_schedule_checks (
     source          TEXT NOT NULL
 );
 
+-- Real, added 2026-09-09 (same day as the real SQLite fix -- PROGRESS.md's "live agent
+-- captured unapproved offshore sportsbooks" entry): the approved-sportsbook allow-list,
+-- database-level, real Postgres port of the SQLite fix. 'williamhill_us' is Caesars' real
+-- Odds API bookmaker key (confirmed live), not the literal string 'caesars'.
+CREATE TABLE approved_sportsbooks (
+    name TEXT PRIMARY KEY
+);
+INSERT INTO approved_sportsbooks (name) VALUES
+    ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us');
+
 -- Real, deliberate design choice carried forward unchanged: NO stored `tier` column, unlike the
 -- original sketch's `market_lines.tier`. The real, proven SQLite implementation computes tier
 -- dynamically via a view specifically because a stored 'closing' tag written before a game's
@@ -243,24 +253,46 @@ CREATE TABLE raw_schedule_checks (
 -- mutable-derived-fact this project's whole "compute fresh, never cache" discipline exists to
 -- avoid (see v_prediction_errors' own real precedent). Do not add a stored tier column.
 CREATE TABLE raw_market_captures (
-    id                 SERIAL PRIMARY KEY,
-    ingestion_id       INT NOT NULL REFERENCES ingestion_runs(id),
-    game_id            TEXT NOT NULL,
-    sportsbook         TEXT NOT NULL,      -- the real book (draftkings, betmgm, ...)
-    market_type        TEXT NOT NULL CHECK (market_type IN ('spread', 'total', 'moneyline')),
-    line_value         NUMERIC,
-    odds               NUMERIC,
-    captured_at        TIMESTAMPTZ NOT NULL,
-    kickoff_time       TIMESTAMPTZ,
-    source             TEXT NOT NULL,      -- the real DATA PROVIDER (e.g. "The Odds API"),
-                                            -- a REAL, DISTINCT concept from `sportsbook` above
-                                            -- -- the original sketch's single `source` field
-                                            -- conflated these two; kept separate here to match
-                                            -- what the real implementation actually needed
-    market_data_status TEXT NOT NULL DEFAULT 'MISSING'
-                        CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING'))
+    id                      SERIAL PRIMARY KEY,
+    ingestion_id            INT NOT NULL REFERENCES ingestion_runs(id),
+    game_id                 TEXT NOT NULL,
+    sportsbook              TEXT NOT NULL,      -- the real book (draftkings, betmgm, ...)
+    market_type             TEXT NOT NULL CHECK (market_type IN ('spread', 'total', 'moneyline')),
+    line_value              NUMERIC,
+    odds                    NUMERIC,
+    captured_at             TIMESTAMPTZ NOT NULL,
+    kickoff_time            TIMESTAMPTZ,
+    source                  TEXT NOT NULL,      -- the real DATA PROVIDER (e.g. "The Odds API"),
+                                                 -- a REAL, DISTINCT concept from `sportsbook`
+                                                 -- above -- the original sketch's single
+                                                 -- `source` field conflated these two; kept
+                                                 -- separate to match what the real
+                                                 -- implementation actually needed
+    market_data_status      TEXT NOT NULL DEFAULT 'MISSING'
+                             CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING')),
+    flagged_excluded_source BOOLEAN NOT NULL DEFAULT FALSE   -- real SQLite-parity column; TRUE
+                             -- only for a preserved historical exception, never for a row
+                             -- written going forward (the trigger below makes that structural)
 );
 CREATE INDEX idx_raw_market_game ON raw_market_captures(game_id, sportsbook, market_type);
+
+-- Real, database-level guarantee (Layer 2, same real design as the SQLite fix, ported to
+-- Postgres' real trigger-function syntax -- SQLite's simple inline BEFORE INSERT/RAISE(ABORT)
+-- form has no direct Postgres equivalent, so this uses a real PL/pgSQL trigger function
+-- instead, achieving the identical real guarantee: a genuine database-level rejection, not
+-- just an application filter).
+CREATE OR REPLACE FUNCTION reject_unapproved_sportsbook() RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM approved_sportsbooks WHERE name = NEW.sportsbook) THEN
+        RAISE EXCEPTION 'Sportsbook not in approved_sportsbooks (see PROGRESS.md)';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_reject_unapproved_sportsbook
+BEFORE INSERT ON raw_market_captures
+FOR EACH ROW EXECUTE FUNCTION reject_unapproved_sportsbook();
 
 -- Real, dynamic tier classification -- direct Postgres port of v_ingestion_market_tiers'own
 -- real window-function logic (Postgres supports the same OVER (PARTITION BY ... ) syntax

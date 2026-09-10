@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL Model -- Live</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<meta name="theme-color" content="#0b1220">
+<style>
+  :root {
+    --bg: #0b1220; --card: #141d2e; --border: #223047; --text: #e8edf5;
+    --muted: #8a97ab; --accent: #c85a2b; --good: #3fb27f; --warn: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding-bottom: 40px;
+  }
+  header {
+    padding: 16px 16px 8px; display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  select {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 14px;
+  }
+  #model-banner {
+    margin: 0 16px 12px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; color: var(--muted);
+  }
+  #model-banner b { color: var(--good); }
+  main { padding: 0 16px; }
+  .game-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; margin-bottom: 10px; cursor: pointer;
+  }
+  .game-card .teams { font-size: 16px; font-weight: 600; }
+  .game-card .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .status-pill {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: #2a3550; color: var(--muted); margin-top: 6px;
+  }
+  .status-pill.not-predictable { background: #3a2a2a; color: var(--warn); }
+  .status-pill.ready { background: #1f3a2f; color: var(--good); }
+  #detail {
+    position: fixed; inset: 0; background: var(--bg); overflow-y: auto; padding: 16px;
+    display: none;
+  }
+  #detail.open { display: block; }
+  #detail .back { color: var(--accent); background: none; border: none; font-size: 15px;
+    padding: 8px 0; cursor: pointer; }
+  #detail h2 { margin: 8px 0 4px; }
+  #detail section { margin-top: 18px; }
+  #detail section h3 { font-size: 13px; text-transform: uppercase; color: var(--muted);
+    letter-spacing: 0.05em; margin-bottom: 8px; }
+  .row { display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px solid var(--border); font-size: 14px; }
+  .prediction-pending {
+    background: #241f14; border: 1px solid #4a3d1f; color: var(--warn);
+    padding: 10px 12px; border-radius: 8px; font-size: 13px;
+  }
+  .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  #loading { color: var(--muted); padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NFL Model -- Live</h1>
+  <select id="sport-select">
+    <option value="NFL">NFL</option>
+  </select>
+</header>
+<div id="model-banner">Loading model status...</div>
+<main>
+  <div id="loading">Loading real games...</div>
+  <div id="games"></div>
+</main>
+
+<div id="detail">
+  <button class="back" onclick="closeDetail()">&larr; Back</button>
+  <div id="detail-content"></div>
+</div>
+
+<script>
+const API = "";  // real, live API is same-origin (this page is served by the FastAPI service)
+
+async function loadModelBanner() {
+  try {
+    const res = await fetch(`${API}/sports/NFL/model-versions`);
+    const versions = await res.json();
+    const prod = versions.find(v => v.status === "PRODUCTION");
+    document.getElementById("model-banner").innerHTML = prod
+      ? `Live model: <b>${prod.version_name}</b> (PRODUCTION)`
+      : `No model currently marked PRODUCTION -- real predictions are not yet being served live.`;
+  } catch (e) {
+    document.getElementById("model-banner").textContent = "Real model-version check failed.";
+  }
+}
+
+function statusPillClass(status) {
+  if (status === "NOT_PREDICTABLE") return "status-pill not-predictable";
+  if (status === "READY" || status === "PREDICTED") return "status-pill ready";
+  return "status-pill";
+}
+
+function fmtKickoff(iso) {
+  if (!iso) return "Kickoff TBD";
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit" });
+}
+
+async function loadGames() {
+  const loading = document.getElementById("loading");
+  const container = document.getElementById("games");
+  try {
+    const res = await fetch(`${API}/sports/NFL/games`);
+    if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
+    const games = await res.json();
+    loading.style.display = "none";
+    if (games.length === 0) {
+      container.innerHTML = '<div class="empty">No real games found.</div>';
+      return;
+    }
+    container.innerHTML = games.map(g => `
+      <div class="game-card" onclick="openDetail('${g.game_id}')">
+        <div class="teams">${g.away_team} @ ${g.home_team}</div>
+        <div class="meta">Week ${g.week} &middot; ${fmtKickoff(g.kickoff_time)}</div>
+        <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    loading.textContent = `Real error loading games: ${e.message}`;
+  }
+}
+
+async function openDetail(gameId) {
+  const detail = document.getElementById("detail");
+  const content = document.getElementById("detail-content");
+  content.innerHTML = "Loading real game data...";
+  detail.classList.add("open");
+  try {
+    const res = await fetch(`${API}/sports/NFL/games/${encodeURIComponent(gameId)}`);
+    if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
+    const g = await res.json();
+
+    let predictionHtml;
+    if (g.prediction && g.prediction.status === "NOT_YET_AVAILABLE") {
+      predictionHtml = `<div class="prediction-pending">Prediction pending -- ${g.prediction.reason}</div>`;
+    } else if (g.prediction) {
+      predictionHtml = `
+        <div class="row"><span>Projected margin (home)</span><span>${g.prediction.projected_margin}</span></div>
+        <div class="row"><span>Home win probability</span><span>${(g.prediction.home_win_probability * 100).toFixed(1)}%</span></div>
+        <div class="row"><span>Model version</span><span>${g.prediction.version_name}</span></div>
+      `;
+    } else {
+      predictionHtml = `<div class="empty">No real prediction data.</div>`;
+    }
+
+    const injuriesHtml = g.injuries.length
+      ? g.injuries.map(i => `
+          <div class="row"><span>${i.player_name} (${i.team}, ${i.position || "?"})</span>
+          <span>${i.report_status || "--"}</span></div>
+        `).join("")
+      : '<div class="empty">No real injury reports for either team right now.</div>';
+
+    const marketHtml = g.market_lines.length
+      ? g.market_lines.slice(0, 8).map(m => `
+          <div class="row"><span>${m.sportsbook} &middot; ${m.market_type}</span>
+          <span>${m.line_value ?? "--"}</span></div>
+        `).join("")
+      : '<div class="empty">No real market lines captured yet.</div>';
+
+    content.innerHTML = `
+      <h2>${g.away_team} @ ${g.home_team}</h2>
+      <div class="meta" style="color:var(--muted)">Week ${g.week} &middot; ${fmtKickoff(g.kickoff_time)}</div>
+      <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
+      <section><h3>Prediction</h3>${predictionHtml}</section>
+      <section><h3>Injuries</h3>${injuriesHtml}</section>
+      <section><h3>Market lines</h3>${marketHtml}</section>
+    `;
+  } catch (e) {
+    content.innerHTML = `<button class="back" onclick="closeDetail()">&larr; Back</button>
+      <div class="prediction-pending">Real error loading game detail: ${e.message}</div>`;
+  }
+}
+
+function closeDetail() {
+  document.getElementById("detail").classList.remove("open");
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+loadModelBanner();
+loadGames();
+</script>
+</body>
+</html>

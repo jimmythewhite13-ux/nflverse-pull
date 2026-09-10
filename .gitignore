@@ -11,3 +11,8 @@ logs/
 
 # Step 9 ablation raw results -- a per-run artifact, not meaningful to version
 prediction_audit/ablation_step9_results.json
+
+# Real, local-machine-specific Claude Code preview artifacts (absolute paths, runtime locks) --
+# not portable across machines, not meant to be versioned. The real, relative-path
+# .claude/launch.json at the repo root (used by other contributors) is NOT covered by this.
+.claude/.claude/

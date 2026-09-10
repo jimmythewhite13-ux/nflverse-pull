@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nfl-live-api",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "hosted_env/api/run_local.py"],
+      "port": 8420
+    }
+  ]
+}

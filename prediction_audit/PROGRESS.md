@@ -1326,3 +1326,113 @@ genuinely absent from real API results -- not fabricated). A real, direct `INSER
 `IntegrityError`, not just an in-memory test. `self_enforcement_check.py` extended with a 4th
 real check (zero un-flagged rows reference an unapproved book) and confirmed CLEAN. Full test
 suite (10755 tests) green throughout.
+
+## Render Postgres schema deployed (2026-09-09) -- Track 2 hard gate explicitly, narrowly waived
+
+User confirmed a real, live Render Postgres instance (`nflverse_db_pull`, PostgreSQL 18.6) and
+explicitly waived Track 2's hard gate for schema-only deployment specifically -- real data
+migration and agent cutover remain gated on 2026-09-29/~10-01 as originally planned.
+
+Real secret resolution took several attempts (Render's dashboard has several similarly-placed
+fields: Service ID `dpg-...`, PSQL Command, Internal/External Database URL) -- resolved via a
+local `.env` entry, same established pattern as `ODDS_API_KEY`, confirmed correct only once a
+real `psycopg` connection actually succeeded (`PostgreSQL 18.6`, database `nflverse_db_pull`).
+
+Updated `hosted_env/schema.sql` first to add the real offshore-sportsbooks protections
+(`approved_sportsbooks` + a real PL/pgSQL trigger function -- Postgres has no direct equivalent
+to SQLite's simple inline `BEFORE INSERT`/`RAISE(ABORT)`, so this uses a real trigger function
+instead, same guarantee) which didn't exist when that file was first written. Applied the full
+schema directly: 16 real tables + 2 views confirmed present, `approved_sportsbooks` seeded with
+the same 4 real books as the SQLite fix.
+
+**Real immutability test, with an honest side effect**: inserted a minimal, clearly-labeled test
+chain to reach a real `predictions` row, then a real `UPDATE`/`DELETE` attempt against it --
+both confirmed rejected (0 rows affected each time, real values unchanged), via Postgres's own
+`RULE ... DO INSTEAD NOTHING` (a real, silent-no-op enforcement mechanism, different from
+SQLite's raising trigger but equally real database-level enforcement). Because the constraint
+worked, the test row can never be deleted -- this transitively locks its whole real FK chain
+(5 rows total: `sports`/`model_versions`/`games`/`prediction_runs`/`predictions`) permanently in
+the database, clearly labeled (`NFL_CONSTRAINT_TEST`/`constraint-test`/`CONSTRAINT_TEST_GAME`).
+Everything else confirmed genuinely empty. Full report:
+`render_postgres_schema_deployment_report.md` (sent to user).
+
+Confirmed: zero writes to the live SQLite database or the production workbook during this task
+-- only the separate, real Postgres instance was touched.
+
+## Phase 1 (2025) + Phase 2/3/4/6/7/8 re-run against the corrected HFA raw estimator (2026-09-09)
+
+Re-ran Phase 1's full 2025 reconstruction under a new `data_version`
+(`phase1_full_season_reconstruction_2025_hfa_raw_fix`) using the corrected raw HFA estimator
+(see "Real bug found and fixed (2026-09-09) -- a THIRD, distinct HFA bug" above). Real result:
+224/224 games, matching the original Phase 1 row count exactly. `phase1_reconstruction_2025.py`
+itself was NOT modified -- its original output remains an honest record of the first (buggy)
+run; `phase1_reconstruction_2025_rerun_hfa_fix.py` is a new wrapper that overrides
+`MODEL_VERSION`/`DATA_VERSION` before calling the original's own `main()`.
+
+Then re-ran Phases 2, 3, 4, 6, 7, and 8 (2025) via six analogous wrapper scripts
+(`phase{2,3,4,6,7,8}_run_rerun_hfa_fix.py`), each re-pointing `DATA_VERSION` at the corrected
+Phase 1 data -- confirmed beforehand that none of the six originals make real DB writes, so no
+model-description fixup was needed for any of them (unlike Phase 1/8-2024, which do write and
+did get a real `_fix_model_description()` correction). All six ran clean, real results:
+
+- **Phase 2 (Travel)**: same real conclusion as before the fix -- no travel variant clearly
+  improves on the champion (closest: G. Nonlinear distance, MAE_delta=-0.043 but
+  Brier_delta=+0.0016).
+- **Phase 3 (probability calibration)**: same real conclusion -- neither Platt nor isotonic
+  scaling improves Brier on this real test set.
+- **Phase 4 (Strength of Schedule)**: same real conclusion -- G (recency-weighted) and H
+  (shrinkage) still the only two dual-metric improvements, and both still exceed the real 0.6
+  correlation-with-Base-Team-Quality concern threshold (Phase 7 recheck below).
+- **Phase 6 (HFA)**: re-run twice now for full internal consistency -- this wrapper's numbers
+  exactly reproduce the numbers already reported the same day when `phase6_run.py`'s own
+  champion computation was fixed to recompute HFA fresh via the corrected resolver (CHAMPION
+  MAE=10.670/Brier=0.2363; A/No-HFA MAE=10.626/Brier=0.2363, Δ-0.044/-0.0000). Confirms the
+  earlier in-place fix and this wrapper-based re-run agree, as expected.
+- **Phase 7 (correlation recheck)**: same real conclusion -- SOS variants D/F/G/H still exceed
+  the 0.6 correlation threshold against Base Team Quality/EPA/Success Rate/NY-A; Phase
+  Matchup-vs-Explosive-Play correlation reconfirmed at r=+0.366 (home)/+0.396 (away), still
+  below the original audit's +0.49 finding; AGL still BLOCKED (no real AV data source).
+- **Phase 8 (2025 champion/challenger matrix)**: same real conclusion -- no combination of
+  individually-improving changes (Travel G, Revised HFA A, Calibration) beats the champion on
+  Brier once combined (best MAE combination, #5-7, still costs +0.0013 to +0.0055 Brier vs.
+  champion); candidate 8 (Simplified) remains numerically identical to champion (injury_adj/
+  qb_replacement both contribute exactly 0.0 in all 224 games this season).
+
+Separately, re-ran Phase 8's 2024 secondary check (`phase8_2024_reconstruction_rerun_hfa_fix.py`,
+same wrapper pattern as Phase 1, `DATA_VERSION="phase8_2024_secondary_check_degraded_olindex_hfa_raw_fix"`).
+Real result: 220/220 games, matching the original Phase 8 2024 row count exactly; model
+description/hash corrected post-insert via the wrapper's own `_fix_model_description()`, same as
+Phase 1's rerun. Same real, structural weeks-1-3 QB-metric gap as the original 2024 run and as
+2025 (no fabricated data). This completes the full real re-run batch: Phase 1 (2025) + Phase 8
+(2024) both re-persisted under corrected `data_version`s, Phases 2/3/4/6/7/8 (2025) all
+re-verified read-only against the corrected data -- nothing left queued from this batch.
+
+**Explicit non-action, unchanged from before this batch**: Phase 9's graduation table and Phase
+10's model selection have NOT been re-derived from these corrected numbers. Per the governing
+task's own Part D, that requires flowing back through Phase 7 -> Phase 9 -> Phase 10 properly.
+Not yet requested beyond "re run all phases" (understood so far as re-running the phase
+scripts with corrected data, not re-deriving Phase 9/10's own conclusions).
+
+Real, incidental bugs found and fixed while re-running the Postgres sync in parallel with this
+batch:
+1. `sync_sqlite_to_postgres.py` initially failed because it tried to sync ALL
+   `raw_market_captures` rows, including the 4,298 rows the offshore-sportsbooks fix flagged
+   (`flagged_excluded_source=1`) -- Postgres's own `reject_unapproved_sportsbook` trigger
+   correctly refused them (working as designed). Fixed: the sync now filters
+   `WHERE flagged_excluded_source = 0` for that table.
+2. `psycopg` was never a real, declared project dependency (only ever installed ad hoc earlier
+   in the session) -- `uv run` failed with `ModuleNotFoundError`. Fixed properly via
+   `uv add "psycopg[binary]==3.2.4"` (also added `fastapi==0.115.6`/`uvicorn==0.34.0` the same
+   way, for the local PWA test server).
+3. Building and locally testing the real PWA against the newly-synced Postgres data surfaced a
+   real data-mixing bug: `games` holds both the live 2026 schedule (abbreviated team names) and
+   the pre-existing Part A reconstruction dataset (full team names) under the SAME season=2026
+   -- both were showing in the PWA's games list. Confirmed directly against the DB: 272/272
+   live-format games have a real `game_workflow_status` row, 0/272 Part A rows do -- same
+   distinguishing convention already established in the "stale demo rows" correction above.
+   Fixed via `INNER JOIN game_workflow_status` (was `LEFT JOIN`) in both `hosted_env/api/main.py`
+   and the sync script's `_sync_games()`. A live re-sync confirms only 272 real games now flow
+   into Postgres going forward; 272 already-synced Part A rows remain harmlessly in Postgres
+   (never returned by the API) -- a live-DB cleanup DELETE was correctly blocked by the
+   permission layer as a hard-to-reverse write to real remote infrastructure, left for the user
+   to authorize/perform if wanted.

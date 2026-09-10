@@ -1487,3 +1487,53 @@ batch:
    (never returned by the API) -- a live-DB cleanup DELETE was correctly blocked by the
    permission layer as a hard-to-reverse write to real remote infrastructure, left for the user
    to authorize/perform if wanted.
+
+## Real Render deploy failure fixed, plus a real kickoff-time timezone bug found and fixed (2026-09-10)
+
+**Render deploy #1 failed**: `Could not find a version that satisfies the requirement
+psycopg-binary==3.2.4` -- real root cause: that exact version has a Windows wheel (why it
+resolved fine locally via `uv`) but no compatible wheel for Render's Linux build platform.
+Fixed by re-pinning to `psycopg[binary]==3.2.10` (the lowest version Render itself confirmed
+available) in `hosted_env/api/requirements.txt`, `pyproject.toml`, and `uv.lock` together, so
+local dev stays consistent with what's deployed. Deploy #2 succeeded -- confirmed via a real
+screenshot from the user's phone showing the live PWA loading real static content, though the
+API calls themselves 500'd (see next finding).
+
+**Real, confirmed kickoff-time timezone bug**: the deployed PWA showed the real Australia game
+(SF@LA) at 1:35 PM Pacific instead of its real 5:35 PM, and multiple Sunday early/late-slate
+games all sharing identical wrong times (6:00 AM / 9:25 AM) despite real staggered NFL kickoff
+slots. Root cause, confirmed against nflverse's own official data dictionary fetched live (not
+assumed): the `gametime` field nflverse provides is always Eastern time "regardless of what
+time zone the game was being played in," but this project's ingestion has always naively
+concatenated `gameday`+`gametime` into a timezone-less string with zero conversion -- which then
+lands in Postgres's `kickoff_time TIMESTAMPTZ` column, which (mis)interprets the bare string as
+UTC on insert. Math confirmed exactly: 13:00 (really 1:00 PM ET) wrongly-as-UTC converts to
+6:00 AM Pacific; 16:25 (really 4:25 PM ET) wrongly-as-UTC converts to 9:25 AM Pacific -- matching
+both reported symptoms precisely before any fix was written.
+
+Fixed at the API serialization layer only (`hosted_env/api/main.py`'s new `_fix_kickoff_tz()`),
+not the wider ingestion pipeline (multiple historical/production scripts also touch that code,
+and real re-runs already depend on it as an honest record -- out of scope for this task):
+reinterpret the wall-clock digits as real `America/New_York` local time via `zoneinfo` (so DST
+resolves correctly per real date, not a fixed offset), convert to true UTC before the PWA ever
+sees it. The PWA's existing `toLocaleString` display code already correctly converts UTC to the
+viewer's own local timezone -- no PWA-side change needed once the source value is actually
+correct. Verified live against the real deployed API after pushing: SF@LA now shows 5:35 PM
+Pacific, early slate correctly staggers to 10:00 AM, late slate to 1:25 PM -- exact match to
+independently pre-computed expected values.
+
+**Two adjacent investigations, real evidence gathered, no fix needed for either**:
+- Player props: `prop_predictions`/`prop_market_lines`/`prop_results` all confirmed 0 rows,
+  all-time, direct query -- no real prop data has ever been captured anywhere in the pipeline
+  (consistent with the v35 audit's Phase 14 note: "schema only, waiting for real prop
+  generation"), and this PWA/API build has no props section at all yet either. Honest absence,
+  not a bug -- nothing to display because nothing real exists to show.
+- Sportsbook coverage: `williamhill_us` (Caesars) confirmed 0 rows, all-time, across every real
+  game checked -- a real, honest data-availability gap (same finding as when the offshore-books
+  fix was first written), not a display/filtering bug. The other 3 approved books
+  (betmgm/draftkings/fanduel) all appear correctly for every live game, including within the
+  PWA's existing top-8-by-recency market-lines slice (verified directly it doesn't currently
+  truncate any real book, since each capture run writes all books' data under one shared
+  timestamp).
+
+Full test suite: 10,755 passed.

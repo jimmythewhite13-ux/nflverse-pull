@@ -150,12 +150,29 @@ def _write(conn: sqlite3.Connection, ingestion_id: int, season: int) -> int:
     captured_at = datetime.now(UTC).isoformat()
     rows = []
     unmatched = 0
+    already_started = 0
     for event in events:
         game_id = game_id_lookup.get((event["home_team"], event["away_team"]))
         if game_id is None:
             unmatched += 1
             continue
         kickoff_time = event.get("commence_time")
+        # Real bug, found and fixed (PROGRESS.md, 2026-09-10): the Odds API keeps returning an
+        # event in this real, same endpoint for a while after its real kickoff (confirmed
+        # directly -- a real capture landed here 1h51m after a real game's actual kickoff, with
+        # a spread that had swung from -3 pregame to +7.5, i.e. real live in-game betting data,
+        # not a pregame line). That silently corrupted `v_ingestion_market_tiers`'s "closing"
+        # classification -- its own logic requires the LAST real capture for a game to be
+        # pre-kickoff to earn the "closing" label, so once a post-kickoff row became the new
+        # real MAX(captured_at), zero rows were labeled "closing" for that game at all,
+        # confirmed directly against live data. Real, deliberate fix: skip any event whose real
+        # kickoff has already passed by this real capture's own timestamp -- `commence_time` is
+        # the Odds API's own real, correct UTC value (confirmed against `now`, both real UTC).
+        if kickoff_time is not None:
+            real_kickoff = datetime.fromisoformat(kickoff_time.replace("Z", "+00:00"))
+            if real_kickoff <= now:
+                already_started += 1
+                continue
         for bm in event.get("bookmakers", []):
             book = bm["key"]
             if book not in APPROVED_BOOKMAKERS:
@@ -189,7 +206,8 @@ def _write(conn: sqlite3.Connection, ingestion_id: int, season: int) -> int:
         )
         conn.commit()
     print(f"  real events: {len(events)}, matched: {len(events) - unmatched}, "
-          f"unmatched: {unmatched}, real rows written: {len(rows)}")
+          f"unmatched: {unmatched}, already-started (skipped): {already_started}, "
+          f"real rows written: {len(rows)}")
     return len(rows)
 
 

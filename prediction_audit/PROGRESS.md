@@ -1452,6 +1452,18 @@ the git add/commit -- so a mid-sequence revert could never destroy unrecoverable
 Both the merge and the final commit were independently verified against the DB on disk after
 each step, not assumed from tool-reported success alone.
 
+**Real, live production verification (2026-09-10T06:24Z)**: no scheduled workflow had fired in
+the ~3.5h since the fix was pushed (GitHub Actions' own well-known scheduling-delay behavior
+under load, not a bug in this repo -- all three workflows confirmed `active`, not disabled), so
+manually triggered `line_capture.yml` via `gh workflow run` rather than wait. Real result:
+849 new rows captured (commit `12056be`), post-capture self-enforcement check CLEAN ("No
+un-flagged, unapproved sportsbook rows found"). Independently re-verified against the pulled
+commit directly (not just trusting the log line): all 849 rows break down as
+betmgm=45/draftkings=717/fanduel=87 -- zero offshore books. `williamhill_us` (Caesars) still
+didn't appear in this capture -- the same, separate, pre-existing data-availability gap noted
+when the fix was first written, unrelated to and not caused by this fix. Production gap fully
+closed and confirmed live, not just believed fixed from code inspection.
+
 Real, incidental bugs found and fixed while re-running the Postgres sync in parallel with this
 batch:
 1. `sync_sqlite_to_postgres.py` initially failed because it tried to sync ALL

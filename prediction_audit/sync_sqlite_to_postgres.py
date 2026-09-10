@@ -27,6 +27,7 @@ Usage:
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -41,12 +42,20 @@ SEASON = 2026
 
 
 def _load_database_url() -> str:
-    for line in (Path(__file__).resolve().parent.parent / ".env").read_text(
-        encoding="utf-8"
-    ).splitlines():
-        if line.startswith("DATABASE_URL="):
-            return line.split("=", 1)[1].strip()
-    raise SystemExit("Real DATABASE_URL not found in .env.")
+    # Real CI path first, same pattern as market_lines.py's _load_env_key(): GitHub Actions
+    # injects the real secret (NFLVERSE_DB_PULL) as this env var (see sync_to_postgres.yml) --
+    # no .env file exists in CI, it's real, deliberately gitignored. Local dev falls back to
+    # the real, gitignored .env file.
+    env_value = os.environ.get("DATABASE_URL")
+    if env_value:
+        return env_value
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("DATABASE_URL="):
+                return line.split("=", 1)[1].strip()
+    raise SystemExit("Real DATABASE_URL not available -- not in the environment and no .env "
+                      "file found.")
 
 
 def _ensure_real_nfl_sport(pg_cur) -> int:

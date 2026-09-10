@@ -17,7 +17,9 @@ Usage (Render): see requirements.txt + this repo's Render Web Service start comm
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import psycopg
 from fastapi import FastAPI, HTTPException
@@ -26,6 +28,29 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+# Real bug, confirmed against nflverse's own data dictionary (not assumed): the `gametime`
+# field nflverse provides is always Eastern time, "regardless of what time zone the game was
+# being played in" -- but this project's ingestion (schedule.py/game_status.py/etc.) has always
+# naively concatenated gameday+gametime into a timezone-less string with zero conversion. That
+# naive Eastern wall-clock value then lands in Postgres's `kickoff_time TIMESTAMPTZ` column,
+# which (mis)interprets a bare string as UTC on insert -- so what psycopg reads back is tagged
+# UTC but is still really Eastern numbers. Real fix, applied only at this serialization layer
+# (not the wider ingestion pipeline, which multiple historical/production scripts also touch
+# and which this task didn't ask to be rewritten): reinterpret the wall-clock digits as real
+# America/New_York local time (so DST resolves correctly per real date), then convert to true
+# UTC before handing it to the PWA -- which already correctly converts UTC to the viewer's own
+# local time via `toLocaleString`, so no PWA-side change is needed once this is correct.
+_EASTERN = ZoneInfo("America/New_York")
+_UTC = ZoneInfo("UTC")
+
+
+def _fix_kickoff_tz(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    wall_clock = value.replace(tzinfo=None)
+    real_eastern = wall_clock.replace(tzinfo=_EASTERN)
+    return real_eastern.astimezone(_UTC).isoformat()
 
 app = FastAPI(title="NFL Model -- Live Data API", version="0.1.0")
 
@@ -95,7 +120,10 @@ def list_games(sport: str, week: int | None = None) -> list[dict]:
             params.append(week)
         query += " ORDER BY g.kickoff_time NULLS LAST;"
         cur.execute(query, params)
-        return cur.fetchall()
+        games = cur.fetchall()
+        for g in games:
+            g["kickoff_time"] = _fix_kickoff_tz(g["kickoff_time"])
+        return games
 
 
 @app.get("/sports/{sport}/games/{game_id}")
@@ -115,6 +143,7 @@ def get_game(sport: str, game_id: str) -> dict:
         game = cur.fetchone()
         if not game:
             raise HTTPException(status_code=404, detail=f"Real game {game_id!r} not found.")
+        game["kickoff_time"] = _fix_kickoff_tz(game["kickoff_time"])
 
         # Real, honest prediction state -- never fabricated. Only ACTIVE, real prediction_runs
         # rows count; a game with none gets an explicit "not yet predictable" style message,

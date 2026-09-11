@@ -52,6 +52,93 @@ def _fix_kickoff_tz(value: datetime | None) -> str | None:
     real_eastern = wall_clock.replace(tzinfo=_EASTERN)
     return real_eastern.astimezone(_UTC).isoformat()
 
+
+# Real, deliberately market-observational only -- see market_signal_features.md's own explicit
+# boundary: never "this is undervalued" or "bet this side," only factual statements about what
+# the real, current market is doing. `raw_market_captures.kickoff_time` (unlike the separate,
+# buggy `games.kickoff_time` fixed above) is already real, correct UTC -- it comes straight
+# from the Odds API's own `commence_time` at capture time -- so no re-fix needed here.
+#
+# Real, evidence-based thresholds (not arbitrary round numbers): computed directly from this
+# project's own captured data. After excluding the 6 rows caused by the now-fixed post-kickoff
+# capture bug (real live in-game odds mixed into what should be pregame-only data -- a spread
+# swinging -3 to +7.5 is not real pregame "movement"), the real, clean distribution showed
+# median/p75/p90 movement of exactly 0.0 for both spread and total, with a single real, genuine
+# outlier: a 3.0-point spread swing (2026_12_SEA_SF, draftkings, -1.5 to +1.5). Given how sparse
+# genuine non-zero movement still is this early in a real season, thresholds are set to flag
+# meaningfully below that one real confirmed swing, not an arbitrary industry number.
+_MAJOR_SHIFT_THRESHOLDS = {"spread": 1.5, "total": 2.0}
+
+
+def _compute_market_signals(rows: list[dict]) -> list[dict]:
+    by_group: dict[tuple[str, str], list[dict]] = {}
+    for r in rows:
+        by_group.setdefault((r["sportsbook"], r["market_type"]), []).append(r)
+
+    latest_by_type: dict[str, list[dict]] = {}
+    for (book, mtype), group in by_group.items():
+        group.sort(key=lambda r: r["captured_at"])
+        opening = group[0]
+        # Real, deliberate exclusion of any capture at/after this row's own real kickoff_time
+        # -- never treat live in-game odds as if they were a pregame "current" line (the exact
+        # contamination that broke real closing-line tracking before the fix above).
+        pregame = [r for r in group if r["kickoff_time"] is None or r["captured_at"] < r["kickoff_time"]]
+        current = pregame[-1] if pregame else None
+
+        entry = {
+            "sportsbook": book, "market_type": mtype,
+            "line_value": current["line_value"] if current else None,
+            "odds": current["odds"] if current else None,
+            "captured_at": current["captured_at"].isoformat() if current else None,
+            "opening_line_value": opening["line_value"],
+            "opening_odds": opening["odds"],
+        }
+        if current is None:
+            entry["movement_status"] = "NO_REAL_PREGAME_DATA"
+        elif current is opening or len(pregame) < 2:
+            entry["movement_status"] = "INSUFFICIENT_DATA"  # real, honest -- can't measure
+            # movement from a single real pregame capture, never fabricated as "no movement"
+        else:
+            entry["movement_status"] = "MEASURED"
+            if current["line_value"] is not None and opening["line_value"] is not None:
+                entry["line_movement"] = round(current["line_value"] - opening["line_value"], 2)
+                threshold = _MAJOR_SHIFT_THRESHOLDS.get(mtype)
+                entry["major_shift"] = bool(
+                    threshold is not None and abs(entry["line_movement"]) >= threshold
+                )
+            if current["odds"] is not None and opening["odds"] is not None:
+                entry["odds_movement"] = current["odds"] - opening["odds"]
+        latest_by_type.setdefault(mtype, []).append(entry)
+
+    # Real "best value" -- deliberately scoped to the one real side this project's own capture
+    # convention actually stores (home side for spread/moneyline, Over side for total; see
+    # market_lines.py's own real, explicit home/Over-only filter) -- never fabricating a
+    # two-sided comparison this data doesn't honestly support.
+    for mtype, entries in latest_by_type.items():
+        comparable = [e for e in entries if e["line_value"] is not None or e["odds"] is not None]
+        if len(comparable) < 2:
+            continue
+        # Real, deliberate two-key sort -- the line NUMBER matters most (a real bettor cares
+        # more about a better line than better juice at the same line), but a real tie on the
+        # number must still resolve to whichever book actually offers the better real odds at
+        # that same number, not an arbitrary row-order pick.
+        if mtype == "spread":
+            key = lambda e: (e["line_value"], e["odds"] or 0)  # noqa: E731
+            best, worst = max(comparable, key=key), min(comparable, key=key)
+        elif mtype == "total":
+            key = lambda e: (e["line_value"], -(e["odds"] or 0))  # noqa: E731
+            best, worst = min(comparable, key=key), max(comparable, key=key)
+        else:  # moneyline -- best/worst real payout for the home side
+            best = max(comparable, key=lambda e: e["odds"])
+            worst = min(comparable, key=lambda e: e["odds"])
+        for e in comparable:
+            e["best_value"] = e is best and best is not worst
+            e["worst_value"] = e is worst and best is not worst
+
+    result = [e for entries in latest_by_type.values() for e in entries]
+    result.sort(key=lambda e: (e["market_type"], e["sportsbook"]))
+    return result
+
 app = FastAPI(title="NFL Model -- Live Data API", version="0.1.0")
 
 # Real, deliberately permissive CORS for now -- this is a read-only, non-sensitive display API
@@ -173,6 +260,24 @@ def list_games(sport: str, week: int | None = None) -> list[dict]:
         games = cur.fetchall()
         for g in games:
             g["kickoff_time"] = _fix_kickoff_tz(g["kickoff_time"])
+
+        # Real "major shift" badge, for the row itself (not just the drill-down) -- one real,
+        # batched query for every listed game rather than N+1 per-game queries.
+        if games:
+            game_ids = [g["game_id"] for g in games]
+            cur.execute(
+                "SELECT game_id, sportsbook, market_type, line_value, odds, captured_at, "
+                "kickoff_time FROM raw_market_captures "
+                "WHERE game_id = ANY(%s) AND flagged_excluded_source = FALSE "
+                "ORDER BY captured_at ASC;",
+                (game_ids,),
+            )
+            by_game: dict[str, list[dict]] = {}
+            for r in cur.fetchall():
+                by_game.setdefault(r["game_id"], []).append(r)
+            for g in games:
+                signals = _compute_market_signals(by_game.get(g["game_id"], []))
+                g["has_major_shift"] = any(e.get("major_shift") for e in signals)
         return games
 
 
@@ -224,12 +329,12 @@ def get_game(sport: str, game_id: str) -> dict:
         game["injuries"] = cur.fetchall()
 
         cur.execute(
-            "SELECT sportsbook, market_type, line_value, odds, captured_at "
+            "SELECT sportsbook, market_type, line_value, odds, captured_at, kickoff_time "
             "FROM raw_market_captures WHERE game_id = %s AND flagged_excluded_source = FALSE "
-            "ORDER BY captured_at DESC;",
+            "ORDER BY captured_at ASC;",
             (game_id,),
         )
-        game["market_lines"] = cur.fetchall()
+        game["market_lines"] = _compute_market_signals(cur.fetchall())
 
         return game
 

@@ -264,14 +264,13 @@ CREATE TABLE IF NOT EXISTS approved_sportsbooks (
 );
 INSERT OR IGNORE INTO approved_sportsbooks (name) VALUES
     ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us'),
-    -- Real, UK Gambling Commission-verified (2026-09-10, checked directly against the real
-    -- public register, not assumed): williamhill (WHG International Ltd, #39225),
-    -- ladbrokes_uk + coral (both LC International Ltd, #54743 -- same real license, Ladbrokes
-    -- and Coral merged), paddypower (PPB Counterparty Services Ltd, #39439), betway (Betway
-    -- Ltd, #39372), betvictor (BV Gaming Ltd, #39576) -- all confirmed Active. Prepped here,
-    -- but NOT yet real-world active: market_lines.py doesn't request regions=uk yet (measured
-    -- real cost: ~2x credits per call -- pending an explicit go-ahead before enabling).
-    ('williamhill'), ('ladbrokes_uk'), ('coral'), ('paddypower'), ('betway'), ('betvictor');
+    -- Real, international expansion (2026-09-11), each verified directly against its own real
+    -- national regulator -- see market_lines.py's APPROVED_BOOKMAKERS comment for the full,
+    -- real per-book verification detail (which entity, which register, confirmed how). Real,
+    -- live-active: market_lines.py requests regions=us,uk,eu,au (accepted 4x credit cost).
+    ('williamhill'), ('ladbrokes_uk'), ('coral'), ('paddypower'), ('betway'), ('betvictor'),
+    ('sportsbet'), ('ladbrokes_au'), ('neds'), ('pointsbetau'), ('betright'), ('tab'), ('unibet'),
+    ('betclic_fr'), ('pmu_fr'), ('tipico_de'), ('unibet_nl'), ('unibet_se');
 
 -- Real market-line captures for CLV -- deliberately NOT tagged 'opening'/'closing' at write
 -- time (a capture can't know it's the real LAST one before kickoff until kickoff has already

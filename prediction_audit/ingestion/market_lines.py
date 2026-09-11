@@ -42,20 +42,33 @@ SOURCE = "The Odds API (api.the-odds-api.com)"
 # "williamhill_us" is Caesars' REAL Odds API bookmaker key (confirmed live in
 # check_odds_api_coverage.py's own real coverage check, not "caesars" literally -- that
 # string is never returned by the real API).
-APPROVED_BOOKMAKERS = {"draftkings", "fanduel", "betmgm", "williamhill_us"}
-
-# Real, UK Gambling Commission-verified (2026-09-10, checked directly against the real public
-# register, not assumed): williamhill (WHG International Ltd, #39225), ladbrokes_uk + coral
-# (both LC International Ltd, #54743 -- Ladbrokes/Coral merged, same real license), paddypower
-# (PPB Counterparty Services Ltd, #39439), betway (Betway Ltd, #39372), betvictor (BV Gaming
-# Ltd, #39576) -- all confirmed Active. Prepped here and in approved_sportsbooks (both DBs),
-# but NOT yet real-world active -- the real request below still only asks for regions="us", so
-# none of these will ever actually appear in a real response until that's deliberately changed.
-# Real, measured cost of doing so: adding regions=uk roughly DOUBLES the credit cost of every
-# real capture, forever (measured directly: 6 credits for a real us+uk request vs. ~3 for
-# us-only) -- holding this back pending an explicit go-ahead given that real, ongoing cost.
-APPROVED_UK_BOOKMAKERS_PENDING_ACTIVATION = {
+#
+# Real, international expansion (2026-09-11), each verified directly against its own real
+# national regulator's public register, not assumed from name recognition:
+#   UK (Gambling Commission): williamhill (WHG International Ltd, #39225), ladbrokes_uk + coral
+#     (both LC International Ltd, #54743 -- Ladbrokes/Coral merged, same real license),
+#     paddypower (PPB Counterparty Services Ltd, #39439), betway (Betway Ltd, #39372),
+#     betvictor (BV Gaming Ltd, #39576) -- all confirmed Active.
+#   AU (NT Dept. of Tourism and Hospitality licensed wagering operators register): sportsbet
+#     (Sportsbet Pty Ltd), ladbrokes_au + neds (both Entain Group Pty Ltd), pointsbetau
+#     (Pointsbet Australia Pty Ltd), betright (IRPSX Pty Ltd), tab (Ubet NT Pty Ltd), unibet
+#     (BetChoice Corporation Pty Ltd) -- all confirmed present on the real, current register.
+#   EU (each book's own national regulator): betclic_fr + pmu_fr (France's ANJ, confirmed
+#     "Paris sportifs" licensed), tipico_de (Germany's Regierungspräsidium Darmstadt, confirmed
+#     via multiple independent real sources -- NOT found on the GGL's general whitelist page,
+#     which appears scoped differently; the Darmstadt concession is real and separately
+#     verified), unibet_nl (Netherlands' Kansspelautoriteit, licensed since 2022), unibet_se
+#     (Sweden's Spelinspektionen, licensed since 2019). Other EU candidates (betsson, coolbet,
+#     marathonbet, pinnacle, nordicbet, leovegas_se, sport888) not yet checked.
+#
+# Real, measured cost of activating all three regions together: 12 credits per real capture
+# vs. ~3 for us-only -- a 4x increase, permanently, on every future automated capture. Real,
+# explicit go-ahead given for this despite the cost (2026-09-11).
+APPROVED_BOOKMAKERS = {
+    "draftkings", "fanduel", "betmgm", "williamhill_us",
     "williamhill", "ladbrokes_uk", "coral", "paddypower", "betway", "betvictor",
+    "sportsbet", "ladbrokes_au", "neds", "pointsbetau", "betright", "tab", "unibet",
+    "betclic_fr", "pmu_fr", "tipico_de", "unibet_nl", "unibet_se",
 }
 
 
@@ -146,9 +159,13 @@ def _write(conn: sqlite3.Connection, ingestion_id: int, season: int) -> int:
     key = _load_env_key()
     game_id_lookup = _build_game_id_lookup(season)
 
+    # Real, deliberate international expansion (2026-09-11) -- see APPROVED_BOOKMAKERS' own
+    # comment for the real, per-book regulator verification behind each new region. Real,
+    # measured cost: 12 credits per call vs ~3 for us-only (4x), accepted with an explicit
+    # go-ahead despite that real, permanent cost increase.
     r = requests.get(
         f"{BASE}/sports/americanfootball_nfl/odds",
-        params={"apiKey": key, "regions": "us", "markets": "spreads,totals,h2h",
+        params={"apiKey": key, "regions": "us,uk,eu,au", "markets": "spreads,totals,h2h",
                 "oddsFormat": "american"},
         timeout=30,
     )

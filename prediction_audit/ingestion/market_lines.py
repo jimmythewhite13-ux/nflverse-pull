@@ -44,6 +44,20 @@ SOURCE = "The Odds API (api.the-odds-api.com)"
 # string is never returned by the real API).
 APPROVED_BOOKMAKERS = {"draftkings", "fanduel", "betmgm", "williamhill_us"}
 
+# Real, UK Gambling Commission-verified (2026-09-10, checked directly against the real public
+# register, not assumed): williamhill (WHG International Ltd, #39225), ladbrokes_uk + coral
+# (both LC International Ltd, #54743 -- Ladbrokes/Coral merged, same real license), paddypower
+# (PPB Counterparty Services Ltd, #39439), betway (Betway Ltd, #39372), betvictor (BV Gaming
+# Ltd, #39576) -- all confirmed Active. Prepped here and in approved_sportsbooks (both DBs),
+# but NOT yet real-world active -- the real request below still only asks for regions="us", so
+# none of these will ever actually appear in a real response until that's deliberately changed.
+# Real, measured cost of doing so: adding regions=uk roughly DOUBLES the credit cost of every
+# real capture, forever (measured directly: 6 credits for a real us+uk request vs. ~3 for
+# us-only) -- holding this back pending an explicit go-ahead given that real, ongoing cost.
+APPROVED_UK_BOOKMAKERS_PENDING_ACTIVATION = {
+    "williamhill", "ladbrokes_uk", "coral", "paddypower", "betway", "betvictor",
+}
+
 
 def _load_env_key() -> str:
     # Real CI path first: GitHub Actions injects the real secret as an env var (no .env file

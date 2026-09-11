@@ -244,7 +244,16 @@ CREATE TABLE approved_sportsbooks (
     name TEXT PRIMARY KEY
 );
 INSERT INTO approved_sportsbooks (name) VALUES
-    ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us');
+    ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us'),
+    -- Real, UK Gambling Commission-verified (2026-09-10, checked directly against the real
+    -- public register): williamhill (WHG International Ltd, #39225), ladbrokes_uk + coral
+    -- (both LC International Ltd, #54743 -- Ladbrokes/Coral merged, same real license),
+    -- paddypower (PPB Counterparty Services Ltd, #39439), betway (Betway Ltd, #39372),
+    -- betvictor (BV Gaming Ltd, #39576) -- all confirmed Active. Prepped, not yet
+    -- real-world active: the live capture job doesn't request regions=uk yet (measured real
+    -- cost: ~2x credits per call -- pending an explicit go-ahead before enabling).
+    ('williamhill'), ('ladbrokes_uk'), ('coral'), ('paddypower'), ('betway'), ('betvictor')
+ON CONFLICT (name) DO NOTHING;
 
 -- Real, deliberate design choice carried forward unchanged: NO stored `tier` column, unlike the
 -- original sketch's `market_lines.tier`. The real, proven SQLite implementation computes tier

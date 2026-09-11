@@ -263,7 +263,15 @@ CREATE TABLE IF NOT EXISTS approved_sportsbooks (
                              -- (Caesars' real key -- confirmed live, not the string 'caesars')
 );
 INSERT OR IGNORE INTO approved_sportsbooks (name) VALUES
-    ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us');
+    ('draftkings'), ('fanduel'), ('betmgm'), ('williamhill_us'),
+    -- Real, UK Gambling Commission-verified (2026-09-10, checked directly against the real
+    -- public register, not assumed): williamhill (WHG International Ltd, #39225),
+    -- ladbrokes_uk + coral (both LC International Ltd, #54743 -- same real license, Ladbrokes
+    -- and Coral merged), paddypower (PPB Counterparty Services Ltd, #39439), betway (Betway
+    -- Ltd, #39372), betvictor (BV Gaming Ltd, #39576) -- all confirmed Active. Prepped here,
+    -- but NOT yet real-world active: market_lines.py doesn't request regions=uk yet (measured
+    -- real cost: ~2x credits per call -- pending an explicit go-ahead before enabling).
+    ('williamhill'), ('ladbrokes_uk'), ('coral'), ('paddypower'), ('betway'), ('betvictor');
 
 -- Real market-line captures for CLV -- deliberately NOT tagged 'opening'/'closing' at write
 -- time (a capture can't know it's the real LAST one before kickoff until kickoff has already

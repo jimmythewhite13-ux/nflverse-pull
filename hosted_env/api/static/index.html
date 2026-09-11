@@ -126,6 +126,26 @@
   }
   .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
   #loading { color: var(--muted); padding: 20px 0; text-align: center; }
+  .view-tabs { display: flex; gap: 4px; margin: 0 16px 12px; }
+  .view-tabs button {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    font-family: "Inter", sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.03em;
+    text-transform: uppercase; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+  }
+  .view-tabs button.active { color: var(--signal); border-color: #4a3f22; background: #221d10; }
+  #team-filter {
+    width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-family: "Inter", sans-serif; font-size: 13px; padding: 8px 12px; border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  #team-filter::placeholder { color: var(--muted); }
+  table.cheatsheet { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.cheatsheet th {
+    text-align: left; font-size: 10px; text-transform: uppercase; color: var(--muted);
+    letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 1px solid var(--border);
+  }
+  table.cheatsheet td { padding: 8px; border-bottom: 1px solid var(--border); }
+  table.cheatsheet tr:hover td { background: var(--pending-bg); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -143,9 +163,15 @@
   <div class="week-dropdown" id="week-dropdown"></div>
 </div>
 <div id="model-banner">Loading model status...</div>
+<div class="view-tabs">
+  <button id="tab-games" class="active" onclick="switchView('games')">Games</button>
+  <button id="tab-cheatsheet" onclick="switchView('cheatsheet')">Cheat Sheet</button>
+</div>
 <main>
+  <input id="team-filter" type="text" placeholder="Filter by team (e.g. SEA)&hellip;" oninput="applyTeamFilter()">
   <div id="loading">Loading real games...</div>
   <div id="games"></div>
+  <div id="cheatsheet-view" style="display:none"></div>
 </main>
 
 <div id="detail">
@@ -157,6 +183,8 @@
 const API = "";  // real, live API is same-origin (this page is served by the FastAPI service)
 let currentWeek = null;
 let viewingWeek = null;
+let loadedGames = [];   // real, currently-loaded week's games -- source for both views + filter
+let activeView = "games";
 
 async function loadModelBanner() {
   try {
@@ -220,33 +248,86 @@ async function loadCurrentWeek() {
   }
 }
 
+function gameRowHtml(g) {
+  return `
+    <div class="game-row" onclick="openDetail('${g.game_id}')">
+      <div>
+        <div class="teams">${g.away_team} @ ${g.home_team}</div>
+        <div class="meta">${fmtKickoff(g.kickoff_time)}</div>
+      </div>
+      <div class="badges">
+        <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
+        ${g.has_major_shift ? '<span class="shift-badge">&#9650; Line moved</span>' : ""}
+      </div>
+    </div>
+  `;
+}
+
+// Real, additive second top-level view -- not a replacement for the per-game list. Same real
+// games/data, denser one-glance layout. Deliberately no populated prediction/edge column yet
+// (no real predictions exist for any 2026 game) -- the real structure (columns, sort-readiness)
+// is built now so it needs no further work once Week 4's real predictions start populating it.
+function cheatsheetHtml(games) {
+  if (!games.length) return '<div class="empty">No real games scheduled for this week yet.</div>';
+  const rows = games.map(g => `
+    <tr onclick="openDetail('${g.game_id}')">
+      <td>${g.away_team} @ ${g.home_team}</td>
+      <td>${fmtKickoff(g.kickoff_time)}</td>
+      <td><span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span></td>
+      <td>${g.has_major_shift ? '<span class="shift-badge">&#9650; moved</span>' : "--"}</td>
+    </tr>
+  `).join("");
+  return `
+    <table class="cheatsheet">
+      <thead><tr><th>Matchup</th><th>Kickoff</th><th>Status</th><th>Market</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderCurrentView() {
+  const filterTerm = document.getElementById("team-filter").value.trim().toUpperCase();
+  const filtered = filterTerm
+    ? loadedGames.filter(g => g.home_team.includes(filterTerm) || g.away_team.includes(filterTerm))
+    : loadedGames;
+  const gamesEl = document.getElementById("games");
+  const sheetEl = document.getElementById("cheatsheet-view");
+  if (activeView === "games") {
+    gamesEl.style.display = "block";
+    sheetEl.style.display = "none";
+    gamesEl.innerHTML = filtered.length
+      ? filtered.map(gameRowHtml).join("")
+      : '<div class="empty">No real games match that filter.</div>';
+  } else {
+    gamesEl.style.display = "none";
+    sheetEl.style.display = "block";
+    sheetEl.innerHTML = cheatsheetHtml(filtered);
+  }
+}
+
+function applyTeamFilter() {
+  renderCurrentView();
+}
+
+function switchView(view) {
+  activeView = view;
+  document.getElementById("tab-games").classList.toggle("active", view === "games");
+  document.getElementById("tab-cheatsheet").classList.toggle("active", view === "cheatsheet");
+  renderCurrentView();
+}
+
 async function loadGames() {
   const loading = document.getElementById("loading");
-  const container = document.getElementById("games");
   loading.style.display = "block";
   loading.textContent = "Loading real games...";
-  container.innerHTML = "";
+  document.getElementById("games").innerHTML = "";
+  document.getElementById("cheatsheet-view").innerHTML = "";
   try {
     const res = await fetch(`${API}/sports/NFL/games?week=${viewingWeek}`);
     if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
-    const games = await res.json();
+    loadedGames = await res.json();
     loading.style.display = "none";
-    if (games.length === 0) {
-      container.innerHTML = '<div class="empty">No real games scheduled for this week yet.</div>';
-      return;
-    }
-    container.innerHTML = games.map(g => `
-      <div class="game-row" onclick="openDetail('${g.game_id}')">
-        <div>
-          <div class="teams">${g.away_team} @ ${g.home_team}</div>
-          <div class="meta">${fmtKickoff(g.kickoff_time)}</div>
-        </div>
-        <div class="badges">
-          <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
-          ${g.has_major_shift ? '<span class="shift-badge">&#9650; Line moved</span>' : ""}
-        </div>
-      </div>
-    `).join("");
+    renderCurrentView();
   } catch (e) {
     loading.textContent = `Real error loading games: ${e.message}`;
   }

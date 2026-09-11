@@ -13,14 +13,14 @@ the live API before writing this file:
     lines (raw_market_captures) stay all-region (already working, already paid for).
   - Markets: 5 to start ("core 4 + QB interceptions" -- explicit user scope-down from an
     initially much larger requested list). MARKET_KEYS below is the one place to extend later.
-  - Cadence: real, custom, user-specified -- "twice daily, and the last day the hour before
-    every game time." Implemented as a PER-EVENT gate (not a job-level one like market_lines.py,
-    since events kick off at different real times across a week): a fixed twice-daily baseline
-    (ANCHOR_HOURS, UTC) while a game is upcoming, plus one dedicated capture in the real final
-    hour before that game's own kickoff (the closing-line snapshot). The workflow itself still
-    fires hourly (same real fix as market_lines.py's own cron -- see its `_should_capture_now`
-    docstring for why cron alone can't express this); THIS script's gate decides, per real
-    event, whether an hourly tick actually spends a real API credit.
+  - Cadence: real, deliberately SIMPLIFIED for the beta period (2026-09-11 revision -- explicit
+    user request: "for now during the beta process let's do a once a day trigger", superseding
+    the originally-specified "twice daily + hour-before-kickoff" cadence). The workflow's own
+    cron now fires once daily (see player_props_capture.yml), and `_should_capture_event` below
+    is a simple per-event safety net (skip if already captured for this game in the last ~20h),
+    not the finer-grained pre-kickoff-hour logic market_lines.py's own cadence gate uses --
+    revisit adding a dedicated closing-line (hour-before-kickoff) capture once beta is
+    graduated, per the same user request.
 
 Real game_id resolution and CLV/post-kickoff exclusion: identical real logic to market_lines.py
 (reused directly, not reimplemented) -- see that module's own comments for the full rationale.
@@ -61,9 +61,6 @@ MARKET_KEYS = [
     "player_pass_interceptions",
 ]
 
-# Real, twice-daily baseline capture hours (UTC). Deliberately spread ~12h apart.
-ANCHOR_HOURS = {13, 1}
-
 # Real, deliberate window -- don't spend real credits probing an event more than this many days
 # out; sportsbooks generally haven't posted real player-prop lines that early anyway, and this
 # bounds the real, total weekly cost to games actually close enough to have markets.
@@ -84,24 +81,19 @@ def _fetch_real_upcoming_events(key: str) -> list[dict]:
 
 def _should_capture_event(conn: sqlite3.Connection, game_id: str, kickoff: datetime,
                            now: datetime) -> tuple[bool, str]:
+    """Real, deliberately simple beta-phase gate: the workflow's own cron already fires once
+    daily (see player_props_capture.yml), so this is just a safety net against a real duplicate
+    capture (e.g. a manual workflow_dispatch re-run the same day) -- skip only if this exact
+    game was already captured within the last ~20 real hours."""
     cur = conn.execute(
         "SELECT MAX(captured_at) FROM raw_player_prop_captures WHERE game_id = ?", (game_id,)
     )
     row = cur.fetchone()
     last = datetime.fromisoformat(row[0]) if row and row[0] else None
-
-    within_final_hour = timedelta(0) < (kickoff - now) <= timedelta(hours=1)
-    if within_final_hour:
-        if last is None or last < kickoff - timedelta(hours=1):
-            return True, f"real final-hour pre-kickoff capture (kickoff {kickoff.isoformat()})"
-        return False, "already captured within the final pre-kickoff hour"
-
-    if now.hour in ANCHOR_HOURS:
-        if last is None or (now - last) >= timedelta(hours=6):
-            return True, f"real twice-daily baseline (anchor hour {now.hour} UTC)"
-        return False, f"anchor hour {now.hour} UTC, but last real capture only " \
-                       f"{(now - last).total_seconds() / 3600:.1f}h ago"
-    return False, f"not an anchor hour ({now.hour} UTC) and not within the final pre-kickoff hour"
+    if last is None or (now - last) >= timedelta(hours=20):
+        return True, "real once-daily capture due"
+    return False, f"already captured {(now - last).total_seconds() / 3600:.1f}h ago " \
+                   f"(<20h, once-daily gate not due yet)"
 
 
 def _extract_prop_rows(outcomes: list[dict]) -> dict[str, dict]:

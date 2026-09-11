@@ -1,18 +1,19 @@
 name: Player-prop line capture (real, US-only)
 
-# Real, deliberate scope: sibling to line_capture.yml, same real hourly-cron-plus-script-gate
-# pattern (see market_lines.py's own `_should_capture_now` docstring for why cron alone can't
-# express a per-event, kickoff-relative cadence) -- player_props.py's own `_should_capture_event`
-# decides per real event whether an hourly tick spends a real API credit.
+# Real, LIVE as of 2026-09-11 -- manually tested end-to-end first (real API call -> real DB
+# write -> real Postgres sync -> real API response -> real PWA render, confirmed via Playwright
+# screenshot), then the user explicitly said "go live."
 #
-# Real, deliberate manual-trigger-only for now (2026-09-11): this is a NEW capture path against
-# the live Odds API, not yet run end-to-end. `workflow_dispatch` lets it be triggered manually to
-# confirm real data actually lands in the DB and renders correctly in the API/PWA before the
-# `schedule` trigger below is uncommented and this goes fully automated -- explicit, deliberate
-# sequencing (test before automate), not an oversight.
+# Real, deliberately SIMPLE once-daily cadence for the beta period (explicit user request,
+# 2026-09-11: "for now during the beta process let's do a once a day trigger" -- supersedes the
+# originally-specified twice-daily + hour-before-kickoff design). One real cron fire per day;
+# player_props.py's own `_should_capture_event` is just a duplicate-run safety net, not a
+# finer-grained gate (unlike market_lines.py's hourly-cron-plus-gate pattern, which this
+# deliberately does NOT copy for now). Revisit a dedicated closing-line capture once beta is
+# graduated.
 on:
-  # schedule:
-  #   - cron: '0 * * * *'   # uncomment once a real manual test run has been verified end-to-end
+  schedule:
+    - cron: '0 13 * * *'   # once daily, 13:00 UTC (~9am ET)
   workflow_dispatch: {}
 
 permissions:

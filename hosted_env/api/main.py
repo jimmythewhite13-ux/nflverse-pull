@@ -245,9 +245,15 @@ def list_games(sport: str, week: int | None = None) -> list[dict]:
         # same distinguishing convention already established for this exact two-dataset overlap
         # (see PROGRESS.md's "stale demo rows" correction). Confirmed directly against the real
         # DB: 272/272 abbreviated-format games have a workflow_status row; 0/272 Part A rows do.
+        # Real "has_prediction" -- computed here (not left for the frontend to guess from
+        # week number) so the real week-level caveat banner can reflect actual current state:
+        # only an ACTIVE, real prediction_runs row counts, same rule as get_game's own honest
+        # prediction check.
         query = (
             "SELECT g.game_id, g.season, g.week, g.game_date, g.kickoff_time, g.home_team, "
-            "g.away_team, gws.status, gws.status_reason "
+            "g.away_team, gws.status, gws.status_reason, "
+            "EXISTS (SELECT 1 FROM prediction_runs pr WHERE pr.game_id = g.game_id "
+            "AND pr.model_status = 'ACTIVE') AS has_prediction "
             "FROM games g JOIN game_workflow_status gws ON gws.game_id = g.game_id "
             "WHERE g.sport_id = %s"
         )

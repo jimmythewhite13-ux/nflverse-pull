@@ -1537,3 +1537,43 @@ independently pre-computed expected values.
   timestamp).
 
 Full test suite: 10,755 passed.
+
+## Phase 9/10 re-derived against the corrected raw-HFA-estimator data (2026-09-11)
+
+Real, requested follow-through on the raw-estimator fix: `phase9_graduation_table.md` and
+`phase10_model_selection.md` had already been corrected once (2026-09-08, for the separate
+margin-symmetry bug) but never updated for the raw-estimator fix (2026-09-09/10). Re-derived
+both documents in full against this session's own fresh re-runs, row by row, not assumed:
+
+- **Real, corrected champion**: MAE=10.670/Brier=0.2363/Win%=57.7% (2025) -- down from the stale
+  MAE=11.074/Brier=0.2410/Win%=54.5% every prior "vs. champion" delta was computed against. The
+  champion's real error had been overstated by the same bug the whole time.
+- Built a new wrapper (`phase8_2024_run_rerun_hfa_fix.py`, same established pattern) to re-run
+  the 2024 secondary-check challenger matrix against the corrected reconstruction -- this
+  surfaced a real, previously-invisible finding: the combined Travel+HFA candidate's real 2025
+  MAE advantage does **not** survive the 2024 secondary check (2024 MAE=10.411, worse than the
+  2024 champion's own 10.215) -- a real reversal, not noise.
+- HFA-A's own absolute numbers were already correct (self-cancelling, confirmed identical
+  before/after the fix); what changed was the delta vs. champion, which shrinks from a stale
+  MAE −0.448/Brier −0.0047 to a real MAE −0.044/Brier −0.0000 -- near parity on 2025 data alone.
+- Platt calibration reverses status entirely: TESTED → REJECTED, since the corrected champion is
+  already well-calibrated (real Δ+0.0001 Brier, not the stale −0.0042 gain originally claimed).
+- Travel-G downgrades from a clean TESTED to TESTED-mixed (real MAE improves, real Brier does
+  not).
+- Also found and corrected one further, independent discrepancy while re-verifying (not
+  attributable to the raw-estimator fix): Travel variant A ("no travel") does not beat the
+  existing production travel coefficient on Brier, only MAE -- the original "beats it on both"
+  claim doesn't reconcile with this session's own direct re-run.
+- **Real, final selection (Phase 10) is unchanged -- Candidate 2, HFA-A alone -- but the
+  reasoning changed materially**: the original document leaned on a large first-season MAE gap
+  that has now nearly vanished; the corrected decision instead rests on durability across both
+  real seasons checked (HFA-A is the only candidate with a real, non-reversing improvement in
+  both 2025 and 2024, most clearly Win%: +0.8pt in 2025, +11.7pt in 2024), while the
+  combined-candidate's real 2025 edge reverses in 2024. Both documents now say explicitly that
+  retaining the champion unchanged would also be a defensible real alternative, given how narrow
+  the first-season case has become -- not something the original (buggy-baseline) numbers could
+  honestly say.
+
+Both documents follow the project's established correction convention: a dated notice at the
+top, the real table rows updated in place with the new correction called out per row, and the
+original (now-superseded) numbers preserved below for the record, not deleted.

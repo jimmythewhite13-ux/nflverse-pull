@@ -92,6 +92,56 @@ def list_sports() -> list[dict]:
         return cur.fetchall()
 
 
+@app.get("/sports/{sport}/current-week")
+def current_week(sport: str) -> dict:
+    """Real, single authoritative source for "what week is it" -- computed fresh here, every
+    call, so the PWA never independently calculates this from device date (the exact kind of
+    redundant, drift-prone calculation already flagged elsewhere in this project). Real
+    definition: the week containing the next real game whose (corrected) kickoff hasn't
+    happened yet -- this naturally advances forward as each week's games complete, including
+    mid-week (Sunday afternoon still correctly reports the current week via its own remaining
+    Sunday/Monday games), and correctly rolls over to the next week the moment the prior week's
+    real last game finishes. Falls back to the real season's last week once every game is done."""
+    with _get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM sports WHERE name = %s;", (sport.upper(),))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Real sport {sport!r} not found.")
+        sport_id = row["id"]
+
+        # Real, deliberate INNER JOIN -- same reasoning as list_games/get_game: only real,
+        # live-tracked games (not the Part A reconstruction dataset) count here.
+        cur.execute(
+            "SELECT g.season, g.week, g.kickoff_time "
+            "FROM games g JOIN game_workflow_status gws ON gws.game_id = g.game_id "
+            "WHERE g.sport_id = %s AND g.kickoff_time IS NOT NULL "
+            "ORDER BY g.season DESC;",
+            (sport_id,),
+        )
+        rows = cur.fetchall()
+        if not rows:
+            raise HTTPException(
+                status_code=404, detail=f"Real, no games with a kickoff time found for {sport!r}."
+            )
+        season = rows[0]["season"]  # real, most-recent real season present
+
+        now = datetime.now(_UTC)
+        upcoming = []
+        max_week = 1
+        for r in rows:
+            if r["season"] != season:
+                continue
+            fixed = datetime.fromisoformat(_fix_kickoff_tz(r["kickoff_time"]))
+            max_week = max(max_week, r["week"])
+            if fixed > now:
+                upcoming.append((fixed, r["week"]))
+        if upcoming:
+            week = min(upcoming, key=lambda t: t[0])[1]
+        else:
+            week = max_week  # real, honest fallback -- every real game has already kicked off
+        return {"season": season, "week": week}
+
+
 @app.get("/sports/{sport}/games")
 def list_games(sport: str, week: int | None = None) -> list[dict]:
     with _get_connection() as conn, conn.cursor() as cur:

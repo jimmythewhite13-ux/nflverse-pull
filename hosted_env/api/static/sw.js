@@ -10,8 +10,16 @@
 // errors to explain it. Real fix: NETWORK-first for the shell (always try live first, only
 // fall back to cache when genuinely offline) + a bumped cache name with old-cache cleanup on
 // activate, so anyone who already installed the old, cache-first version also recovers.
-const SHELL_CACHE = "nfl-model-shell-v2";
-const SHELL_FILES = ["/", "/manifest.json", "/icon.svg"];
+// Real, bumped cache version (2026-09-11): the frontend architecture refactor split one
+// monolithic index.html into real, separate css/js files -- the old cache's stale, pre-refactor
+// shell entries (if any survived offline) shouldn't linger under the same cache name.
+const SHELL_CACHE = "nfl-model-shell-v3";
+const SHELL_FILES = [
+  "/", "/manifest.json", "/icon.svg", "/css/app.css",
+  "/js/app.js", "/js/api.js", "/js/state.js", "/js/format.js",
+  "/js/market-signals.js", "/js/week-caveat.js", "/js/views.js",
+  "/js/detail.js", "/js/week-nav.js",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

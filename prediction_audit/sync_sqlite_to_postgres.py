@@ -79,8 +79,12 @@ def _sync_games(sq_conn, pg_cur, sport_id: int) -> int:
         "FROM games g JOIN game_workflow_status gws ON gws.game_id = g.game_id "
         "WHERE g.season = ?", (SEASON,),
     ).fetchall()
-    for r in rows:
-        pg_cur.execute(
+    params = [
+        (sport_id, r[0], r[1], r[2], r[3], r[4], r[5], r[6], bool(r[7]), r[8], r[9], r[10])
+        for r in rows
+    ]
+    if params:
+        pg_cur.executemany(
             "INSERT INTO games (sport_id, game_id, season, week, game_date, kickoff_time, "
             "away_team, home_team, neutral_site, stadium, surface, timezone) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
@@ -89,7 +93,7 @@ def _sync_games(sq_conn, pg_cur, sport_id: int) -> int:
             "kickoff_time=EXCLUDED.kickoff_time, away_team=EXCLUDED.away_team, "
             "home_team=EXCLUDED.home_team, neutral_site=EXCLUDED.neutral_site, "
             "stadium=EXCLUDED.stadium, surface=EXCLUDED.surface, timezone=EXCLUDED.timezone;",
-            (sport_id, r[0], r[1], r[2], r[3], r[4], r[5], r[6], bool(r[7]), r[8], r[9], r[10]),
+            params,
         )
     return len(rows)
 
@@ -100,13 +104,13 @@ def _sync_game_workflow_status(sq_conn, pg_cur) -> int:
         "FROM game_workflow_status gws JOIN games g ON g.game_id = gws.game_id "
         "WHERE g.season = ?", (SEASON,),
     ).fetchall()
-    for r in rows:
-        pg_cur.execute(
+    if rows:
+        pg_cur.executemany(
             "INSERT INTO game_workflow_status (game_id, status, status_reason, updated_at) "
             "VALUES (%s, %s, %s, %s) "
             "ON CONFLICT (game_id) DO UPDATE SET status=EXCLUDED.status, "
             "status_reason=EXCLUDED.status_reason, updated_at=EXCLUDED.updated_at;",
-            r,
+            rows,
         )
     return len(rows)
 
@@ -116,13 +120,13 @@ def _sync_ingestion_runs(sq_conn, pg_cur) -> int:
         "SELECT ingestion_id, job_name, run_timestamp, status, source, rows_written, detail "
         "FROM ingestion_runs",
     ).fetchall()
-    for r in rows:
-        pg_cur.execute(
+    if rows:
+        pg_cur.executemany(
             "INSERT INTO ingestion_runs (id, job_name, run_timestamp, status, source, "
             "rows_written, detail) VALUES (%s, %s, %s, %s, %s, %s, %s) "
             "ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, "
             "rows_written=EXCLUDED.rows_written, detail=EXCLUDED.detail;",
-            r,
+            rows,
         )
     if rows:
         pg_cur.execute(
@@ -167,12 +171,23 @@ def _sync_raw_table(sq_conn, pg_cur, table: str, columns: list[str],
     placeholders = ", ".join(["%s"] * len(columns))
     update_cols = [c for c in columns if c != "id"]
     update_clause = ", ".join(f"{c}=EXCLUDED.{c}" for c in update_cols)
-    for r in rows:
-        pg_cur.execute(
+    # Real, deliberate batching (2026-09-11): a real hang was confirmed directly (CI and local,
+    # independently) -- the process blocked with zero CPU usage inside a per-row execute() loop,
+    # with no progress signal at all to diagnose which row or how far through. Real fix:
+    # executemany() in real, bounded batches (fewer, larger round trips -- much less surface
+    # area for a single stalled one) with real, visible progress printed after every batch, so
+    # any future hang is immediately diagnosable from the real log instead of a silent stall.
+    batch_size = 500
+    if rows:
+        insert_sql = (
             f"INSERT INTO {table} ({col_list}) VALUES ({placeholders}) "
-            f"ON CONFLICT (id) DO UPDATE SET {update_clause};",
-            r,
+            f"ON CONFLICT (id) DO UPDATE SET {update_clause};"
         )
+        for start in range(0, len(rows), batch_size):
+            batch = rows[start:start + batch_size]
+            pg_cur.executemany(insert_sql, batch)
+            print(f"  {table}: synced {min(start + batch_size, len(rows))}/{len(rows)} real rows",
+                  flush=True)
     if rows:
         id_idx = columns.index("id")
         pg_cur.execute(
@@ -186,7 +201,19 @@ def main() -> None:
     database_url = _load_database_url()
     sq_conn = sqlite3.connect(DEFAULT_DB_PATH)
 
-    with psycopg.connect(database_url, connect_timeout=15) as pg_conn:
+    # Real, confirmed gap fixed (2026-09-11): connect_timeout alone only bounds how long
+    # establishing the connection can take -- once connected, an individual query with a
+    # stalled network round-trip (no error, no response, TCP not dropped) could block forever
+    # with no way to recover. Confirmed directly: a real CI run hung for 13+ minutes with its
+    # Postgres session sitting "idle in transaction" -- the client itself stalled, not Postgres
+    # (no blocking lock found). Real fix: keepalives so a genuinely dead connection is detected
+    # and dropped within ~15s instead of hanging indefinitely, plus a real statement_timeout so
+    # any single query that somehow does stall server-side fails loudly instead of hanging.
+    with psycopg.connect(
+        database_url, connect_timeout=15,
+        keepalives=1, keepalives_idle=5, keepalives_interval=5, keepalives_count=3,
+        options="-c statement_timeout=30000",
+    ) as pg_conn:
         with pg_conn.cursor() as pg_cur:
             # Real, before counts -- for the required real reconciliation evidence.
             before = {}
@@ -196,24 +223,30 @@ def main() -> None:
                 before[t] = pg_cur.fetchone()[0]
 
             sport_id = _ensure_real_nfl_sport(pg_cur)
-            print(f"Real 'NFL' sports.id = {sport_id}")
+            print(f"Real 'NFL' sports.id = {sport_id}", flush=True)
 
             src_counts = {}
+            print("Syncing games...", flush=True)
             src_counts["games"] = _sync_games(sq_conn, pg_cur, sport_id)
+            print("Syncing game_workflow_status...", flush=True)
             src_counts["game_workflow_status"] = _sync_game_workflow_status(sq_conn, pg_cur)
+            print("Syncing ingestion_runs...", flush=True)
             src_counts["ingestion_runs"] = _sync_ingestion_runs(sq_conn, pg_cur)
+            print("Syncing raw_injury_reports...", flush=True)
             src_counts["raw_injury_reports"] = _sync_raw_table(
                 sq_conn, pg_cur, "raw_injury_reports",
                 ["id", "ingestion_id", "season", "week", "team", "player_name", "position",
                  "report_status", "practice_status", "pulled_at", "source"],
                 season_filter=True,
             )
+            print("Syncing raw_roster_snapshots...", flush=True)
             src_counts["raw_roster_snapshots"] = _sync_raw_table(
                 sq_conn, pg_cur, "raw_roster_snapshots",
                 ["id", "ingestion_id", "season", "team", "player_name", "position",
                  "depth_rank", "roster_status", "pulled_at", "source"],
                 season_filter=True,
             )
+            print("Syncing raw_market_captures...", flush=True)
             src_counts["raw_market_captures"] = _sync_raw_table(
                 sq_conn, pg_cur, "raw_market_captures",
                 ["id", "ingestion_id", "game_id", "sportsbook", "market_type", "line_value",
@@ -221,7 +254,9 @@ def main() -> None:
                  "flagged_excluded_source"],
                 season_filter=False, exclude_flagged_sources=True,
             )
+            print("Committing...", flush=True)
             pg_conn.commit()
+            print("Committed.", flush=True)
 
             after = {}
             for t in before:

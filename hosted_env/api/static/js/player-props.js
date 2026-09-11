@@ -3,6 +3,7 @@
 // one level deeper (by stat, then by player) since a prop line is meaningless without knowing
 // who it's for. Real, deliberate scope note shown at the bottom: props are currently captured
 // US-only (game lines above stay all-region) -- a real, explicit cost tradeoff, not an oversight.
+import { bookNameHtml } from "./format.js";
 
 function fmtPropValue(p) {
   if (p.market_key === "player_anytime_td") {
@@ -30,7 +31,7 @@ export function renderPlayerProps(playerProps) {
         const cls = p.best_value ? "best" : p.worst_value ? "worst" : "";
         return `
           <div class="line-row ${cls}">
-            <span class="book">${p.sportsbook.replace(/_/g, " ")}</span>
+            ${bookNameHtml(p.sportsbook)}
             <div class="value"><span>${fmtPropValue(p)}</span></div>
           </div>
         `;

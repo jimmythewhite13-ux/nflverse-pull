@@ -3,10 +3,9 @@
 // games and the same real team-filter input.
 import { state } from "./state.js";
 import { statusPillClass, fmtKickoff } from "./format.js";
-
-export const ALL_TEAMS = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB",
-  "HOU","IND","JAX","KC","LA","LAC","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA",
-  "SF","TB","TEN","WAS"];
+import { ALL_TEAMS } from "./teams.js";
+import { renderHistoricalView } from "./historical.js";
+export { ALL_TEAMS, FULL_TEAM_NAME } from "./teams.js";
 
 export function gameRowHtml(g) {
   return `
@@ -54,29 +53,32 @@ export function teamsGridHtml(filterTerm) {
 }
 
 export function renderCurrentView() {
-  const filterTerm = document.getElementById("team-filter").value.trim().toUpperCase();
+  // Real, deliberate change (consolidated_outstanding_queue.md item 3): driven by the selected
+  // team from the ported autocomplete filter (team-filter.js), not raw live input text -- the
+  // reference implementation only ever filters once a real suggestion is clicked.
+  const filterTerm = state.teamFilter || "";
   const filtered = filterTerm
     ? state.loadedGames.filter(g => g.home_team.includes(filterTerm) || g.away_team.includes(filterTerm))
     : state.loadedGames;
   const gamesEl = document.getElementById("games");
   const sheetEl = document.getElementById("cheatsheet-view");
   const teamsEl = document.getElementById("teams-view");
+  const histEl = document.getElementById("historical-view");
   gamesEl.style.display = state.activeView === "games" ? "block" : "none";
   sheetEl.style.display = state.activeView === "cheatsheet" ? "block" : "none";
   teamsEl.style.display = state.activeView === "teams" ? "block" : "none";
+  histEl.style.display = state.activeView === "historical" ? "block" : "none";
   if (state.activeView === "games") {
     gamesEl.innerHTML = filtered.length
       ? filtered.map(gameRowHtml).join("")
       : '<div class="empty">No real games match that filter.</div>';
   } else if (state.activeView === "teams") {
     teamsEl.innerHTML = teamsGridHtml(filterTerm);
+  } else if (state.activeView === "historical") {
+    renderHistoricalView();  // real, async -- own real fetch/cache, see historical.js
   } else {
     sheetEl.innerHTML = cheatsheetHtml(filtered);
   }
-}
-
-export function applyTeamFilter() {
-  renderCurrentView();
 }
 
 export function switchView(view) {
@@ -84,5 +86,6 @@ export function switchView(view) {
   document.getElementById("tab-games").classList.toggle("active", view === "games");
   document.getElementById("tab-cheatsheet").classList.toggle("active", view === "cheatsheet");
   document.getElementById("tab-teams").classList.toggle("active", view === "teams");
+  document.getElementById("tab-historical").classList.toggle("active", view === "historical");
   renderCurrentView();
 }

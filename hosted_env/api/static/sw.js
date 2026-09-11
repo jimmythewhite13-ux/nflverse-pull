@@ -13,12 +13,18 @@
 // Real, bumped cache version (2026-09-11): the frontend architecture refactor split one
 // monolithic index.html into real, separate css/js files -- the old cache's stale, pre-refactor
 // shell entries (if any survived offline) shouldn't linger under the same cache name.
-const SHELL_CACHE = "nfl-model-shell-v3";
+// Real, bumped cache version (2026-09-11, later same day): player-props.js shipped after v3 was
+// cut and was missing from SHELL_FILES -- an offline visitor would have gotten a real, broken
+// missing-module error instead of the Player Props section simply not updating. Bumped to v4
+// (triggers the same real old-cache cleanup on activate) and added the missing file.
+// Real, bumped again (same day): team-filter.js (autocomplete port) and historical.js
+// (Historical/backtest tab) shipped -- same real reasoning, both added to SHELL_FILES, v5.
+const SHELL_CACHE = "nfl-model-shell-v5";
 const SHELL_FILES = [
   "/", "/manifest.json", "/icon.svg", "/css/app.css",
   "/js/app.js", "/js/api.js", "/js/state.js", "/js/format.js",
-  "/js/market-signals.js", "/js/week-caveat.js", "/js/views.js",
-  "/js/detail.js", "/js/week-nav.js",
+  "/js/market-signals.js", "/js/player-props.js", "/js/week-caveat.js", "/js/views.js",
+  "/js/detail.js", "/js/week-nav.js", "/js/team-filter.js", "/js/historical.js",
 ];
 
 self.addEventListener("install", (event) => {

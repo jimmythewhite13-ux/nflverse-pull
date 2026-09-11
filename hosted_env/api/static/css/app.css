@@ -12,6 +12,10 @@
   --best: #5B9279; --best-bg: #1c2620;
   --worst: #C4695E; --worst-bg: #291d1c;
   --shift: #d98c3f; --shift-bg: #2b2015;
+  /* Real, third distinct state (historical_backtest_view.md) -- a graded historical result,
+     deliberately neither the live --signal (yellow, real computed CURRENT output) nor
+     --pending (slate, "not yet available"). Exact real hex values from the reference mockup. */
+  --historical: #A9C9CC; --historical-bg: #24363A;
 }
 * { box-sizing: border-box; }
 body {
@@ -90,6 +94,10 @@ main { padding: 0 16px; }
 .line-row.best { background: var(--best-bg); }
 .line-row.worst { background: var(--worst-bg); }
 .line-row .book { text-transform: capitalize; }
+/* Real, plain link (never tracked/affiliate) to the book's own site -- underline-on-hover
+   affordance so it reads as interactive without looking like a different, "special" price. */
+a.line-row .book, .line-row a.book { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+.line-row a.book:hover { border-bottom-color: var(--text); }
 .line-row .value { display: flex; align-items: center; gap: 6px; }
 .line-row.best .value { color: var(--best); font-weight: 600; }
 .line-row.worst .value { color: var(--worst); }
@@ -119,19 +127,86 @@ main { padding: 0 16px; }
 }
 .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
 #loading { color: var(--muted); padding: 20px 0; text-align: center; }
-.view-tabs { display: flex; gap: 4px; margin: 0 16px 12px; }
+
+/* Real Historical/backtest tab (consolidated_outstanding_queue.md item 2) -- reference
+   implementation ported from interface_mockup_home_drilldown.html, adapted to this app's real
+   CSS custom-property palette instead of the mockup's hardcoded hex values. */
+.historical-disclaimer {
+  margin: 0 0 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5;
+}
+.row-wrapper { border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.row-wrapper .game-row { border: none; margin-bottom: 0; }
+.matchup { display: flex; flex-direction: column; gap: 2px; }
+.game-row .kickoff { color: var(--muted); font-size: 12px; }
+.chevron { color: var(--muted); margin-left: 10px; font-size: 14px; transition: transform 0.2s ease; }
+.game-row.expanded .chevron { transform: rotate(90deg); }
+.historical-badge {
+  font-family: "Oswald", sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.03em;
+  text-transform: uppercase; padding: 4px 9px; border-radius: 999px;
+  color: var(--historical); background: var(--historical-bg); white-space: nowrap;
+}
+.drilldown { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; background: var(--bg); }
+.drilldown.open { max-height: 400px; }
+.drilldown-inner { padding: 8px 4px 16px; }
+.readout-row { display: flex; justify-content: space-between; padding: 8px 0;
+  border-bottom: 1px solid var(--border); font-size: 13px; }
+.readout-row:last-child { border-bottom: none; }
+.readout-label { color: var(--muted); }
+.readout-value { font-weight: 600; }
+.result-compare {
+  display: flex; justify-content: space-between; padding: 12px 0; margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.result-compare-col { text-align: center; flex: 1; }
+.result-compare-label {
+  font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+.result-compare-value { font-family: "Oswald", sans-serif; font-size: 16px; font-weight: 600; }
+.accuracy-tag { font-size: 11.5px; padding: 4px 10px; border-radius: 999px; display: inline-block; margin-top: 4px; }
+.accuracy-tag.correct { background: var(--best-bg); color: var(--best); }
+.accuracy-tag.miss { background: var(--worst-bg); color: var(--worst); }
+/* Real, deliberate wrap (not scroll) at narrow widths: a 4th tab (Historical) can push this
+   row past ~360px before wrapping -- wrapping to a second row keeps every tab visible and
+   clickable rather than hiding one behind a horizontal scroll a viewer might not notice. */
+.view-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 16px 12px; }
 .view-tabs button {
   background: var(--surface); border: 1px solid var(--border); color: var(--muted);
   font-family: "Inter", sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.03em;
-  text-transform: uppercase; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+  text-transform: uppercase; padding: 7px 12px; border-radius: 6px; cursor: pointer;
 }
 .view-tabs button.active { color: var(--signal); border-color: #4a3f22; background: #221d10; }
-#team-filter {
+/* Real, ported autocomplete team filter (consolidated_outstanding_queue.md item 3) -- adapted
+   from interface_mockup_home_drilldown.html's reference implementation to this app's real CSS
+   custom-property palette. Note: match highlighting deliberately does NOT use var(--signal) --
+   that color is reserved elsewhere in this file for real, computed model output only. */
+.team-filter-wrap { position: relative; margin-bottom: 10px; }
+.team-filter-input {
   width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text);
   font-family: "Inter", sans-serif; font-size: 13px; padding: 8px 12px; border-radius: 6px;
-  margin-bottom: 10px;
 }
-#team-filter::placeholder { color: var(--muted); }
+.team-filter-input::placeholder { color: var(--muted); }
+.team-suggestions {
+  position: absolute; left: 0; right: 0; top: 100%; margin-top: 2px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  max-height: 220px; overflow-y: auto; display: none; z-index: 10;
+}
+.team-suggestions.visible { display: block; }
+.team-suggestion-item {
+  padding: 9px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border);
+}
+.team-suggestion-item:last-child { border-bottom: none; }
+.team-suggestion-item:hover { background: var(--pending-bg); }
+.team-suggestion-item.no-match { color: var(--muted); cursor: default; }
+.team-suggestion-item.no-match:hover { background: none; }
+.team-suggestion-item .match { font-weight: 700; }
+.active-filter-chip {
+  display: none; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px;
+  color: var(--muted);
+}
+.active-filter-chip.visible { display: flex; }
+.active-filter-chip .clear-btn { cursor: pointer; text-decoration: underline; color: var(--text); }
 table.cheatsheet { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.cheatsheet th {
   text-align: left; font-size: 10px; text-transform: uppercase; color: var(--muted);

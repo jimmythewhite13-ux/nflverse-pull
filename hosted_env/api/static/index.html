@@ -31,13 +31,30 @@
   <button id="tab-games" class="active" onclick="switchView('games')">Games</button>
   <button id="tab-cheatsheet" onclick="switchView('cheatsheet')">Cheat Sheet</button>
   <button id="tab-teams" onclick="switchView('teams')">Teams</button>
+  <button id="tab-historical" onclick="switchView('historical')">Historical</button>
 </div>
 <main>
-  <input id="team-filter" type="text" placeholder="Filter by team (e.g. SEA)&hellip;" oninput="applyTeamFilter()">
+  <div class="team-filter-wrap">
+    <input type="text" class="team-filter-input" id="team-filter-input"
+           placeholder="Filter by team (e.g. SEA)&hellip;" autocomplete="off">
+    <div class="team-suggestions" id="team-suggestions"></div>
+    <div class="active-filter-chip" id="active-filter-chip">
+      <span>Showing: <strong id="active-filter-name"></strong></span>
+      <span class="clear-btn" onclick="clearTeamFilter()">Clear &times;</span>
+    </div>
+  </div>
   <div id="loading">Loading real games...</div>
   <div id="games"></div>
   <div id="cheatsheet-view" style="display:none"></div>
   <div id="teams-view" style="display:none"></div>
+  <div id="historical-view" style="display:none">
+    <div class="historical-disclaimer">
+      These are real, already-completed games from the model's validated 2025 (Phase 1) and
+      2024 (Phase 8) reconstructions &mdash; shown to demonstrate real accuracy, not live
+      predictions. Nothing here reflects roster or team changes since those seasons.
+    </div>
+    <div id="historical-games"></div>
+  </div>
 </main>
 
 <div id="detail">

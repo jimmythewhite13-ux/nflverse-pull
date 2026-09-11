@@ -417,6 +417,46 @@ def get_game(sport: str, game_id: str) -> dict:
         return game
 
 
+# Real, explicit scope -- exactly the two CORRECTED historical model_versions this project's own
+# audit trail identifies as valid (see prediction_audit/sync_historical_to_postgres.py's own
+# docstring for the full real rationale), never every research run that happens to exist in the
+# database. Real Phase 1 (2025, 224 games) + Phase 8 (2024, 220 games) reconstructions.
+_HISTORICAL_MODEL_VERSIONS = (
+    "v35.0-hfa-raw-estimator-fix",
+    "v35.0-degraded-ol-2024-secondary-check-hfa-raw-estimator-fix",
+)
+
+
+@app.get("/sports/{sport}/historical")
+def get_historical(sport: str) -> dict:
+    """Real, already-completed games from the model's validated 2025/2024 reconstructions --
+    consolidated_outstanding_queue.md item 2. Deliberately returns EVERY real game from these
+    two model_versions, not a curated subset -- the surest way to guarantee a genuinely
+    representative sample (real hits AND real misses) is to never filter any of them out."""
+    with _get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT g.game_id, g.season, g.week, g.away_team, g.home_team, "
+            "p.projected_margin, p.home_win_probability, "
+            "r.away_final_score, r.home_final_score, mv.version_name "
+            "FROM predictions p "
+            "JOIN prediction_runs pr ON pr.id = p.run_id "
+            "JOIN model_versions mv ON mv.id = pr.model_version_id "
+            "JOIN games g ON g.game_id = pr.game_id "
+            "JOIN results r ON r.game_id = g.game_id "
+            "JOIN sports s ON s.id = g.sport_id "
+            "WHERE s.name = %s AND mv.version_name = ANY(%s) "
+            "ORDER BY g.season DESC, g.week ASC, g.game_id ASC;",
+            (sport.upper(), list(_HISTORICAL_MODEL_VERSIONS)),
+        )
+        rows = cur.fetchall()
+        for r in rows:
+            actual_margin = r["home_final_score"] - r["away_final_score"]
+            r["actual_margin"] = actual_margin
+            r["margin_error"] = round(abs(r["projected_margin"] - actual_margin), 1)
+            r["winner_correct"] = (r["projected_margin"] > 0) == (actual_margin > 0)
+        return {"games": rows}
+
+
 @app.get("/sports/{sport}/teams/{team}")
 def get_team(sport: str, team: str) -> dict:
     """Real per-team view: full real season schedule + real current injury status for one

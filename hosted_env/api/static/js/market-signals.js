@@ -1,7 +1,7 @@
 // Real, purely market-observational rendering -- factual statements about what the real,
 // current market is doing ("DraftKings currently offers the best number," "this line has
 // moved 3.0+ points since opening"), never a recommendation or "value" in the betting sense.
-import { fmtLineValue } from "./format.js";
+import { fmtLineValue, bookNameHtml } from "./format.js";
 
 export function renderMarketLines(marketLines) {
   if (!marketLines.length) return '<div class="empty">No real market lines captured yet.</div>';
@@ -30,7 +30,7 @@ export function renderMarketLines(marketLines) {
       }
       return `
         <div class="line-row ${cls}">
-          <span class="book">${m.sportsbook.replace(/_/g, " ")}</span>
+          ${bookNameHtml(m.sportsbook)}
           <div class="value">${movementHtml}<span>${fmtLineValue(m)}</span></div>
         </div>
       `;

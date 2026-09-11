@@ -166,12 +166,14 @@
 <div class="view-tabs">
   <button id="tab-games" class="active" onclick="switchView('games')">Games</button>
   <button id="tab-cheatsheet" onclick="switchView('cheatsheet')">Cheat Sheet</button>
+  <button id="tab-teams" onclick="switchView('teams')">Teams</button>
 </div>
 <main>
   <input id="team-filter" type="text" placeholder="Filter by team (e.g. SEA)&hellip;" oninput="applyTeamFilter()">
   <div id="loading">Loading real games...</div>
   <div id="games"></div>
   <div id="cheatsheet-view" style="display:none"></div>
+  <div id="teams-view" style="display:none"></div>
 </main>
 
 <div id="detail">
@@ -285,6 +287,18 @@ function cheatsheetHtml(games) {
   `;
 }
 
+const ALL_TEAMS = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB",
+  "HOU","IND","JAX","KC","LA","LAC","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA",
+  "SF","TB","TEN","WAS"];
+
+function teamsGridHtml(filterTerm) {
+  const teams = filterTerm ? ALL_TEAMS.filter(t => t.includes(filterTerm)) : ALL_TEAMS;
+  if (!teams.length) return '<div class="empty">No real team matches that filter.</div>';
+  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">` +
+    teams.map(t => `<div class="game-row" style="justify-content:center" onclick="openTeamDetail('${t}')"><span class="teams">${t}</span></div>`).join("") +
+    `</div>`;
+}
+
 function renderCurrentView() {
   const filterTerm = document.getElementById("team-filter").value.trim().toUpperCase();
   const filtered = filterTerm
@@ -292,15 +306,17 @@ function renderCurrentView() {
     : loadedGames;
   const gamesEl = document.getElementById("games");
   const sheetEl = document.getElementById("cheatsheet-view");
+  const teamsEl = document.getElementById("teams-view");
+  gamesEl.style.display = activeView === "games" ? "block" : "none";
+  sheetEl.style.display = activeView === "cheatsheet" ? "block" : "none";
+  teamsEl.style.display = activeView === "teams" ? "block" : "none";
   if (activeView === "games") {
-    gamesEl.style.display = "block";
-    sheetEl.style.display = "none";
     gamesEl.innerHTML = filtered.length
       ? filtered.map(gameRowHtml).join("")
       : '<div class="empty">No real games match that filter.</div>';
+  } else if (activeView === "teams") {
+    teamsEl.innerHTML = teamsGridHtml(filterTerm);
   } else {
-    gamesEl.style.display = "none";
-    sheetEl.style.display = "block";
     sheetEl.innerHTML = cheatsheetHtml(filtered);
   }
 }
@@ -313,7 +329,47 @@ function switchView(view) {
   activeView = view;
   document.getElementById("tab-games").classList.toggle("active", view === "games");
   document.getElementById("tab-cheatsheet").classList.toggle("active", view === "cheatsheet");
+  document.getElementById("tab-teams").classList.toggle("active", view === "teams");
   renderCurrentView();
+}
+
+// Real per-team page: full real season schedule + real current injury status. Explicitly no
+// Season Win Totals section -- honest "not available" note instead, same as the per-game
+// drill-down (not a real data point from any current source, never fabricated).
+async function openTeamDetail(team) {
+  const detail = document.getElementById("detail");
+  const content = document.getElementById("detail-content");
+  content.innerHTML = "Loading real team data...";
+  detail.classList.add("open");
+  try {
+    const res = await fetch(`${API}/sports/NFL/teams/${encodeURIComponent(team)}`);
+    if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
+    const t = await res.json();
+
+    const scheduleHtml = t.schedule.map(g => `
+      <div class="row" style="cursor:pointer" onclick="openDetail('${g.game_id}')">
+        <span>Wk ${g.week} &middot; ${g.away_team} @ ${g.home_team}</span>
+        <span>${fmtKickoff(g.kickoff_time)}</span>
+      </div>
+    `).join("");
+
+    const injuriesHtml = t.injuries.length
+      ? t.injuries.map(i => `
+          <div class="row"><span>${i.player_name} (${i.position || "?"})</span>
+          <span>${i.report_status || "--"}</span></div>
+        `).join("")
+      : '<div class="empty">No real injury reports for this team right now.</div>';
+
+    content.innerHTML = `
+      <h2>${t.team}</h2>
+      <div class="not-available-note">Season Win Total: not available from the current real data source.</div>
+      <section><h3>Full schedule</h3>${scheduleHtml}</section>
+      <section><h3>Injuries</h3>${injuriesHtml}</section>
+    `;
+  } catch (e) {
+    content.innerHTML = `<button class="back" onclick="closeDetail()">&larr; Back</button>
+      <div class="prediction-pending">Real error loading team data: ${e.message}</div>`;
+  }
 }
 
 async function loadGames() {

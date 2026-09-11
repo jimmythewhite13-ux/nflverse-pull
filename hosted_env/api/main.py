@@ -339,6 +339,42 @@ def get_game(sport: str, game_id: str) -> dict:
         return game
 
 
+@app.get("/sports/{sport}/teams/{team}")
+def get_team(sport: str, team: str) -> dict:
+    """Real per-team view: full real season schedule + real current injury status for one
+    team -- explicitly NOT season win totals (see the honest note the PWA shows: not a real
+    data point from any current source), never fabricated."""
+    team = team.upper()
+    with _get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM sports WHERE name = %s;", (sport.upper(),))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Real sport {sport!r} not found.")
+        sport_id = row["id"]
+
+        cur.execute(
+            "SELECT g.game_id, g.season, g.week, g.kickoff_time, g.home_team, g.away_team, "
+            "gws.status, gws.status_reason "
+            "FROM games g JOIN game_workflow_status gws ON gws.game_id = g.game_id "
+            "WHERE g.sport_id = %s AND (g.home_team = %s OR g.away_team = %s) "
+            "ORDER BY g.kickoff_time NULLS LAST;",
+            (sport_id, team, team),
+        )
+        schedule = cur.fetchall()
+        if not schedule:
+            raise HTTPException(status_code=404, detail=f"Real team {team!r} not found.")
+        for g in schedule:
+            g["kickoff_time"] = _fix_kickoff_tz(g["kickoff_time"])
+
+        cur.execute(
+            "SELECT player_name, position, report_status, practice_status, pulled_at "
+            "FROM raw_injury_reports WHERE season = %s AND team = %s "
+            "ORDER BY pulled_at DESC;",
+            (schedule[0]["season"], team),
+        )
+        return {"team": team, "schedule": schedule, "injuries": cur.fetchall()}
+
+
 @app.get("/sports/{sport}/model-versions")
 def list_model_versions(sport: str) -> list[dict]:
     with _get_connection() as conn, conn.cursor() as cur:

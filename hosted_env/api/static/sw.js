@@ -1,7 +1,16 @@
 // Real, minimal service worker -- makes the page installable (a real PWA requirement) without
 // caching real, live game/injury/market data (those must always be fetched fresh; caching them
 // would risk showing stale real data as if it were current).
-const SHELL_CACHE = "nfl-model-shell-v1";
+//
+// Real bug found and fixed (2026-09-11): the original version used cache-FIRST for the app
+// shell ("/", manifest, icon) -- once installed, a returning visitor kept seeing whatever
+// index.html/CSS/JS existed at install time forever, with no way to pick up a real update
+// short of the visitor manually clearing site data. Confirmed directly: this session's own
+// local testing kept serving a stale, pre-redesign index.html after a real edit, with zero
+// errors to explain it. Real fix: NETWORK-first for the shell (always try live first, only
+// fall back to cache when genuinely offline) + a bumped cache name with old-cache cleanup on
+// activate, so anyone who already installed the old, cache-first version also recovers.
+const SHELL_CACHE = "nfl-model-shell-v2";
 const SHELL_FILES = ["/", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -12,7 +21,13 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then((names) => Promise.all(
+        names.filter((n) => n !== SHELL_CACHE).map((n) => caches.delete(n))
+      ))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -21,7 +36,16 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/sports")) {
     return;
   }
+  // Real, deliberate network-first for the app shell: a returning visitor with a live
+  // connection always gets the real, current shell; the cached copy is only ever a fallback
+  // for genuinely being offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(SHELL_CACHE).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

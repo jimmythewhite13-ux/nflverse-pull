@@ -6,60 +6,97 @@
 <title>NFL Model -- Live</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon.svg">
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#14171C">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b1220; --card: #141d2e; --border: #223047; --text: #e8edf5;
-    --muted: #8a97ab; --accent: #c85a2b; --good: #3fb27f; --warn: #d9a441;
+    --bg: #14171C; --surface: #1D2128; --border: #2A2F38;
+    --text: #EDEBE6; --muted: #8B92A0;
+    --signal: #F2C14E;      /* ONLY for real, computed model output -- never anything else */
+    --pending: #4A5568;     /* honest "not yet available" states -- visually distinct from signal */
+    --pending-bg: #262b35;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font: 15px/1.5 "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
     padding-bottom: 40px;
   }
+  h1, h2, .teams, .week-label { font-family: "Oswald", "Inter", sans-serif; }
   header {
-    padding: 16px 16px 8px; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
   }
-  header h1 { font-size: 18px; margin: 0; }
-  select {
-    background: var(--card); color: var(--text); border: 1px solid var(--border);
-    border-radius: 8px; padding: 6px 10px; font-size: 14px;
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: 0.02em; color: var(--muted); }
+  select#sport-select {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: "Inter", sans-serif;
   }
+  .week-nav {
+    margin: 0 16px 10px; position: relative;
+  }
+  .week-label {
+    display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em; background: none; border: none;
+    color: var(--text); padding: 4px 0; cursor: pointer; font-family: "Oswald", sans-serif;
+  }
+  .week-label .chevron { font-size: 14px; color: var(--muted); font-family: "Inter", sans-serif; }
+  .week-dropdown {
+    position: absolute; top: 100%; left: 0; z-index: 10; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; margin-top: 4px;
+    max-height: 320px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: none; min-width: 160px;
+  }
+  .week-dropdown.open { display: block; }
+  .week-dropdown button {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    color: var(--text); font-size: 14px; font-family: "Inter", sans-serif; padding: 9px 14px;
+    cursor: pointer;
+  }
+  .week-dropdown button:hover { background: var(--pending-bg); }
+  .week-dropdown button.current { color: var(--signal); font-weight: 600; }
   #model-banner {
-    margin: 0 16px 12px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border);
-    border-radius: 8px; font-size: 13px; color: var(--muted);
+    margin: 0 16px 12px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 12px; color: var(--muted);
   }
-  #model-banner b { color: var(--good); }
+  #model-banner b { color: var(--signal); }
   main { padding: 0 16px; }
-  .game-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 14px; margin-bottom: 10px; cursor: pointer;
+  /* Real, deliberate ticker-row layout -- not rounded SaaS cards -- per the established design
+     system: dense, scannable rows, consistent with a scoreboard-ticker visual language. */
+  .game-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 10px 12px; margin-bottom: 4px; cursor: pointer;
   }
-  .game-card .teams { font-size: 16px; font-weight: 600; }
-  .game-card .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .game-row:hover { border-color: #3a4150; }
+  .game-row .teams { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .game-row .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .status-pill {
-    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
-    background: #2a3550; color: var(--muted); margin-top: 6px;
+    display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.03em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+    background: var(--pending-bg); color: var(--pending);
   }
-  .status-pill.not-predictable { background: #3a2a2a; color: var(--warn); }
-  .status-pill.ready { background: #1f3a2f; color: var(--good); }
+  .status-pill.ready { background: #2a2410; color: var(--signal); }
   #detail {
     position: fixed; inset: 0; background: var(--bg); overflow-y: auto; padding: 16px;
     display: none;
   }
   #detail.open { display: block; }
-  #detail .back { color: var(--accent); background: none; border: none; font-size: 15px;
-    padding: 8px 0; cursor: pointer; }
-  #detail h2 { margin: 8px 0 4px; }
-  #detail section { margin-top: 18px; }
-  #detail section h3 { font-size: 13px; text-transform: uppercase; color: var(--muted);
-    letter-spacing: 0.05em; margin-bottom: 8px; }
-  .row { display: flex; justify-content: space-between; padding: 6px 0;
+  #detail .back { color: var(--signal); background: none; border: none; font-size: 15px;
+    padding: 8px 0; cursor: pointer; font-family: "Inter", sans-serif; }
+  #detail h2 { margin: 8px 0 4px; font-size: 20px; }
+  #detail section { margin-top: 20px; }
+  #detail section h3 { font-size: 12px; text-transform: uppercase; color: var(--muted);
+    letter-spacing: 0.06em; margin-bottom: 8px; font-family: "Inter", sans-serif; font-weight: 600; }
+  .row { display: flex; justify-content: space-between; padding: 7px 0;
     border-bottom: 1px solid var(--border); font-size: 14px; }
   .prediction-pending {
-    background: #241f14; border: 1px solid #4a3d1f; color: var(--warn);
+    background: var(--pending-bg); border: 1px solid #38404d; color: var(--pending);
     padding: 10px 12px; border-radius: 8px; font-size: 13px;
+  }
+  .not-available-note {
+    color: var(--muted); font-size: 12px; padding: 6px 0; font-style: italic;
   }
   .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
   #loading { color: var(--muted); padding: 20px 0; text-align: center; }
@@ -72,6 +109,13 @@
     <option value="NFL">NFL</option>
   </select>
 </header>
+<div class="week-nav">
+  <button class="week-label" id="week-label" onclick="toggleWeekDropdown()">
+    2026 SEASON &mdash; WEEK <span id="week-number">&hellip;</span>
+    <span class="chevron">&#9662;</span>
+  </button>
+  <div class="week-dropdown" id="week-dropdown"></div>
+</div>
 <div id="model-banner">Loading model status...</div>
 <main>
   <div id="loading">Loading real games...</div>
@@ -85,6 +129,8 @@
 
 <script>
 const API = "";  // real, live API is same-origin (this page is served by the FastAPI service)
+let currentWeek = null;
+let viewingWeek = null;
 
 async function loadModelBanner() {
   try {
@@ -100,7 +146,6 @@ async function loadModelBanner() {
 }
 
 function statusPillClass(status) {
-  if (status === "NOT_PREDICTABLE") return "status-pill not-predictable";
   if (status === "READY" || status === "PREDICTED") return "status-pill ready";
   return "status-pill";
 }
@@ -112,22 +157,64 @@ function fmtKickoff(iso) {
     hour: "numeric", minute: "2-digit" });
 }
 
+function buildWeekDropdown() {
+  const dd = document.getElementById("week-dropdown");
+  const weeks = Array.from({ length: 18 }, (_, i) => i + 1);
+  dd.innerHTML = weeks.map(w => `
+    <button class="${w === viewingWeek ? 'current' : ''}" onclick="selectWeek(${w})">
+      Week ${w}${w === currentWeek ? " (current)" : ""}
+    </button>
+  `).join("");
+}
+
+function toggleWeekDropdown() {
+  document.getElementById("week-dropdown").classList.toggle("open");
+}
+
+function selectWeek(w) {
+  viewingWeek = w;
+  document.getElementById("week-dropdown").classList.remove("open");
+  document.getElementById("week-number").textContent = w;
+  buildWeekDropdown();
+  loadGames();
+}
+
+async function loadCurrentWeek() {
+  try {
+    const res = await fetch(`${API}/sports/NFL/current-week`);
+    if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
+    const data = await res.json();
+    currentWeek = data.week;
+    viewingWeek = data.week;
+    document.getElementById("week-number").textContent = viewingWeek;
+    buildWeekDropdown();
+  } catch (e) {
+    document.getElementById("week-number").textContent = "?";
+    console.error("Real error loading current week:", e.message);
+  }
+}
+
 async function loadGames() {
   const loading = document.getElementById("loading");
   const container = document.getElementById("games");
+  loading.style.display = "block";
+  loading.textContent = "Loading real games...";
+  container.innerHTML = "";
   try {
-    const res = await fetch(`${API}/sports/NFL/games`);
+    const res = await fetch(`${API}/sports/NFL/games?week=${viewingWeek}`);
     if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
     const games = await res.json();
     loading.style.display = "none";
     if (games.length === 0) {
-      container.innerHTML = '<div class="empty">No real games found.</div>';
+      container.innerHTML = '<div class="empty">No real games scheduled for this week yet.</div>';
       return;
     }
     container.innerHTML = games.map(g => `
-      <div class="game-card" onclick="openDetail('${g.game_id}')">
-        <div class="teams">${g.away_team} @ ${g.home_team}</div>
-        <div class="meta">Week ${g.week} &middot; ${fmtKickoff(g.kickoff_time)}</div>
+      <div class="game-row" onclick="openDetail('${g.game_id}')">
+        <div>
+          <div class="teams">${g.away_team} @ ${g.home_team}</div>
+          <div class="meta">${fmtKickoff(g.kickoff_time)}</div>
+        </div>
         <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
       </div>
     `).join("");
@@ -146,19 +233,6 @@ async function openDetail(gameId) {
     if (!res.ok) throw new Error(`Real API returned HTTP ${res.status}`);
     const g = await res.json();
 
-    let predictionHtml;
-    if (g.prediction && g.prediction.status === "NOT_YET_AVAILABLE") {
-      predictionHtml = `<div class="prediction-pending">Prediction pending -- ${g.prediction.reason}</div>`;
-    } else if (g.prediction) {
-      predictionHtml = `
-        <div class="row"><span>Projected margin (home)</span><span>${g.prediction.projected_margin}</span></div>
-        <div class="row"><span>Home win probability</span><span>${(g.prediction.home_win_probability * 100).toFixed(1)}%</span></div>
-        <div class="row"><span>Model version</span><span>${g.prediction.version_name}</span></div>
-      `;
-    } else {
-      predictionHtml = `<div class="empty">No real prediction data.</div>`;
-    }
-
     const injuriesHtml = g.injuries.length
       ? g.injuries.map(i => `
           <div class="row"><span>${i.player_name} (${i.team}, ${i.position || "?"})</span>
@@ -173,13 +247,40 @@ async function openDetail(gameId) {
         `).join("")
       : '<div class="empty">No real market lines captured yet.</div>';
 
+    // Real, honest "What we know so far" section for a game with no prediction yet -- real
+    // current market lines (the one real data point actually available), plus an explicit,
+    // honest note that Season Win Totals aren't a real data point at all right now (not
+    // available from the current odds provider at any tier -- a genuine gap, not fabricated).
+    let bodyHtml;
+    if (g.prediction && g.prediction.status === "NOT_YET_AVAILABLE") {
+      bodyHtml = `
+        <section>
+          <h3>What we know so far</h3>
+          <div class="prediction-pending" style="margin-bottom:12px">${g.prediction.reason}</div>
+          <div class="not-available-note">Season Win Totals: not available from the current real data source.</div>
+          <div style="margin-top:10px">${marketHtml}</div>
+        </section>
+      `;
+    } else if (g.prediction) {
+      bodyHtml = `
+        <section>
+          <h3>Prediction</h3>
+          <div class="row"><span>Projected margin (home)</span><span style="color:var(--signal)">${g.prediction.projected_margin}</span></div>
+          <div class="row"><span>Home win probability</span><span style="color:var(--signal)">${(g.prediction.home_win_probability * 100).toFixed(1)}%</span></div>
+          <div class="row"><span>Model version</span><span>${g.prediction.version_name}</span></div>
+        </section>
+        <section><h3>Market lines</h3>${marketHtml}</section>
+      `;
+    } else {
+      bodyHtml = `<section><h3>Market lines</h3>${marketHtml}</section>`;
+    }
+
     content.innerHTML = `
       <h2>${g.away_team} @ ${g.home_team}</h2>
       <div class="meta" style="color:var(--muted)">Week ${g.week} &middot; ${fmtKickoff(g.kickoff_time)}</div>
       <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
-      <section><h3>Prediction</h3>${predictionHtml}</section>
+      ${bodyHtml}
       <section><h3>Injuries</h3>${injuriesHtml}</section>
-      <section><h3>Market lines</h3>${marketHtml}</section>
     `;
   } catch (e) {
     content.innerHTML = `<button class="back" onclick="closeDetail()">&larr; Back</button>
@@ -191,12 +292,19 @@ function closeDetail() {
   document.getElementById("detail").classList.remove("open");
 }
 
+document.addEventListener("click", (e) => {
+  const nav = document.querySelector(".week-nav");
+  if (nav && !nav.contains(e.target)) {
+    document.getElementById("week-dropdown").classList.remove("open");
+  }
+});
+
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
 loadModelBanner();
-loadGames();
+loadCurrentWeek().then(loadGames);
 </script>
 </body>
 </html>

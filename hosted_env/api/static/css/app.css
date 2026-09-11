@@ -95,6 +95,8 @@ main { padding: 0 16px; }
 .line-row.worst .value { color: var(--worst); }
 .movement { font-size: 11px; color: var(--muted); }
 .movement.major { color: var(--shift); font-weight: 600; }
+.prop-player { margin-bottom: 6px; }
+.prop-player-name { font-size: 12px; font-weight: 600; margin: 6px 0 2px; }
 #detail {
   position: fixed; inset: 0; background: var(--bg); overflow-y: auto; padding: 16px;
   display: none;

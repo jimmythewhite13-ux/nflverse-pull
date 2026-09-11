@@ -308,6 +308,49 @@ BEGIN
     SELECT RAISE(ABORT, 'Sportsbook not in approved_sportsbooks (see PROGRESS.md)');
 END;
 
+-- ==== Player-prop line captures (2026-09-11) -- real raw ingestion, same pattern as
+-- raw_market_captures above, deliberately NOT the prop_predictions/prop_market_lines pair
+-- above: those require a real model projection (prop_id) to exist first (Step 14, a separate,
+-- not-yet-built predictive feature); this table holds real sportsbook player-prop LINES only,
+-- independent of whether this project has ever generated a projection for that player/stat.
+-- Real, explicit scope decision (2026-09-11): US region only (region cost is 4x for
+-- us+uk+eu+au vs us-only, measured directly against the live API -- not sustainable at this
+-- account's real remaining quota), 5 real markets to start (player_anytime_td, player_pass_yds,
+-- player_rush_yds, player_reception_yds, player_pass_interceptions -- "core 4 + QB
+-- interceptions"), `market_key` stored as the Odds API's own real key so the market list can
+-- expand later (the user's full requested list -- receptions, pass/rush attempts, completions,
+-- tackles, sacks, defensive INTs -- is a config change in player_props.py, not a schema change).
+CREATE TABLE IF NOT EXISTS raw_player_prop_captures (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id           INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    game_id                TEXT NOT NULL,
+    player_name            TEXT NOT NULL,   -- real, from the Odds API outcome's own
+                                             -- `description` field (confirmed live, not assumed)
+    market_key             TEXT NOT NULL,   -- real Odds API market key, e.g. 'player_pass_yds'
+    sportsbook             TEXT NOT NULL,
+    line_value             REAL,            -- NULL for Yes/No markets (e.g. anytime TD)
+    over_odds              REAL,            -- Over price, or the single Yes price for
+                                             -- Yes/No markets
+    under_odds             REAL,            -- Under price; NULL for Yes/No markets
+    captured_at            TEXT NOT NULL,   -- ISO8601, real
+    kickoff_time           TEXT,            -- real, same post-kickoff exclusion pattern as
+                                             -- raw_market_captures
+    source                 TEXT NOT NULL,
+    market_data_status     TEXT NOT NULL DEFAULT 'MISSING'
+                            CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING')),
+    flagged_excluded_source INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_reject_unapproved_sportsbook_props
+BEFORE INSERT ON raw_player_prop_captures
+WHEN NEW.sportsbook NOT IN (SELECT name FROM approved_sportsbooks)
+BEGIN
+    SELECT RAISE(ABORT, 'Sportsbook not in approved_sportsbooks (see PROGRESS.md)');
+END;
+
+CREATE INDEX IF NOT EXISTS idx_raw_prop_game_player
+    ON raw_player_prop_captures(game_id, player_name, market_key);
+
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_job ON ingestion_runs(job_name, run_timestamp);
 CREATE INDEX IF NOT EXISTS idx_raw_injury_ingestion ON raw_injury_reports(ingestion_id);
 CREATE INDEX IF NOT EXISTS idx_raw_roster_ingestion ON raw_roster_snapshots(ingestion_id);

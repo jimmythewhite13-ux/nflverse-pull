@@ -1,0 +1,78 @@
+name: Player-prop line capture (real, US-only)
+
+# Real, deliberate scope: sibling to line_capture.yml, same real hourly-cron-plus-script-gate
+# pattern (see market_lines.py's own `_should_capture_now` docstring for why cron alone can't
+# express a per-event, kickoff-relative cadence) -- player_props.py's own `_should_capture_event`
+# decides per real event whether an hourly tick spends a real API credit.
+#
+# Real, deliberate manual-trigger-only for now (2026-09-11): this is a NEW capture path against
+# the live Odds API, not yet run end-to-end. `workflow_dispatch` lets it be triggered manually to
+# confirm real data actually lands in the DB and renders correctly in the API/PWA before the
+# `schedule` trigger below is uncommented and this goes fully automated -- explicit, deliberate
+# sequencing (test before automate), not an oversight.
+on:
+  # schedule:
+  #   - cron: '0 * * * *'   # uncomment once a real manual test run has been verified end-to-end
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # real, required: this job commits real ingested data back to the repo
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Self-enforcement check (BEFORE)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check
+
+      - name: Resolve current NFL season
+        id: season
+        run: echo "season=$(uv run python -m prediction_audit.ingestion.season)" >> "$GITHUB_OUTPUT"
+
+      # Real, deliberate retry-the-whole-cycle design -- same real rationale as
+      # line_capture.yml's own identical step (a real concurrent-push race between these
+      # ingestion workflows was hit and caught on this agent layer's first live run).
+      - name: Capture real player-prop lines and push (retries on concurrent-push conflict)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          git config user.name "nfl-model-agent[bot]"
+          git config user.email "actions@github.com"
+          for attempt in 1 2 3 4 5; do
+            echo "=== Attempt $attempt ==="
+            git fetch origin main
+            git reset --hard origin/main
+            uv run python -m prediction_audit.ingestion.player_props --season ${{ steps.season.outputs.season }}
+            git add prediction_audit/db/prediction_audit.sqlite3
+            if git diff --cached --quiet; then
+              echo "No real data changes to commit (cadence gate skipped, or nothing due)."
+              break
+            fi
+            git commit -m "chore(ingestion): player prop capture $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if git push; then
+              echo "Real push succeeded on attempt $attempt."
+              break
+            fi
+            echo "Real push rejected (concurrent writer) -- retrying with fresh state."
+            sleep $(( (RANDOM % 10) + 2 ))
+            if [ "$attempt" = "5" ]; then
+              echo "::error::Real push failed after 5 attempts -- concurrent-writer contention did not clear."
+              exit 1
+            fi
+          done
+
+      - name: Self-enforcement check (AFTER)
+        run: uv run python -m prediction_audit.ingestion.self_enforcement_check

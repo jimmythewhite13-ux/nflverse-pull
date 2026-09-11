@@ -139,6 +139,69 @@ def _compute_market_signals(rows: list[dict]) -> list[dict]:
     result.sort(key=lambda e: (e["market_type"], e["sportsbook"]))
     return result
 
+
+# Real, human-readable labels for the Odds API's own real market keys -- keeps the raw key as
+# the real source of truth (player_props.py stores it verbatim) while giving the PWA something
+# presentable; a market key with no entry here still renders (falls back to the raw key) rather
+# than silently disappearing, so a future market-list expansion in player_props.py never needs a
+# matching PWA change to show up.
+_PROP_MARKET_LABELS = {
+    "player_anytime_td": "Anytime TD",
+    "player_pass_yds": "Passing Yards",
+    "player_rush_yds": "Rushing Yards",
+    "player_reception_yds": "Receiving Yards",
+    "player_pass_interceptions": "Pass Interceptions (thrown)",
+}
+
+
+def _compute_player_prop_signals(rows: list[dict]) -> list[dict]:
+    """Real, deliberate mirror of `_compute_market_signals`'s own pregame-only + best/worst
+    logic, grouped one level deeper (player + market, not just market) since a prop line is
+    meaningless without knowing which player it's for."""
+    by_group: dict[tuple[str, str, str], list[dict]] = {}
+    for r in rows:
+        by_group.setdefault((r["player_name"], r["market_key"], r["sportsbook"]),
+                             []).append(r)
+
+    latest_by_player_market: dict[tuple[str, str], list[dict]] = {}
+    for (player, mkey, book), group in by_group.items():
+        group.sort(key=lambda r: r["captured_at"])
+        # Same real post-kickoff exclusion as game-level market lines -- a prop line captured
+        # after kickoff is live in-game pricing, not a real pregame number.
+        pregame = [r for r in group
+                   if r["kickoff_time"] is None or r["captured_at"] < r["kickoff_time"]]
+        if not pregame:
+            continue
+        current = pregame[-1]
+        entry = {
+            "player_name": player,
+            "market_key": mkey,
+            "market_label": _PROP_MARKET_LABELS.get(mkey, mkey),
+            "sportsbook": book,
+            "line_value": current["line_value"],
+            "over_odds": current["over_odds"],
+            "under_odds": current["under_odds"],
+            "captured_at": current["captured_at"].isoformat(),
+        }
+        latest_by_player_market.setdefault((player, mkey), []).append(entry)
+
+    # Real best/worst across books for the SAME player + market -- e.g. the best real price to
+    # bet Patrick Mahomes Over 274.5 passing yards, comparing only books quoting that exact
+    # player+stat, never across different players or different markets.
+    for (_, _), entries in latest_by_player_market.items():
+        comparable = [e for e in entries if e["over_odds"] is not None]
+        if len(comparable) < 2:
+            continue
+        best = max(comparable, key=lambda e: e["over_odds"])
+        worst = min(comparable, key=lambda e: e["over_odds"])
+        for e in comparable:
+            e["best_value"] = e is best and best is not worst
+            e["worst_value"] = e is worst and best is not worst
+
+    result = [e for entries in latest_by_player_market.values() for e in entries]
+    result.sort(key=lambda e: (e["player_name"], e["market_key"], e["sportsbook"]))
+    return result
+
 app = FastAPI(title="NFL Model -- Live Data API", version="0.1.0")
 
 # Real, deliberately permissive CORS for now -- this is a read-only, non-sensitive display API
@@ -341,6 +404,15 @@ def get_game(sport: str, game_id: str) -> dict:
             (game_id,),
         )
         game["market_lines"] = _compute_market_signals(cur.fetchall())
+
+        cur.execute(
+            "SELECT player_name, market_key, sportsbook, line_value, over_odds, under_odds, "
+            "captured_at, kickoff_time FROM raw_player_prop_captures "
+            "WHERE game_id = %s AND flagged_excluded_source = FALSE "
+            "ORDER BY captured_at ASC;",
+            (game_id,),
+        )
+        game["player_props"] = _compute_player_prop_signals(cur.fetchall())
 
         return game
 

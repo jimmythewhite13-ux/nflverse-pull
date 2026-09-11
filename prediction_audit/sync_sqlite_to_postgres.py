@@ -218,7 +218,8 @@ def main() -> None:
             # Real, before counts -- for the required real reconciliation evidence.
             before = {}
             for t in ("games", "game_workflow_status", "ingestion_runs",
-                      "raw_injury_reports", "raw_roster_snapshots", "raw_market_captures"):
+                      "raw_injury_reports", "raw_roster_snapshots", "raw_market_captures",
+                      "raw_player_prop_captures"):
                 pg_cur.execute(f"SELECT COUNT(*) FROM {t};")
                 before[t] = pg_cur.fetchone()[0]
 
@@ -252,6 +253,14 @@ def main() -> None:
                 ["id", "ingestion_id", "game_id", "sportsbook", "market_type", "line_value",
                  "odds", "captured_at", "kickoff_time", "source", "market_data_status",
                  "flagged_excluded_source"],
+                season_filter=False, exclude_flagged_sources=True,
+            )
+            print("Syncing raw_player_prop_captures...", flush=True)
+            src_counts["raw_player_prop_captures"] = _sync_raw_table(
+                sq_conn, pg_cur, "raw_player_prop_captures",
+                ["id", "ingestion_id", "game_id", "player_name", "market_key", "sportsbook",
+                 "line_value", "over_odds", "under_odds", "captured_at", "kickoff_time",
+                 "source", "market_data_status", "flagged_excluded_source"],
                 season_filter=False, exclude_flagged_sources=True,
             )
             print("Committing...", flush=True)

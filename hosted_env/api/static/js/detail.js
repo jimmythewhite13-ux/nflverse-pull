@@ -2,6 +2,7 @@
 import { api } from "./api.js";
 import { statusPillClass, fmtKickoff } from "./format.js";
 import { renderMarketLines } from "./market-signals.js";
+import { renderPlayerProps } from "./player-props.js";
 
 export async function openDetail(gameId) {
   const detail = document.getElementById("detail");
@@ -19,6 +20,7 @@ export async function openDetail(gameId) {
       : '<div class="empty">No real injury reports for either team right now.</div>';
 
     const marketHtml = renderMarketLines(g.market_lines);
+    const propsHtml = renderPlayerProps(g.player_props || []);
 
     // Real, honest "What we know so far" section for a game with no prediction yet -- real
     // current market lines (the one real data point actually available), plus an explicit,
@@ -53,6 +55,7 @@ export async function openDetail(gameId) {
       <div class="meta" style="color:var(--muted)">Week ${g.week} &middot; ${fmtKickoff(g.kickoff_time)}</div>
       <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
       ${bodyHtml}
+      <section><h3>Player Props</h3>${propsHtml}</section>
       <section><h3>Injuries</h3>${injuriesHtml}</section>
     `;
   } catch (e) {

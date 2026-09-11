@@ -302,6 +302,37 @@ CREATE TRIGGER trg_reject_unapproved_sportsbook
 BEFORE INSERT ON raw_market_captures
 FOR EACH ROW EXECUTE FUNCTION reject_unapproved_sportsbook();
 
+-- Real player-prop line captures (2026-09-11), direct Postgres port of the SQLite
+-- raw_player_prop_captures table -- see that table's own comment in prediction_audit/db/
+-- schema.py for the real, deliberate distinction from prop_predictions/prop_market_lines
+-- (those require a real model projection; this is raw sportsbook data only). Real, explicit
+-- scope: US region only, 5 real markets to start (see player_props.py) -- measured directly
+-- against the live Odds API: 4x cost for us+uk+eu+au vs us-only, not sustainable at this
+-- account's real remaining quota.
+CREATE TABLE raw_player_prop_captures (
+    id                      SERIAL PRIMARY KEY,
+    ingestion_id            INT NOT NULL REFERENCES ingestion_runs(id),
+    game_id                 TEXT NOT NULL,
+    player_name             TEXT NOT NULL,
+    market_key              TEXT NOT NULL,
+    sportsbook              TEXT NOT NULL,
+    line_value              NUMERIC,
+    over_odds               NUMERIC,
+    under_odds              NUMERIC,
+    captured_at             TIMESTAMPTZ NOT NULL,
+    kickoff_time            TIMESTAMPTZ,
+    source                  TEXT NOT NULL,
+    market_data_status      TEXT NOT NULL DEFAULT 'MISSING'
+                             CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING')),
+    flagged_excluded_source BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX idx_raw_prop_game_player
+    ON raw_player_prop_captures(game_id, player_name, market_key);
+
+CREATE TRIGGER trg_reject_unapproved_sportsbook_props
+BEFORE INSERT ON raw_player_prop_captures
+FOR EACH ROW EXECUTE FUNCTION reject_unapproved_sportsbook();
+
 -- Real, dynamic tier classification -- direct Postgres port of v_ingestion_market_tiers'own
 -- real window-function logic (Postgres supports the same OVER (PARTITION BY ... ) syntax
 -- SQLite does; no rewrite needed beyond the CREATE VIEW dialect itself).

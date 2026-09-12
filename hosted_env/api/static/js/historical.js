@@ -12,6 +12,27 @@ import { state } from "./state.js";
 import { FULL_TEAM_NAME } from "./teams.js";
 
 let cachedGames = null;
+let cachedSummary = null;
+
+// Real aggregate headline stats (check_total_accuracy_and_headline_stats.md) -- MAE for spread
+// AND total shown separately (never blended into one number), winner accuracy, and Brier, per
+// real season, so any one example game below can be read against the real overall distribution
+// rather than in isolation.
+function summaryHtml(summary) {
+  if (!summary || !summary.length) return "";
+  const tiles = summary.map(s => `
+    <div class="summary-card">
+      <div class="summary-season">${s.season} Season <span class="summary-n">(${s.n_games} real games)</span></div>
+      <div class="summary-stats">
+        <div class="summary-stat"><span class="summary-stat-label">Margin MAE</span><span class="summary-stat-value">${s.margin_mae}</span></div>
+        <div class="summary-stat"><span class="summary-stat-label">Total MAE</span><span class="summary-stat-value">${s.total_mae}</span></div>
+        <div class="summary-stat"><span class="summary-stat-label">Winner Acc.</span><span class="summary-stat-value">${s.winner_accuracy}%</span></div>
+        <div class="summary-stat"><span class="summary-stat-label">Brier</span><span class="summary-stat-value">${s.brier}</span></div>
+      </div>
+    </div>
+  `).join("");
+  return `<div class="summary-cards">${tiles}</div>`;
+}
 
 function nickname(fullTeamName) {
   return fullTeamName.split(" ").pop();
@@ -111,16 +132,19 @@ function renderRows(games) {
 
 export async function renderHistoricalView() {
   const container = document.getElementById("historical-games");
+  const summaryContainer = document.getElementById("historical-summary");
   if (!cachedGames) {
     container.innerHTML = "Loading real historical data...";
     try {
       const data = await api.getHistorical();
       cachedGames = data.games;
+      cachedSummary = data.summary;
     } catch (e) {
       container.innerHTML = `<div class="empty">Real error loading historical data: ${e.message}</div>`;
       return;
     }
   }
+  summaryContainer.innerHTML = summaryHtml(cachedSummary);
   renderRows(cachedGames);
 }
 

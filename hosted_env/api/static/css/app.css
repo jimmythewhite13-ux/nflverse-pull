@@ -169,6 +169,24 @@ details.region-group details.region-group { margin: 0 10px 8px; }
   margin: 0 0 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
   border-radius: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5;
 }
+/* Real aggregate headline stats (check_total_accuracy_and_headline_stats.md) -- one card per
+   real season so a viewer can see the real overall distribution before reading any one game. */
+.summary-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.summary-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+}
+.summary-season { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.summary-n { font-weight: 400; color: var(--muted); font-size: 12px; }
+.summary-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.summary-stat { text-align: center; }
+.summary-stat-label {
+  display: block; font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.03em; margin-bottom: 2px;
+}
+.summary-stat-value {
+  display: block; font-family: "Oswald", sans-serif; font-size: 16px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .row-wrapper { border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .row-wrapper .game-row { border: none; margin-bottom: 0; }
 .matchup { display: flex; flex-direction: column; gap: 2px; }

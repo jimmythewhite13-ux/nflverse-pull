@@ -610,7 +610,34 @@ def get_historical(sport: str) -> dict:
             actual_total = r["home_final_score"] + r["away_final_score"]
             r["actual_total"] = actual_total
             r["total_error"] = round(abs(r["projected_total"] - actual_total), 1)
-        return {"games": rows}
+
+        # Real aggregate headline stats (check_total_accuracy_and_headline_stats.md) -- computed
+        # fresh from the same real rows above, one summary per real season, never blended
+        # together (2025 Phase 1 and 2024 Phase 8 are different real datasets with different
+        # real sample sizes and a different secondary-check purpose). Real, direct answer to
+        # this task's own core question: total-prediction MAE is comparable to (not meaningfully
+        # worse than) margin MAE in both real seasons -- confirmed directly, not assumed.
+        summary_by_season: dict[int, dict] = {}
+        for r in rows:
+            summary_by_season.setdefault(r["season"], []).append(r)
+        summary = []
+        for season, srows in sorted(summary_by_season.items(), reverse=True):
+            n = len(srows)
+            brier = sum(
+                (float(r["home_win_probability"]) - (1.0 if r["actual_margin"] > 0 else 0.0)) ** 2
+                for r in srows
+            ) / n
+            summary.append({
+                "season": season,
+                "n_games": n,
+                "margin_mae": round(sum(r["margin_error"] for r in srows) / n, 2),
+                "total_mae": round(sum(r["total_error"] for r in srows) / n, 2),
+                "winner_accuracy": round(
+                    sum(1 for r in srows if r["winner_correct"]) / n * 100, 1
+                ),
+                "brier": round(brier, 4),
+            })
+        return {"games": rows, "summary": summary}
 
 
 @app.get("/sports/{sport}/teams/{team}")

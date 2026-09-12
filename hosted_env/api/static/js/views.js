@@ -2,9 +2,10 @@
 // table), Teams (real 32-team grid). All three share the same real, currently-loaded week's
 // games and the same real team-filter input.
 import { state } from "./state.js";
-import { statusPillClass, fmtKickoff } from "./format.js";
+import { statusPillClass, fmtKickoff, bookNameHtml } from "./format.js";
 import { ALL_TEAMS } from "./teams.js";
 import { renderHistoricalView } from "./historical.js";
+import { api } from "./api.js";
 export { ALL_TEAMS, FULL_TEAM_NAME } from "./teams.js";
 
 export function gameRowHtml(g) {
@@ -44,6 +45,72 @@ export function cheatsheetHtml(games) {
   `;
 }
 
+// Real, purely observational Cheat Sheet market-signal sections (cheat_sheet_market_signals_
+// part1.md) -- no model predictions anywhere (none exist yet for any 2026 game). Both sections
+// read as "here's what's happening in the market," never a recommendation -- no "value,"
+// "opportunity," or "worth a look" language anywhere in this module.
+let cachedCheatsheetWeek = null;
+let cachedCheatsheetData = null;
+
+function bestValueHtml(bestValue) {
+  if (!bestValue.length) {
+    return '<div class="empty">No real, comparable best/worst price gap found across this week\'s slate yet.</div>';
+  }
+  const rows = bestValue.map(e => {
+    const isMoneyline = e.market_type === "moneyline";
+    const headerLineTxt = isMoneyline ? "" : ` at ${e.line_value}`;
+    const betDesc = isMoneyline ? "moneyline bet" : `${e.market_type} at the same real ${e.line_value}`;
+    return `
+    <div class="line-row">
+      <div class="line-row-main">
+        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.matchup} <span class="region-count">${e.market_type}${headerLineTxt}</span></span>
+        <span class="line-row-odds">${e.gap}</span>
+      </div>
+      <div class="line-row-movement"><span class="movement">${bookNameHtml(e.best_book)} (${e.best_odds}) currently offers ${e.gap} points better real odds than ${bookNameHtml(e.worst_book)} (${e.worst_odds}) for the exact same real ${betDesc}</span></div>
+    </div>
+  `;
+  }).join("");
+  return `<div class="market-group">${rows}</div>`;
+}
+
+function unusualMovementHtml(unusualMovement, n) {
+  if (!unusualMovement.length) {
+    return `<div class="empty">No real game this week has moved further than 90% of the ${n} real, measured movements captured so far.</div>`;
+  }
+  const rows = unusualMovement.map(e => `
+    <div class="line-row">
+      <div class="line-row-main">
+        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.matchup}</span>
+        <span class="line-row-odds">${e.movement}pt move</span>
+      </div>
+      <div class="line-row-movement"><span class="movement major">This line has moved further than ${e.percentile}% of the ${n} real book/market movements captured so far this season</span></div>
+    </div>
+  `).join("");
+  return `<div class="market-group">${rows}</div>`;
+}
+
+export async function renderCheatsheetSignals(week) {
+  const container = document.getElementById("cheatsheet-signals");
+  if (!container) return;
+  if (cachedCheatsheetWeek !== week) {
+    container.innerHTML = "Loading real market signals...";
+    try {
+      cachedCheatsheetData = await api.getCheatsheet(week);
+      cachedCheatsheetWeek = week;
+    } catch (e) {
+      container.innerHTML = `<div class="empty">Real error loading market signals: ${e.message}</div>`;
+      return;
+    }
+  }
+  const d = cachedCheatsheetData;
+  container.innerHTML = `
+    <h4 style="margin:10px 0 4px">Best Real Line Value This Week</h4>
+    ${bestValueHtml(d.best_value)}
+    <h4 style="margin:14px 0 4px">Statistically Unusual Line Movement</h4>
+    ${unusualMovementHtml(d.unusual_movement, d.movement_distribution_n)}
+  `;
+}
+
 export function teamsGridHtml(filterTerm) {
   const teams = filterTerm ? ALL_TEAMS.filter(t => t.includes(filterTerm)) : ALL_TEAMS;
   if (!teams.length) return '<div class="empty">No real team matches that filter.</div>';
@@ -77,7 +144,8 @@ export function renderCurrentView() {
   } else if (state.activeView === "historical") {
     renderHistoricalView();  // real, async -- own real fetch/cache, see historical.js
   } else {
-    sheetEl.innerHTML = cheatsheetHtml(filtered);
+    sheetEl.innerHTML = `<div id="cheatsheet-signals"></div>` + cheatsheetHtml(filtered);
+    renderCheatsheetSignals(state.viewingWeek);
   }
 }
 

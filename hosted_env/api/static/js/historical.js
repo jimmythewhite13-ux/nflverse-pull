@@ -13,6 +13,53 @@ import { FULL_TEAM_NAME } from "./teams.js";
 
 let cachedGames = null;
 let cachedSummary = null;
+let cachedPropSummary = null;
+
+// Real, human-readable labels for player_prop_backtest.py's own real stat_type strings.
+const _STAT_LABELS = {
+  passing_yards: "Passing Yards", interceptions: "INTs Thrown", rushing_yards: "Rushing Yards",
+  receiving_yards: "Receiving Yards", receptions: "Receptions",
+};
+
+// Real aggregate prop-backtest MAE per stat type (historical_player_prop_backtest.md) -- shown
+// alongside the game-level headline stats above, same "real distribution before any one
+// example" purpose. Renders nothing (not an empty error) when the backtest hasn't been run yet
+// on this checkout -- an honest absence, not a broken feature.
+function propSummaryHtml(propSummary) {
+  if (!propSummary || !propSummary.length) return "";
+  const tiles = propSummary.map(s => `
+    <div class="summary-stat">
+      <span class="summary-stat-label">${_STAT_LABELS[s.stat_type] || s.stat_type}</span>
+      <span class="summary-stat-value">${s.mae}</span>
+    </div>
+  `).join("");
+  return `
+    <div class="summary-card">
+      <div class="summary-season">Player Prop Backtest <span class="summary-n">(real MAE, walk-forward-safe replay of Player Prop Projections' own methodology)</span></div>
+      <div class="summary-stats" style="grid-template-columns:repeat(${propSummary.length},1fr)">${tiles}</div>
+    </div>
+  `;
+}
+
+// Real per-game player-prop comparison rows, shown in the drill-down when this game has any
+// real backtest rows.
+function propRowsHtml(props) {
+  if (!props || !props.length) return "";
+  const byPlayer = {};
+  props.forEach(p => (byPlayer[`${p.player_name} (${p.team})`] = byPlayer[`${p.player_name} (${p.team})`] || []).push(p));
+  const rows = Object.entries(byPlayer).map(([label, stats]) => `
+    <div class="readout-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <span class="readout-label" style="font-weight:600">${label}</span>
+      ${stats.map(s => `
+        <div style="display:flex;justify-content:space-between;width:100%;font-size:12.5px">
+          <span class="readout-label">${_STAT_LABELS[s.stat_type] || s.stat_type}</span>
+          <span>Proj ${Number(s.projected_value).toFixed(1)} &middot; Real ${Number(s.actual_value).toFixed(1)} &middot; off by ${s.error}</span>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+  return `<div class="readout-row" style="border-top:1px solid var(--border);padding-top:10px;margin-top:6px"></div>${rows}`;
+}
 
 // Real aggregate headline stats (check_total_accuracy_and_headline_stats.md) -- MAE for spread
 // AND total shown separately (never blended into one number), winner accuracy, and Brier, per
@@ -113,6 +160,7 @@ function rowHtml(g, idx) {
           </div>
           <div style="text-align:center">${accuracyTagHtml(g)}</div>
           ${totalHtml}
+          ${propRowsHtml(g.player_props)}
         </div>
       </div>
     </div>
@@ -139,12 +187,13 @@ export async function renderHistoricalView() {
       const data = await api.getHistorical();
       cachedGames = data.games;
       cachedSummary = data.summary;
+      cachedPropSummary = data.prop_summary;
     } catch (e) {
       container.innerHTML = `<div class="empty">Real error loading historical data: ${e.message}</div>`;
       return;
     }
   }
-  summaryContainer.innerHTML = summaryHtml(cachedSummary);
+  summaryContainer.innerHTML = summaryHtml(cachedSummary) + propSummaryHtml(cachedPropSummary);
   renderRows(cachedGames);
 }
 

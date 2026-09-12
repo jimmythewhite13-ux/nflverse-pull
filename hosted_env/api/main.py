@@ -464,6 +464,152 @@ def list_games(sport: str, week: int | None = None) -> list[dict]:
         return games
 
 
+def _real_movement_distribution(conn) -> list[float]:
+    """Real, evidence-based reference distribution for cheat_sheet_market_signals_part1.md's
+    percentile-based "unusual movement" flag -- every real, MEASURED |line_movement| across
+    every real captured game/book/market so far (not scoped to one week -- the whole real
+    history is the fairest real reference sample this project actually has). Deliberately NOT
+    further conditioned on "similar point in the capture window": with real capture history
+    still this early, sub-segmenting by days-to-kickoff would leave most segments with too few
+    real points to mean anything -- an honest, documented simplification, not a silent
+    deviation from the task's own suggestion."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT game_id, sportsbook, market_type, line_value, captured_at, kickoff_time "
+            "FROM raw_market_captures WHERE flagged_excluded_source = FALSE "
+            "AND market_type IN ('spread', 'total') "
+            "ORDER BY game_id, sportsbook, market_type, captured_at ASC;"
+        )
+        rows = cur.fetchall()
+    by_group: dict[tuple, list[dict]] = {}
+    for r in rows:
+        by_group.setdefault((r["game_id"], r["sportsbook"], r["market_type"]), []).append(r)
+    movements = []
+    for group in by_group.values():
+        pregame = [r for r in group
+                   if r["kickoff_time"] is None or r["captured_at"] < r["kickoff_time"]]
+        if len(pregame) < 2:
+            continue  # same real "INSUFFICIENT_DATA" rule as _compute_market_signals
+        opening, current = pregame[0], pregame[-1]
+        if opening["line_value"] is None or current["line_value"] is None:
+            continue
+        movements.append(abs(float(current["line_value"]) - float(opening["line_value"])))
+    return sorted(movements)
+
+
+def _percentile_rank(distribution: list[float], value: float) -> float:
+    """Real percentile rank of `value` within `distribution` -- % of the real distribution at
+    or below this value. Returns 0.0 for an empty real distribution (honest, not fabricated)."""
+    if not distribution:
+        return 0.0
+    at_or_below = sum(1 for v in distribution if v <= value)
+    return round(at_or_below / len(distribution) * 100, 1)
+
+
+@app.get("/sports/{sport}/cheatsheet")
+def get_cheatsheet(sport: str, week: int) -> dict:
+    """Real, purely observational Cheat Sheet content (cheat_sheet_market_signals_part1.md) --
+    no model predictions anywhere (none exist yet for any 2026 game): real best-line-value
+    ranked across the whole week's slate, and real, percentile-based unusual-movement flags
+    (never a fixed, arbitrary threshold)."""
+    with _get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM sports WHERE name = %s;", (sport.upper(),))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Real sport {sport!r} not found.")
+        sport_id = row["id"]
+
+        cur.execute(
+            "SELECT g.game_id, g.home_team, g.away_team, g.kickoff_time "
+            "FROM games g JOIN game_workflow_status gws ON gws.game_id = g.game_id "
+            "WHERE g.sport_id = %s AND g.week = %s ORDER BY g.kickoff_time NULLS LAST;",
+            (sport_id, week),
+        )
+        games = cur.fetchall()
+        if not games:
+            return {"best_value": [], "unusual_movement": [], "movement_distribution_n": 0}
+
+        game_ids = [g["game_id"] for g in games]
+        cur.execute(
+            "SELECT game_id, sportsbook, market_type, line_value, odds, captured_at, "
+            "kickoff_time FROM raw_market_captures "
+            "WHERE game_id = ANY(%s) AND flagged_excluded_source = FALSE "
+            "ORDER BY captured_at ASC;",
+            (game_ids,),
+        )
+        by_game: dict[str, list[dict]] = {}
+        for r in cur.fetchall():
+            by_game.setdefault(r["game_id"], []).append(r)
+
+        distribution = _real_movement_distribution(conn)
+
+        best_value = []
+        unusual_movement = []
+        for g in games:
+            signals = _compute_market_signals(by_game.get(g["game_id"], []))
+            matchup = f"{g['away_team']} @ {g['home_team']}"
+
+            # Real best-value gap -- the largest real odds difference between a real best_value
+            # and worst_value entry for the SAME market_type (only meaningful when both flags
+            # exist, i.e. real, comparable prices at the same real line).
+            by_type: dict[str, list[dict]] = {}
+            for e in signals:
+                by_type.setdefault(e["market_type"], []).append(e)
+            for mtype, entries in by_type.items():
+                best = next((e for e in entries if e.get("best_value")), None)
+                worst = next((e for e in entries if e.get("worst_value")), None)
+                if best and worst and best["odds"] is not None and worst["odds"] is not None:
+                    # Real, deliberate distinction: for spread/total, "best" is picked by real
+                    # LINE VALUE first (odds only a tiebreaker -- see _compute_market_signals'
+                    # own sort key), so the two real books being compared can quote genuinely
+                    # different real numbers, not just different juice on the same number. The
+                    # real odds gap alone (raw American-odds units) can look huge in that case
+                    # without being a fair "same number, different price" comparison -- both the
+                    # real line values and the real gap are returned so the frontend can show
+                    # the full real context rather than one bare, possibly misleading number.
+                    same_line = (mtype == "moneyline"
+                                 or best["line_value"] == worst["line_value"])
+                    gap = abs(float(best["odds"]) - float(worst["odds"]))
+                    # Real, deliberate restriction to same_line comparisons only -- "shop
+                    # around" only means something real when both real books are quoting the
+                    # SAME real number (moneyline has no separate line to differ). A raw odds
+                    # gap between two DIFFERENT real spread/total numbers isn't a real, bettable
+                    # price discrepancy at all (you can't take both sides of two different real
+                    # numbers as "the same wager") -- excluded here rather than shown as a
+                    # misleadingly large, not-actually-comparable "gap."
+                    if gap > 0 and same_line:
+                        best_value.append({
+                            "game_id": g["game_id"], "matchup": matchup, "market_type": mtype,
+                            "best_book": best["sportsbook"], "worst_book": worst["sportsbook"],
+                            "best_odds": best["odds"], "worst_odds": worst["odds"],
+                            "line_value": best["line_value"],
+                            "gap": round(gap, 1),
+                        })
+
+            # Real, percentile-based unusual movement -- the game's own largest real MEASURED
+            # movement, ranked against the real distribution above.
+            max_move = max(
+                (abs(e["line_movement"]) for e in signals
+                 if e.get("movement_status") == "MEASURED" and e.get("line_movement") is not None),
+                default=None,
+            )
+            if max_move is not None:
+                percentile = _percentile_rank(distribution, max_move)
+                if percentile >= 90:
+                    unusual_movement.append({
+                        "game_id": g["game_id"], "matchup": matchup,
+                        "movement": round(max_move, 1), "percentile": percentile,
+                    })
+
+        best_value.sort(key=lambda e: e["gap"], reverse=True)
+        unusual_movement.sort(key=lambda e: e["percentile"], reverse=True)
+        return {
+            "best_value": best_value[:10],
+            "unusual_movement": unusual_movement,
+            "movement_distribution_n": len(distribution),
+        }
+
+
 @app.get("/sports/{sport}/games/{game_id}")
 def get_game(sport: str, game_id: str) -> dict:
     with _get_connection() as conn, conn.cursor() as cur:
@@ -637,7 +783,34 @@ def get_historical(sport: str) -> dict:
                 ),
                 "brier": round(brier, 4),
             })
-        return {"games": rows, "summary": summary}
+
+        # Real player-prop backtest (historical_player_prop_backtest.md, expanded per explicit
+        # user request) -- attaches each real game's real projected-vs-actual prop comparisons,
+        # and a real aggregate MAE per stat type across the whole real dataset. Table may be
+        # empty on a checkout where the backtest script hasn't been run yet -- an honest empty
+        # result, not an error.
+        cur.execute(
+            "SELECT game_id, player_id, player_name, team, position, stat_type, "
+            "projected_value, actual_value FROM player_prop_backtest "
+            "WHERE model_version = ANY(%s) ORDER BY game_id, team, position, player_name;",
+            (list(_HISTORICAL_MODEL_VERSIONS),),
+        )
+        prop_rows = cur.fetchall()
+        props_by_game: dict[str, list[dict]] = {}
+        mae_by_stat: dict[str, list[float]] = {}
+        for pr in prop_rows:
+            error = round(abs(float(pr["projected_value"]) - float(pr["actual_value"])), 1)
+            pr["error"] = error
+            props_by_game.setdefault(pr["game_id"], []).append(pr)
+            mae_by_stat.setdefault(pr["stat_type"], []).append(error)
+        for r in rows:
+            r["player_props"] = props_by_game.get(r["game_id"], [])
+        prop_summary = [
+            {"stat_type": stat, "mae": round(sum(errs) / len(errs), 2), "n": len(errs)}
+            for stat, errs in sorted(mae_by_stat.items())
+        ]
+
+        return {"games": rows, "summary": summary, "prop_summary": prop_summary}
 
 
 @app.get("/sports/{sport}/teams/{team}")

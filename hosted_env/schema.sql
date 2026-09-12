@@ -362,6 +362,28 @@ CREATE TRIGGER trg_reject_unapproved_sportsbook_team_totals
 BEFORE INSERT ON raw_team_total_captures
 FOR EACH ROW EXECUTE FUNCTION reject_unapproved_sportsbook();
 
+-- Real historical player-prop backtest (2026-09-12), direct Postgres port of the SQLite
+-- player_prop_backtest table -- see that table's own comment in prediction_audit/db/schema.py
+-- and prediction_audit/historical/player_prop_backtest.py's own module docstring for the full
+-- real scope. One-time backfill (sync_historical_to_postgres.py), same real pattern as the
+-- Phase 1/8 predictions/results tables -- this data is frozen, never a recurring live sync.
+CREATE TABLE player_prop_backtest (
+    id              SERIAL PRIMARY KEY,
+    game_id         TEXT NOT NULL,
+    season          INT NOT NULL,
+    week            INT NOT NULL,
+    player_id       TEXT NOT NULL,
+    player_name     TEXT NOT NULL,
+    team            TEXT NOT NULL,
+    position        TEXT NOT NULL,
+    stat_type       TEXT NOT NULL,
+    projected_value NUMERIC NOT NULL,
+    actual_value    NUMERIC NOT NULL,
+    model_version   TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX idx_prop_backtest_game ON player_prop_backtest(game_id, player_id);
+
 -- Real, dynamic tier classification -- direct Postgres port of v_ingestion_market_tiers'own
 -- real window-function logic (Postgres supports the same OVER (PARTITION BY ... ) syntax
 -- SQLite does; no rewrite needed beyond the CREATE VIEW dialect itself).

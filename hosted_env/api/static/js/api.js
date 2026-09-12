@@ -15,4 +15,5 @@ export const api = {
   getGame: (gameId) => realFetch(`/sports/NFL/games/${encodeURIComponent(gameId)}`),
   getTeam: (team) => realFetch(`/sports/NFL/teams/${encodeURIComponent(team)}`),
   getHistorical: () => realFetch("/sports/NFL/historical"),
+  getCheatsheet: (week) => realFetch(`/sports/NFL/cheatsheet?week=${week}`),
 };

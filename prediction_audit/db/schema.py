@@ -185,6 +185,32 @@ CREATE INDEX IF NOT EXISTS idx_market_run ON market_lines(run_id);
 CREATE INDEX IF NOT EXISTS idx_prop_run ON prop_predictions(run_id);
 CREATE INDEX IF NOT EXISTS idx_prop_market_prop ON prop_market_lines(prop_id);
 
+-- ==== Historical player-prop backtest (2026-09-12) -- real, one-off table populated by
+-- `prediction_audit.historical.player_prop_backtest`, NOT part of the live automated pipeline.
+-- Deliberately separate from prop_predictions/prop_market_lines (Step 14's own live-prediction
+-- schema, still 0 rows -- unrelated real feature): this table holds a real, historical
+-- projected-vs-actual comparison for the model's own Player Prop Projections methodology,
+-- replayed walk-forward-safely against Phase 1's already-validated 2025 reconstruction. See
+-- that script's own module docstring for the full real scope (which stats, which real
+-- reimplementation choices were made and why).
+CREATE TABLE IF NOT EXISTS player_prop_backtest (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id         TEXT NOT NULL,
+    season          INTEGER NOT NULL,
+    week            INTEGER NOT NULL,
+    player_id       TEXT NOT NULL,
+    player_name     TEXT NOT NULL,
+    team            TEXT NOT NULL,
+    position        TEXT NOT NULL,   -- 'QB' / 'RB' / 'WR' / 'TE'
+    stat_type       TEXT NOT NULL,   -- 'passing_yards' / 'interceptions' / 'rushing_yards' /
+                                     -- 'receiving_yards' / 'receptions'
+    projected_value REAL NOT NULL,
+    actual_value    REAL NOT NULL,
+    model_version   TEXT NOT NULL,  -- the real historical model_version this replay is against
+    created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_prop_backtest_game ON player_prop_backtest(game_id, player_id);
+
 -- ==== Automated agent layer (2026-09-08) -- real, INPUT-ONLY ingestion logging =============
 -- Deliberately NOT keyed off prediction_runs/run_id: the automated agent's whole real purpose
 -- is refreshing raw input data (injuries, rosters, schedule, market lines), never generating or

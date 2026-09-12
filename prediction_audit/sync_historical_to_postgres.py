@@ -142,11 +142,36 @@ def main() -> None:
 
                 print(f"  {model_version}: {len(rows)} real rows processed", flush=True)
 
+            # Real player-prop backtest rows (historical_player_prop_backtest.md) -- same real,
+            # one-time backfill pattern, keyed by (game_id, player_id, stat_type) so a re-run
+            # (e.g. after fixing a real bug in the backtest script) safely replaces the old real
+            # rows for that model_version rather than duplicating them.
+            cur.execute(
+                "DELETE FROM player_prop_backtest WHERE model_version = %s;",
+                (REAL_HISTORICAL_MODEL_VERSIONS[0],),
+            )
+            backtest_rows = sq_conn.execute(
+                "SELECT game_id, season, week, player_id, player_name, team, position, "
+                "stat_type, projected_value, actual_value, model_version, created_at "
+                "FROM player_prop_backtest WHERE model_version = ?",
+                (REAL_HISTORICAL_MODEL_VERSIONS[0],),
+            ).fetchall()
+            if backtest_rows:
+                cur.executemany(
+                    "INSERT INTO player_prop_backtest (game_id, season, week, player_id, "
+                    "player_name, team, position, stat_type, projected_value, actual_value, "
+                    "model_version, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                    "%s, %s, %s);",
+                    [tuple(r) for r in backtest_rows],
+                )
+            print(f"  player_prop_backtest: {len(backtest_rows)} real rows processed", flush=True)
+
             pg_conn.commit()
 
     sq_conn.close()
     print(f"\nReal historical backfill complete: {total_games} new games, "
-          f"{total_runs} new prediction_runs, {total_results} new results rows.")
+          f"{total_runs} new prediction_runs, {total_results} new results rows, "
+          f"{len(backtest_rows)} real prop-backtest rows.")
 
 
 if __name__ == "__main__":

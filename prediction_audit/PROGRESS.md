@@ -1698,3 +1698,104 @@ Full test suite: 10,755 passed, both before and after.
 
 Full test suite: 10,755 passed. All pushed to `main`, deployed live, and re-verified against the
 live production API/PWA after each deploy -- not just locally.
+
+## Second consolidated task batch (2026-09-11, later same session)
+
+Seven more real task files arrived, most requiring investigation before any build (this
+project's established discipline). Real, direct findings and what was actually built:
+
+**Player-props cadence simplified to once-daily, then went live** -- explicit user request
+("for now during the beta process let's do a once a day trigger") superseded the earlier
+twice-daily + hour-before-kickoff design; `player_props.py`'s gate simplified to a per-event
+duplicate-run safety net, `player_props_capture.yml`'s schedule uncommented. Real, forced test
+capture confirmed live in production (116 real rows, 5 markets, 3 US books) before automation
+was enabled.
+
+**Text-overlap bug (fix_overlap_grouping_historical_props.md Issue 1)** -- real, confirmed via
+user screenshot: the movement disclaimer ("only one real capture so far...") overlapped
+sportsbook names once they became links. Root cause: `.line-row` crammed book name + disclaimer
++ odds into one flex row with no room for the longer real disclaimer text. Fixed by splitting
+into two lines (book+odds always fit on one; the disclaimer gets its own full-width line below).
+Verified live against real Postgres data -- every previously-broken row (Tipico De, Unibet Nl,
+Sportsbet, etc.) now renders clean.
+
+**Odds nav restructured into Lines/Props (restructure_dropdown_navigation.md Part A)** --
+real two-level nav in the drill-down:
+- Lines: North America (open by default) + International -> UK | EU | Australia (adapted from
+  the task's literal "Europe | Asia/Other" wording to this project's real, actually-captured
+  taxonomy -- there is no real Asia region anywhere in this pipeline). Directly resolves Issue
+  1's crowding root cause, not just the CSS symptom.
+- Props: real team-first grouping. New `_resolve_player_team()` in `main.py` -- exact roster
+  match, then a prefix match (catches a real, confirmed naming gap: the Odds API's "Kyle Pitts"
+  vs. the roster snapshot's own "Kyle Pitts Sr."), then team-defense entries by literal name
+  prefix ("Atlanta Falcons Defense"). A player the resolver can't confidently match gets an
+  honest "Team unclear" bucket, never a guessed team. Verified live: 116 real prop rows across
+  one real game split correctly into Atlanta Falcons / Pittsburgh Steelers / 9 honestly
+  unresolved players (spot-checked against the real roster snapshot directly).
+- Pre-check for Part A's "game props" question and Part B's 1H/2H investigation: both real
+  markets exist and were tested directly against the live API -- `team_totals` (true game-level,
+  non-player prop) and `h2h_h1`/`spreads_h1`/`totals_h1` (1st-half lines) all confirmed real and
+  returned real data, at 4 credits/event (US-only, all 4 markets together) via the per-event
+  endpoint (the bulk endpoint rejects them with a real 422). Real remaining quota checked before
+  and after: 279 -> 275. **Not built** -- these are a new, additional real cost on top of
+  existing props/game-line spend, and Part B's own instruction is explicit: don't add nav
+  placeholders for markets not actually captured. Left for an explicit future go-ahead.
+
+**Real total (O/U) added to the Historical view (Issue 3)** -- same real `projected_total`
+column every prediction run already writes, paired with the real actual combined score, no new
+data source. Caught and fixed a real bug live during verification: Postgres NUMERIC columns
+arrive over the wire as JSON strings, and calling `.toFixed()` on `projected_total` directly
+threw -- `projected_margin` never hit this because the existing code always ran it through
+`Math.abs()` first, which coerces to a real number as a side effect.
+
+**Issues 4 & 5, confirmed honest absence, no bug** -- real query evidence: all 116 real prop
+rows ever captured came from this session's own single manual test (for `2026_01_ATL_PIT`); zero
+historical (Phase 1/8) prop data exists anywhere, and the once-daily cron hadn't fired yet at
+check time -- so every other game (including the one a user screenshot showed as empty) honestly
+has no real props captured yet. The existing "No real player-prop lines captured yet" message is
+correct as-is.
+
+**Phase 9/10 formal status (phase9_10_check_and_error_alerting.md Part A)** -- confirmed already
+done, not just an informal spot-check: both `phase9_graduation_table.md` and
+`phase10_model_selection.md`'s 2026-09-11 corrections (recorded above) are real, row-by-row
+re-derivations against the corrected data, with the real re-run numbers shown inline, not an
+assumption that the fix "probably didn't change anything."
+
+**Historical player-prop backtest, player-level success-rate extension -- both investigated,
+neither built yet** (historical_player_prop_backtest.md, investigate_and_extend_player_
+projections.md): confirmed Case A / complete overlap for both --
+`resolve_rb_index_history()`/`wr_te_index_historical.py` already compute real, walk-forward-safe
+(`week < target_week`, confirmed directly in code) blended per-player values for every metric
+Player Prop Projections' methodology needs (Team Pace, Carry/Target Share, Base Efficiency,
+Matchup Differential), including a genuine standalone `rushing_sr`/`success_rate` value (QB Index
+has no equivalent metric -- it never computed a success rate at all, only EPA/CPOE/ANY/A). The
+real gap: none of these intermediate values are persisted anywhere in the database -- Phase 1's
+reconstruction computes them transiently and only stores the final game margin. Building either
+backtest is real, tractable, correctness-sensitive new code (re-running the existing walk-forward
+functions per player/game and extracting the intermediate value) -- deliberately not rushed into
+the same pass as everything else above; scoped and ready, pending an explicit go-ahead.
+
+**GitHub failure-email real test triggered, awaiting real confirmation**
+(verify_github_failure_email.md) -- an isolated `_test_failure_alert.yml` (manual-trigger,
+deliberate `exit 1`) was added and fired for real at `2026-09-12T02:51:46Z`. Whether GitHub's
+built-in email actually arrived can only be confirmed by the user checking their own inbox --
+Part B's custom Discord/Slack alerting is deliberately not built yet, per that task's own
+explicit sequencing ("only then consider... don't build in parallel").
+
+**Postgres backup verification -- partial** (postgres_backup_verification.md): Render's real,
+public policy confirmed via their own docs (no paid-plan backups on the free tier; Hobby = 3-day
+PITR window, Pro+ = 7-day; logical backups retained 7 days regardless of plan; PITR restores to
+a genuinely separate new instance, never overwrites the live one). The account-specific parts
+(which plan this project is actually on, whether a real backup snapshot exists right now, a real
+test restore) need the user's own Render dashboard -- no Render API key or CLI exists in this
+environment to check it directly.
+
+**Real, additional fix found during this session's own verification, not requested**: Starlette's
+default `StaticFiles` sets no explicit `Cache-Control` header, so a browser can serve a stale
+JS/CSS file from disk cache on heuristic freshness alone with zero revalidation -- confirmed
+directly (a real edit's fresh content stayed invisible behind a browser-cached response for the
+rest of a real local testing session, same failure-mode class already fixed once for the service
+worker's own cache, per that fix's own docstring). Fixed via a `_NoCacheStaticFiles` subclass
+forcing `Cache-Control: no-cache` on every static response.
+
+Full test suite: 10,755 passed, both before and after every change in this batch.

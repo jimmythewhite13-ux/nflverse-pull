@@ -1807,3 +1807,77 @@ that task AND phase9_10_check_and_error_alerting.md Part B with it -- no custom 
 webhook alerting is needed, since GitHub's own built-in behavior already works. The isolated
 `_test_failure_alert.yml` test workflow was deleted now that it's served its purpose. Postgres
 backup verification (postgres_backup_verification.md) explicitly tabled by the user for now.
+
+## Third batch (2026-09-12): 1H markets/team totals, Cheat Sheet signals, real player-prop backtest
+
+**1H markets + team totals, explicit user go-ahead** (restructure_dropdown_navigation.md Part B):
+real 1st-half game lines (moneyline_h1/spread_h1/total_h1, added as new `raw_market_captures`
+market_type values) and real team totals (new `raw_team_total_captures` table, mirrors
+raw_player_prop_captures keyed by team). Real, measured cost: 4 credits/event, US-only.
+New `game_extras.py` capture script, same once-daily cadence/allow-list/post-kickoff-exclusion
+discipline as player_props.py. Verified live with a real forced capture (9 1H rows, 4 team-total
+rows). Also fixed, same session: a real UX bug confirmed via a user screenshot -- a region with
+zero rows for a specific game used to omit its whole nav section rather than showing an honest
+empty state; and a real Starlette gap -- no explicit Cache-Control header on static files let a
+browser serve stale JS indefinitely with zero revalidation (same failure-mode class as the
+service worker's own earlier fix).
+
+**Real total-accuracy check + Historical headline stats** (check_total_accuracy_and_headline_
+stats.md): real, direct finding -- total-prediction MAE (10.36/2025, 10.06/2024) is comparable to
+margin MAE (10.77/10.13), not meaningfully worse; correlation between actual combined score and
+total error is ~0 (0.026), no shootout-driven pattern. Real aggregate MAE/winner-accuracy/Brier
+cards added above the Historical game list.
+
+**Cheat Sheet market signals** (cheat_sheet_market_signals_part1.md): real best-line-value
+ranking across the week's slate, deliberately restricted to genuine same-line comparisons
+(moneyline, or spread/total at the identical real number) -- a raw odds gap between two
+DIFFERENT real numbers isn't a real, bettable price discrepancy, so excluded rather than shown
+as a misleadingly large "gap." Real, percentile-based unusual-movement flag against the live-
+computed distribution of every real measured movement captured so far (636 real points at time
+of writing) -- not a fixed threshold, and not further conditioned on "similar point in capture
+window" (real data volume doesn't yet support that sub-segmentation honestly).
+
+**Real 224-game player-prop historical backtest** (historical_player_prop_backtest.md, expanded
+per explicit user request to include QB + all positions): new
+`prediction_audit/historical/player_prop_backtest.py` replays Player Prop Projections' own real
+methodology against Phase 1's 2025 reconstruction, walk-forward-safe throughout. Two real,
+documented gaps closed (not borrowed/approximated): `wr_te_index_historical.py`'s own docstring
+confirms it deliberately placeholders `target_share`/`catch_rate` at 0.0 (weight-0 for the Index
+Score, but genuinely needed here) -- re-derived directly from real pbp via the same tested
+`nflverse_pull.player_props` season-level functions; RB Carry Share (the live pipeline's own
+version isn't walk-forward-safe) re-derived the same way from `compute_team_season_rb_stats`'s
+real Carries column. Matchup Differential reimplemented as the opposing defense's own real
+Pass/Run Defense Matchup score (real, documented, non-byte-for-byte-verified simplification).
+No touchdown backtest, ever -- confirmed the model has never computed a TD projection anywhere.
+
+Real run: zero uncaught errors across 176 real games (weeks 4-18; weeks 1-3 structurally skipped,
+same real "no current-season data yet" gap already shown in the PWA). 1174 real rows. Real MAE:
+passing_yards 96.2, rushing_yards 38.8, receiving_yards 30.4, receptions 2.2, interceptions 0.68.
+
+Three real, confirmed bugs found via post-run data-quality checks (never assumed correct just
+because the run didn't crash) and fixed:
+- A real perf bug (900+ CPU-seconds before caching) from redundant real season-level
+  recomputation on every player/team call -- fixed with real memoization.
+- A real team-abbreviation-vs-full-name mismatch feeding the Matchup Differential
+  reimplementation, caught by a real 5-week test run before committing to the full run.
+- `player_name` silently stored raw player IDs (e.g. "00-0033873") -- the history dataclasses
+  have no `player_name` field at all, so the original `getattr()` fallback always hit its
+  default. Fixed with a direct ID->name lookup from pbp's own name columns.
+- Re-running `sync_historical_to_postgres.py` (needed to also backfill the new
+  player_prop_backtest table) silently duplicated all 444 real prediction_runs/predictions rows
+  -- that insert had no real conflict guard. Root cause: a real, deliberate
+  `predictions_no_delete` database rule (confirmed directly) blocks DELETE outright, same
+  immutable-audit-trail discipline as elsewhere in this project -- so the existing real
+  duplicates can never be cleaned up by deleting, only worked around. Fixed at both layers:
+  `get_historical()`'s query now picks one real row per (game, model_version) deterministically
+  (DISTINCT ON lowest real run id -- same real numbers either way, confirmed directly, since a
+  duplicate is an exact copy), and the sync script now checks for an existing real run before
+  inserting.
+
+A real, unrelated binary-file merge conflict also surfaced mid-session: a concurrent automated
+line-capture commit landed while the real backtest was running, conflicting on the SQLite binary
+file. Resolved by taking the remote's fresher automated-capture data and re-applying this
+session's own 1174 real backtest rows from the already-synced live Postgres copy -- safer than
+attempting to merge two divergent binary copies.
+
+Full test suite: 10,755 passed, both before and after every change in this batch.

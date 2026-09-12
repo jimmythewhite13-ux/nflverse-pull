@@ -282,7 +282,10 @@ CREATE TABLE IF NOT EXISTS raw_market_captures (
     ingestion_id           INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
     game_id                TEXT NOT NULL,
     sportsbook             TEXT NOT NULL,
-    market_type            TEXT NOT NULL,   -- 'spread' / 'total' / 'moneyline'
+    market_type            TEXT NOT NULL,   -- 'spread' / 'total' / 'moneyline', plus
+                                             -- 'spread_h1' / 'total_h1' / 'moneyline_h1' (real
+                                             -- 1st-half markets, added 2026-09-12 -- see
+                                             -- game_extras.py)
     line_value             REAL,
     odds                   REAL,
     captured_at            TEXT NOT NULL,   -- ISO8601, real
@@ -350,6 +353,42 @@ END;
 
 CREATE INDEX IF NOT EXISTS idx_raw_prop_game_player
     ON raw_player_prop_captures(game_id, player_name, market_key);
+
+-- ==== Team-total captures (2026-09-12) -- real raw ingestion, same pattern as
+-- raw_player_prop_captures, keyed by TEAM instead of player. Real, explicit go-ahead
+-- (restructure_dropdown_navigation.md Part B): `team_totals` confirmed real and available via
+-- the per-event endpoint (US region), same 1-credit-per-market-per-event pricing as player
+-- props -- see game_extras.py for the real, measured combined cost (4 credits/event for this
+-- plus the three real 1st-half markets, which reuse raw_market_captures instead -- see its own
+-- market_type comment).
+CREATE TABLE IF NOT EXISTS raw_team_total_captures (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingestion_id           INTEGER NOT NULL REFERENCES ingestion_runs(ingestion_id),
+    game_id                TEXT NOT NULL,
+    team                   TEXT NOT NULL,   -- real full team name, from the Odds API outcome's
+                                             -- own `description` field (same convention as
+                                             -- raw_player_prop_captures.player_name)
+    sportsbook             TEXT NOT NULL,
+    line_value             REAL,
+    over_odds              REAL,
+    under_odds             REAL,
+    captured_at            TEXT NOT NULL,
+    kickoff_time           TEXT,
+    source                 TEXT NOT NULL,
+    market_data_status     TEXT NOT NULL DEFAULT 'MISSING'
+                            CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING')),
+    flagged_excluded_source INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_reject_unapproved_sportsbook_team_totals
+BEFORE INSERT ON raw_team_total_captures
+WHEN NEW.sportsbook NOT IN (SELECT name FROM approved_sportsbooks)
+BEGIN
+    SELECT RAISE(ABORT, 'Sportsbook not in approved_sportsbooks (see PROGRESS.md)');
+END;
+
+CREATE INDEX IF NOT EXISTS idx_raw_team_total_game
+    ON raw_team_total_captures(game_id, team);
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_job ON ingestion_runs(job_name, run_timestamp);
 CREATE INDEX IF NOT EXISTS idx_raw_injury_ingestion ON raw_injury_reports(ingestion_id);

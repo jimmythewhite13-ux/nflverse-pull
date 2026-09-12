@@ -265,7 +265,9 @@ CREATE TABLE raw_market_captures (
     ingestion_id            INT NOT NULL REFERENCES ingestion_runs(id),
     game_id                 TEXT NOT NULL,
     sportsbook              TEXT NOT NULL,      -- the real book (draftkings, betmgm, ...)
-    market_type             TEXT NOT NULL CHECK (market_type IN ('spread', 'total', 'moneyline')),
+    market_type             TEXT NOT NULL CHECK (market_type IN ('spread', 'total', 'moneyline',
+                             'spread_h1', 'total_h1', 'moneyline_h1')),  -- h1 variants added
+                             -- 2026-09-12, real 1st-half markets -- see game_extras.py
     line_value              NUMERIC,
     odds                    NUMERIC,
     captured_at             TIMESTAMPTZ NOT NULL,
@@ -331,6 +333,33 @@ CREATE INDEX idx_raw_prop_game_player
 
 CREATE TRIGGER trg_reject_unapproved_sportsbook_props
 BEFORE INSERT ON raw_player_prop_captures
+FOR EACH ROW EXECUTE FUNCTION reject_unapproved_sportsbook();
+
+-- Real team-total captures (2026-09-12), direct Postgres port of the SQLite
+-- raw_team_total_captures table -- see that table's own comment in prediction_audit/db/
+-- schema.py. Same real per-event-endpoint pricing as player props, explicit user go-ahead
+-- given after the real, measured cost (4 credits/event, US-only, combined with the 3 real
+-- 1st-half markets above).
+CREATE TABLE raw_team_total_captures (
+    id                      SERIAL PRIMARY KEY,
+    ingestion_id            INT NOT NULL REFERENCES ingestion_runs(id),
+    game_id                 TEXT NOT NULL,
+    team                    TEXT NOT NULL,
+    sportsbook              TEXT NOT NULL,
+    line_value              NUMERIC,
+    over_odds               NUMERIC,
+    under_odds              NUMERIC,
+    captured_at             TIMESTAMPTZ NOT NULL,
+    kickoff_time            TIMESTAMPTZ,
+    source                  TEXT NOT NULL,
+    market_data_status      TEXT NOT NULL DEFAULT 'MISSING'
+                             CHECK (market_data_status IN ('VERIFIED', 'UNVERIFIED', 'MISSING')),
+    flagged_excluded_source BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX idx_raw_team_total_game ON raw_team_total_captures(game_id, team);
+
+CREATE TRIGGER trg_reject_unapproved_sportsbook_team_totals
+BEFORE INSERT ON raw_team_total_captures
 FOR EACH ROW EXECUTE FUNCTION reject_unapproved_sportsbook();
 
 -- Real, dynamic tier classification -- direct Postgres port of v_ingestion_market_tiers'own

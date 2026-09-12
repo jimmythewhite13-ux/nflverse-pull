@@ -29,7 +29,7 @@ export async function openDetail(gameId) {
     // is now several collapsed, scannable groups.
     const linesHtml = renderLinesNav(g.market_lines);
     const propsHtml = renderPlayerPropsByTeam(
-      g.player_props || [], g.away_team, g.home_team,
+      g.player_props || [], g.team_totals || [], g.away_team, g.home_team,
       FULL_TEAM_NAME[g.away_team] || g.away_team, FULL_TEAM_NAME[g.home_team] || g.home_team,
     );
     const oddsHtml = `

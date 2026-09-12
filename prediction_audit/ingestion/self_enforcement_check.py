@@ -169,6 +169,26 @@ def check_no_unapproved_sportsbook_rows() -> list[str]:
                 f"unapproved sportsbook(s): {sorted(r[0] for r in prop_rows)} -- the "
                 f"database-level trigger should have rejected these; investigate how they "
                 f"landed here."]
+
+    # Real, same check extended to raw_team_total_captures (2026-09-12) -- identical allow-list
+    # discipline and identical database-level trigger, so identical audit-visibility check.
+    conn = sqlite3.connect(db_path)
+    try:
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(raw_team_total_captures)")]
+        if not cols:
+            return []  # table not created yet on this checkout -- nothing to check
+        team_total_rows = conn.execute(
+            "SELECT DISTINCT sportsbook FROM raw_team_total_captures "
+            "WHERE flagged_excluded_source = 0 "
+            "AND sportsbook NOT IN (SELECT name FROM approved_sportsbooks)"
+        ).fetchall()
+    finally:
+        conn.close()
+    if team_total_rows:
+        return [f"CRITICAL: real, un-flagged row(s) in raw_team_total_captures reference "
+                f"unapproved sportsbook(s): {sorted(r[0] for r in team_total_rows)} -- the "
+                f"database-level trigger should have rejected these; investigate how they "
+                f"landed here."]
     return []
 
 

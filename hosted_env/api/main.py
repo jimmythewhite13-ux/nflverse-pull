@@ -89,6 +89,11 @@ def _fix_kickoff_tz(value: datetime | None) -> str | None:
 # genuine non-zero movement still is this early in a real season, thresholds are set to flag
 # meaningfully below that one real confirmed swing, not an arbitrary industry number.
 _MAJOR_SHIFT_THRESHOLDS = {"spread": 1.5, "total": 2.0}
+# Real, deliberate omission: no threshold for spread_h1/total_h1 yet -- the existing thresholds
+# above were derived from this project's own real captured-data distribution (see this dict's
+# original comment), and no such real evidence exists yet for 1st-half movement. `.get()` below
+# returns None for these, which correctly suppresses the "major shift" badge rather than
+# guessing a scaled-down number with no real backing.
 
 # Real, deliberate book -> region map (restructure_dropdown_navigation.md Part A) -- exact same
 # real, per-book regulator categorization as `market_lines.py`'s own `APPROVED_BOOKMAKERS`
@@ -181,13 +186,13 @@ def _compute_market_signals(rows: list[dict]) -> list[dict]:
         # more about a better line than better juice at the same line), but a real tie on the
         # number must still resolve to whichever book actually offers the better real odds at
         # that same number, not an arbitrary row-order pick.
-        if mtype == "spread":
+        if mtype in ("spread", "spread_h1"):
             key = lambda e: (e["line_value"], e["odds"] or 0)  # noqa: E731
             best, worst = max(comparable, key=key), min(comparable, key=key)
-        elif mtype == "total":
+        elif mtype in ("total", "total_h1"):
             key = lambda e: (e["line_value"], -(e["odds"] or 0))  # noqa: E731
             best, worst = min(comparable, key=key), max(comparable, key=key)
-        else:  # moneyline -- best/worst real payout for the home side
+        else:  # moneyline / moneyline_h1 -- best/worst real payout for the home side
             best = max(comparable, key=lambda e: e["odds"])
             worst = min(comparable, key=lambda e: e["odds"])
         for e in comparable:
@@ -263,6 +268,52 @@ def _compute_player_prop_signals(rows: list[dict], home_abbr: str, away_abbr: st
 
     result = [e for entries in latest_by_player_market.values() for e in entries]
     result.sort(key=lambda e: (e["player_name"], e["market_key"], e["sportsbook"]))
+    return result
+
+
+def _compute_team_total_signals(rows: list[dict], home_abbr: str, away_abbr: str) -> list[dict]:
+    """Real, deliberate mirror of `_compute_player_prop_signals`'s own pregame-only + best/worst
+    logic, keyed by TEAM instead of player -- `raw_team_total_captures.team` is already a real
+    full team name (no fuzzy resolution needed, unlike props' player->team match), so this just
+    maps it back to the real abbreviation the rest of the API/PWA uses."""
+    by_group: dict[tuple[str, str], list[dict]] = {}
+    for r in rows:
+        by_group.setdefault((r["team"], r["sportsbook"]), []).append(r)
+
+    full_to_abbr = {_TEAM_FULL_NAMES.get(home_abbr): home_abbr,
+                     _TEAM_FULL_NAMES.get(away_abbr): away_abbr}
+    latest_by_team: dict[str, list[dict]] = {}
+    for (team_full, book), group in by_group.items():
+        group.sort(key=lambda r: r["captured_at"])
+        pregame = [r for r in group
+                   if r["kickoff_time"] is None or r["captured_at"] < r["kickoff_time"]]
+        if not pregame:
+            continue
+        current = pregame[-1]
+        entry = {
+            "team": full_to_abbr.get(team_full, team_full),
+            "sportsbook": book,
+            "line_value": current["line_value"],
+            "over_odds": current["over_odds"],
+            "under_odds": current["under_odds"],
+            "captured_at": current["captured_at"].isoformat(),
+        }
+        latest_by_team.setdefault(team_full, []).append(entry)
+
+    # Real best/worst across books for the SAME team's total -- never compared across the two
+    # different teams in the game, which are two genuinely different real numbers.
+    for entries in latest_by_team.values():
+        comparable = [e for e in entries if e["over_odds"] is not None]
+        if len(comparable) < 2:
+            continue
+        best = max(comparable, key=lambda e: e["over_odds"])
+        worst = min(comparable, key=lambda e: e["over_odds"])
+        for e in comparable:
+            e["best_value"] = e is best and best is not worst
+            e["worst_value"] = e is worst and best is not worst
+
+    result = [e for entries in latest_by_team.values() for e in entries]
+    result.sort(key=lambda e: (e["team"], e["sportsbook"]))
     return result
 
 app = FastAPI(title="NFL Model -- Live Data API", version="0.1.0")
@@ -499,6 +550,17 @@ def get_game(sport: str, game_id: str) -> dict:
 
         game["player_props"] = _compute_player_prop_signals(
             prop_rows, game["home_team"], game["away_team"], roster_by_team,
+        )
+
+        cur.execute(
+            "SELECT team, sportsbook, line_value, over_odds, under_odds, captured_at, "
+            "kickoff_time FROM raw_team_total_captures "
+            "WHERE game_id = %s AND flagged_excluded_source = FALSE "
+            "ORDER BY captured_at ASC;",
+            (game_id,),
+        )
+        game["team_totals"] = _compute_team_total_signals(
+            cur.fetchall(), game["home_team"], game["away_team"],
         )
 
         return game

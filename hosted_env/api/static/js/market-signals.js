@@ -28,10 +28,20 @@ export function renderMarketLines(marketLines) {
       } else if (m.movement_status === "NO_REAL_PREGAME_DATA") {
         movementHtml = '<span class="movement">no real pregame data captured</span>';
       }
+      // Real, deliberate two-line structure (fix_overlap_grouping_historical_props.md Issue 1):
+      // book name + odds share one row (always short, always fits); the movement/disclaimer
+      // text -- which can be much longer, e.g. "only one real capture so far -- insufficient
+      // data for movement" -- gets its own full-width line below instead of fighting the book
+      // name and odds for the same horizontal space. Confirmed real bug: cramming all three
+      // into one flex row visually overlapped the disclaimer text onto the book name once book
+      // names became links (dotted underline) with real, longer international names.
       return `
         <div class="line-row ${cls}">
-          ${bookNameHtml(m.sportsbook)}
-          <div class="value">${movementHtml}<span>${fmtLineValue(m)}</span></div>
+          <div class="line-row-main">
+            ${bookNameHtml(m.sportsbook)}
+            <span class="line-row-odds">${fmtLineValue(m)}</span>
+          </div>
+          ${movementHtml ? `<div class="line-row-movement">${movementHtml}</div>` : ""}
         </div>
       `;
     }).join("");

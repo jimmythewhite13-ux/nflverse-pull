@@ -88,20 +88,25 @@ main { padding: 0 16px; }
 .market-group h4 { font-size: 11px; text-transform: uppercase; color: var(--muted);
   letter-spacing: 0.05em; margin: 0 0 4px; font-weight: 600; }
 .line-row {
-  display: flex; justify-content: space-between; align-items: center; padding: 6px 8px;
-  border-bottom: 1px solid var(--border); font-size: 13px; border-radius: 4px;
+  padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 13px; border-radius: 4px;
 }
 .line-row.best { background: var(--best-bg); }
 .line-row.worst { background: var(--worst-bg); }
+/* Real, deliberate two-line structure (fix_overlap_grouping_historical_props.md Issue 1) --
+   book name + odds always share one line (both short, always fit); the movement disclaimer
+   below is free to wrap onto as many lines as it needs without contending for that same
+   horizontal space -- the real, confirmed cause of the disclaimer text overlapping book names. */
+.line-row-main { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .line-row .book { text-transform: capitalize; }
 /* Real, plain link (never tracked/affiliate) to the book's own site -- underline-on-hover
    affordance so it reads as interactive without looking like a different, "special" price. */
-a.line-row .book, .line-row a.book { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+.line-row a.book { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
 .line-row a.book:hover { border-bottom-color: var(--text); }
-.line-row .value { display: flex; align-items: center; gap: 6px; }
-.line-row.best .value { color: var(--best); font-weight: 600; }
-.line-row.worst .value { color: var(--worst); }
-.movement { font-size: 11px; color: var(--muted); }
+.line-row-odds { flex-shrink: 0; white-space: nowrap; }
+.line-row.best .line-row-odds { color: var(--best); font-weight: 600; }
+.line-row.worst .line-row-odds { color: var(--worst); }
+.line-row-movement { margin-top: 3px; }
+.movement { font-size: 11px; color: var(--muted); display: block; }
 .movement.major { color: var(--shift); font-weight: 600; }
 .prop-player { margin-bottom: 6px; }
 .prop-player-name { font-size: 12px; font-weight: 600; margin: 6px 0 2px; }

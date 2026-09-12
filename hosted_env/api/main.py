@@ -729,8 +729,19 @@ def get_historical(sport: str) -> dict:
     two model_versions, not a curated subset -- the surest way to guarantee a genuinely
     representative sample (real hits AND real misses) is to never filter any of them out."""
     with _get_connection() as conn, conn.cursor() as cur:
+        # Real, deliberate DISTINCT ON (game_id, mv.version_name) -- `prediction_runs`/
+        # `predictions` are real, database-enforced INSERT-ONLY/immutable tables (confirmed
+        # directly: a real `predictions_no_delete` rule blocks DELETE outright, by design, same
+        # audit-integrity discipline as everywhere else in this project) and
+        # sync_historical_to_postgres.py's own pre-2026-09-12 re-runs had no real conflict
+        # guard on this specific insert, so a real re-run can leave more than one real
+        # prediction_run per (game, model_version) sitting in the table -- this can never be
+        # cleaned up by deleting (by design), so the query layer picks the EARLIEST real run
+        # (lowest id) per game deterministically, same real numbers either way since every
+        # real duplicate is an exact copy of the same original prediction.
         cur.execute(
-            "SELECT g.game_id, g.season, g.week, g.away_team, g.home_team, "
+            "SELECT DISTINCT ON (g.game_id, mv.version_name) "
+            "g.game_id, g.season, g.week, g.away_team, g.home_team, "
             "p.projected_margin, p.projected_total, p.home_win_probability, "
             "r.away_final_score, r.home_final_score, mv.version_name "
             "FROM predictions p "
@@ -740,10 +751,11 @@ def get_historical(sport: str) -> dict:
             "JOIN results r ON r.game_id = g.game_id "
             "JOIN sports s ON s.id = g.sport_id "
             "WHERE s.name = %s AND mv.version_name = ANY(%s) "
-            "ORDER BY g.season DESC, g.week ASC, g.game_id ASC;",
+            "ORDER BY g.game_id, mv.version_name, pr.id ASC;",
             (sport.upper(), list(_HISTORICAL_MODEL_VERSIONS)),
         )
         rows = cur.fetchall()
+        rows.sort(key=lambda r: (-r["season"], r["week"], r["game_id"]))
         for r in rows:
             actual_margin = r["home_final_score"] - r["away_final_score"]
             r["actual_margin"] = actual_margin

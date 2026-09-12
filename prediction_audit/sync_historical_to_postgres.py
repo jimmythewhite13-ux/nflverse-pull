@@ -112,6 +112,22 @@ def main() -> None:
                     )
                     total_games += cur.rowcount
 
+                    # Real, deliberate skip-if-exists guard -- found live, 2026-09-12:
+                    # `prediction_runs`/`predictions` have no natural real conflict target for
+                    # ON CONFLICT (a real database-enforced immutability rule blocks DELETE
+                    # outright, so this table can never be cleaned up after the fact), and this
+                    # insert previously had no guard at all -- a real re-run (needed to also
+                    # backfill player_prop_backtest) duplicated all 444 real rows before this
+                    # fix. Checked first, real and explicit, rather than relying on a DB-level
+                    # constraint that doesn't exist here.
+                    cur.execute(
+                        "SELECT pr.id FROM prediction_runs pr "
+                        "WHERE pr.model_version_id = %s AND pr.game_id = %s;",
+                        (model_version_id, row["game_id"]),
+                    )
+                    existing = cur.fetchone()
+                    if existing:
+                        continue
                     cur.execute(
                         "INSERT INTO prediction_runs (model_version_id, game_id, "
                         "prediction_timestamp, data_cutoff_timestamp, data_version, "

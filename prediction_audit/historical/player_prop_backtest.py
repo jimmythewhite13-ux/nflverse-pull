@@ -152,6 +152,29 @@ _GAMES_PLAYED_CACHE: dict[int, pd.DataFrame] = {}
 
 
 _TEAM_PACE_CACHE: dict[int, pd.DataFrame] = {}
+_PLAYER_NAME_CACHE: dict[str, str] = {}
+_INSUFFICIENT_HISTORY_SKIPS: dict[str, int] = {}
+
+
+def _build_player_name_lookup(pbp_current: pd.DataFrame) -> None:
+    """Real, one-time fix for a real, confirmed bug (found via a real post-run data-quality
+    check, not assumed correct): `QBHistory`/`RBHistory`/`WRTEHistory` have no `player_name`
+    field at all (confirmed directly against their real dataclass definitions), so the original
+    `getattr(history, "player_name", history.player_id)` always silently fell back to the real
+    player ID (e.g. "00-0033873") -- the real projected/actual VALUES were unaffected (matched
+    by real ID throughout), but every real player_name this module ever wrote was actually a
+    raw ID. Real fix: a direct ID -> real name lookup straight from pbp's own real
+    passer/rusher/receiver name columns, built once and reused."""
+    for id_col, name_col in [("passer_id", "passer_player_name"),
+                              ("rusher_player_id", "rusher_player_name"),
+                              ("receiver_player_id", "receiver_player_name")]:
+        sub = pbp_current[[id_col, name_col]].dropna().drop_duplicates(subset=[id_col])
+        for _, row in sub.iterrows():
+            _PLAYER_NAME_CACHE.setdefault(row[id_col], row[name_col])
+
+
+def _real_player_name(player_id: str) -> str:
+    return _PLAYER_NAME_CACHE.get(player_id, player_id)
 
 
 def _clear_backtest_caches() -> None:
@@ -159,6 +182,7 @@ def _clear_backtest_caches() -> None:
     _CURRENT_CACHE.clear()
     _GAMES_PLAYED_CACHE.clear()
     _TEAM_PACE_CACHE.clear()
+    _PLAYER_NAME_CACHE.clear()
 
 
 def _cached_team_pace(pbp_3yr_prior: pd.DataFrame, pbp_current: pd.DataFrame,
@@ -347,9 +371,15 @@ def _project_qb(pbp_3yr_prior, pbp_current, sched, target_season, target_week,
         history = resolve_qb_index_history(
             pbp_3yr_prior, pbp_current, sched, target_season, target_week, team_full, "Starter",
         )
-    except ValueError:
+    except ValueError as e:
+        # Real, deliberate silent skip -- confirmed live (2026-09-12): this is the same real,
+        # honest "insufficient real Y-1/Y-2/Y-3 history" gap this project has always refused to
+        # fabricate around (a rookie/partial-history starter, e.g. a real in-season starter
+        # change to a young QB). Counted, not printed per-occurrence (this fires often enough
+        # across 224 real games to flood the log) -- see the real end-of-run summary instead.
+        _INSUFFICIENT_HISTORY_SKIPS["QB"] = _INSUFFICIENT_HISTORY_SKIPS.get("QB", 0) + 1
         return None
-    pid, name = history.player_id, getattr(history, "player_name", history.player_id)
+    pid, name = history.player_id, _real_player_name(history.player_id)
 
     team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
     pace_row = team_pace[(team_pace["Team"] == team_full)
@@ -410,9 +440,10 @@ def _project_rb(pbp_3yr_prior, pbp_current, ngs_rush_3yr, ngs_rush_cur, sched,
             target_season, target_week, team_full, "Starter",
         )
     except ValueError:
+        _INSUFFICIENT_HISTORY_SKIPS["RB"] = _INSUFFICIENT_HISTORY_SKIPS.get("RB", 0) + 1
         return None
     result = compute_rb_index(history, rb_c)
-    pid, name = history.player_id, getattr(history, "player_name", history.player_id)
+    pid, name = history.player_id, _real_player_name(history.player_id)
     ypc = result.blended["ypc"]
 
     team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
@@ -460,9 +491,10 @@ def _project_wr(pbp_3yr_prior, pbp_current, ngs_recv_3yr, ngs_recv_cur, rosters,
             target_season, target_week, team_full, role,
         )
     except ValueError:
+        _INSUFFICIENT_HISTORY_SKIPS[role] = _INSUFFICIENT_HISTORY_SKIPS.get(role, 0) + 1
         return None
     result = compute_wr_te_index(history, wr_c)
-    pid, name = history.player_id, getattr(history, "player_name", history.player_id)
+    pid, name = history.player_id, _real_player_name(history.player_id)
     ypt = result.blended["ypt"]
 
     team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
@@ -502,6 +534,7 @@ def main(season: int, max_weeks: int | None = None) -> int:
 
     _clear_backtest_caches()
     _clear_matchup_cache()
+    _INSUFFICIENT_HISTORY_SKIPS.clear()
 
     conn = create_database(DEFAULT_DB_PATH)
     conn.execute("DELETE FROM player_prop_backtest WHERE season = ?", (season,))
@@ -512,6 +545,7 @@ def main(season: int, max_weeks: int | None = None) -> int:
     print("  real pbp_3yr fetched", flush=True)
     pbp_current = fetch_pbp([season])
     print("  real pbp_current fetched", flush=True)
+    _build_player_name_lookup(pbp_current)
     sched = fetch_schedules([season])
     ngs_rush_3yr = fetch_ngs_rushing([season - 3, season - 2, season - 1])
     ngs_rush_cur = fetch_ngs_rushing([season])
@@ -619,6 +653,8 @@ def main(season: int, max_weeks: int | None = None) -> int:
         conn.commit()
     print(f"\nReal rows written: {len(rows)}. Real weeks with zero successful projections "
           f"(structurally too early for real walk-forward role resolution): {skipped_weeks}")
+    print(f"Real, honest 'insufficient Y-1/Y-2/Y-3 history' skips by position "
+          f"(rookie/partial-history starters, never fabricated around): {_INSUFFICIENT_HISTORY_SKIPS}")
     conn.close()
     return len(rows)
 

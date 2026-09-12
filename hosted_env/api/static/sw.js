@@ -19,12 +19,14 @@
 // (triggers the same real old-cache cleanup on activate) and added the missing file.
 // Real, bumped again (same day): team-filter.js (autocomplete port) and historical.js
 // (Historical/backtest tab) shipped -- same real reasoning, both added to SHELL_FILES, v5.
-const SHELL_CACHE = "nfl-model-shell-v5";
+// Real, bumped again: teams.js (shared team reference data, imported by historical.js/
+// team-filter.js/detail.js) was missing entirely -- same real gap class as before, v6.
+const SHELL_CACHE = "nfl-model-shell-v6";
 const SHELL_FILES = [
   "/", "/manifest.json", "/icon.svg", "/css/app.css",
   "/js/app.js", "/js/api.js", "/js/state.js", "/js/format.js",
   "/js/market-signals.js", "/js/player-props.js", "/js/week-caveat.js", "/js/views.js",
-  "/js/detail.js", "/js/week-nav.js", "/js/team-filter.js", "/js/historical.js",
+  "/js/detail.js", "/js/week-nav.js", "/js/team-filter.js", "/js/historical.js", "/js/teams.js",
 ];
 
 self.addEventListener("install", (event) => {

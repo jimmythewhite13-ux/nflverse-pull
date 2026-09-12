@@ -30,6 +30,34 @@ function rowHtml(g, idx) {
   const favoredHome = g.home_win_probability >= 0.5;
   const winProbSide = favoredHome ? g.home_team : g.away_team;
   const winProbPct = (favoredHome ? g.home_win_probability : 1 - g.home_win_probability) * 100;
+  // Real total (O/U) comparison (fix_overlap_grouping_historical_props.md Issue 3) -- same real
+  // projected_total the model already writes for every run, alongside the real actual combined
+  // score. Purely observational (over/under vs. the real, actual number), same "no
+  // recommendation" discipline as the game-line movement displays.
+  // Real, deliberate Number() coercion -- Postgres NUMERIC columns arrive over the wire as
+  // real JSON strings (confirmed live: a direct .toFixed() call threw "not a function"), unlike
+  // projected_margin above which only ever reaches .toFixed() after Math.abs() already coerced
+  // it to a real number.
+  const projectedTotal = g.projected_total != null ? Number(g.projected_total) : null;
+  const actualTotal = g.actual_total;
+  const totalHtml = projectedTotal != null ? `
+          <div class="readout-row">
+            <span class="readout-label">Model total (at kickoff)</span>
+            <span class="readout-value">${projectedTotal.toFixed(1)}</span>
+          </div>
+          <div class="result-compare">
+            <div class="result-compare-col">
+              <div class="result-compare-label">Model Predicted Total</div>
+              <div class="result-compare-value">${projectedTotal.toFixed(1)}</div>
+            </div>
+            <div class="result-compare-col">
+              <div class="result-compare-label">Real Actual Total</div>
+              <div class="result-compare-value">${actualTotal}</div>
+            </div>
+          </div>
+          <div style="text-align:center">
+            <span class="readout-label">Off by ${g.total_error} pt${g.total_error === 1 ? "" : "s"}</span>
+          </div>` : "";
   return `
     <div class="row-wrapper">
       <div class="game-row" onclick="toggleHistorical(this, ${idx})">
@@ -63,6 +91,7 @@ function rowHtml(g, idx) {
             </div>
           </div>
           <div style="text-align:center">${accuracyTagHtml(g)}</div>
+          ${totalHtml}
         </div>
       </div>
     </div>

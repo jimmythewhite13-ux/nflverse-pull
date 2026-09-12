@@ -110,6 +110,35 @@ main { padding: 0 16px; }
 .movement.major { color: var(--shift); font-weight: 600; }
 .prop-player { margin-bottom: 6px; }
 .prop-player-name { font-size: 12px; font-weight: 600; margin: 6px 0 2px; }
+
+/* Real Lines/Props two-level nav (restructure_dropdown_navigation.md Part A). */
+.detail-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.detail-tab {
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  font-family: "Inter", sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.03em;
+  text-transform: uppercase; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+.detail-tab.active { color: var(--signal); border-color: #4a3f22; background: #221d10; }
+/* Real, native <details>/<summary> for region/team groups -- no JS state needed, works with
+   keyboard/screen readers by default. Nested (International -> UK/EU/Australia) gets a slight
+   left inset so the hierarchy reads visually, not just structurally. */
+details.region-group {
+  border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden;
+}
+details.region-group summary {
+  padding: 9px 12px; cursor: pointer; font-size: 13px; font-weight: 600; list-style: none;
+  display: flex; justify-content: space-between; align-items: center;
+}
+details.region-group summary::-webkit-details-marker { display: none; }
+details.region-group summary::after { content: "\203A"; color: var(--muted); transition: transform 0.2s ease; }
+details.region-group[open] > summary::after { transform: rotate(90deg); }
+details.region-group > .market-group, details.region-group > .empty,
+details.region-group > .not-available-note, details.region-group > .prop-player {
+  margin: 0 10px 8px; padding: 0;
+}
+details.region-group > .market-group:first-of-type { margin-top: 6px; }
+details.region-group details.region-group { margin: 0 10px 8px; }
+.region-count { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: normal; }
 #detail {
   position: fixed; inset: 0; background: var(--bg); overflow-y: auto; padding: 16px;
   display: none;

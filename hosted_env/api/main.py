@@ -29,6 +29,27 @@ from psycopg.rows import dict_row
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+# Real, deliberate LOCAL copy (not imported from `nflverse_pull.pull.TEAM_NAMES`) --
+# `hosted_env/api/requirements.txt` is intentionally minimal (fastapi/uvicorn/psycopg only) for
+# Render's real deployment; importing the wider project package here would work locally (via
+# run_local.py's sys.path hack) but break in production, where that package is never installed.
+# Needed for restructure_dropdown_navigation.md's team-first Props grouping: `games.home_team`/
+# `away_team` are real abbreviations, but `raw_roster_snapshots.team` and the Odds API's own
+# team-defense prop entries ("Atlanta Falcons Defense") use real full names.
+_TEAM_FULL_NAMES: dict[str, str] = {
+    "ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Baltimore Ravens",
+    "BUF": "Buffalo Bills", "CAR": "Carolina Panthers", "CHI": "Chicago Bears",
+    "CIN": "Cincinnati Bengals", "CLE": "Cleveland Browns", "DAL": "Dallas Cowboys",
+    "DEN": "Denver Broncos", "DET": "Detroit Lions", "GB": "Green Bay Packers",
+    "HOU": "Houston Texans", "IND": "Indianapolis Colts", "JAX": "Jacksonville Jaguars",
+    "KC": "Kansas City Chiefs", "LA": "Los Angeles Rams", "LAC": "Los Angeles Chargers",
+    "LV": "Las Vegas Raiders", "MIA": "Miami Dolphins", "MIN": "Minnesota Vikings",
+    "NE": "New England Patriots", "NO": "New Orleans Saints", "NYG": "New York Giants",
+    "NYJ": "New York Jets", "PHI": "Philadelphia Eagles", "PIT": "Pittsburgh Steelers",
+    "SEA": "Seattle Seahawks", "SF": "San Francisco 49ers", "TB": "Tampa Bay Buccaneers",
+    "TEN": "Tennessee Titans", "WAS": "Washington Commanders",
+}
+
 # Real bug, confirmed against nflverse's own data dictionary (not assumed): the `gametime`
 # field nflverse provides is always Eastern time, "regardless of what time zone the game was
 # being played in" -- but this project's ingestion (schedule.py/game_status.py/etc.) has always
@@ -69,6 +90,44 @@ def _fix_kickoff_tz(value: datetime | None) -> str | None:
 # meaningfully below that one real confirmed swing, not an arbitrary industry number.
 _MAJOR_SHIFT_THRESHOLDS = {"spread": 1.5, "total": 2.0}
 
+# Real, deliberate book -> region map (restructure_dropdown_navigation.md Part A) -- exact same
+# real, per-book regulator categorization as `market_lines.py`'s own `APPROVED_BOOKMAKERS`
+# comment (each verified there against that region's real regulator, not assumed from name
+# recognition). Adapted from the task's own literal "North America / International -> Europe |
+# Asia/Other" wording to this project's REAL, actually-captured region taxonomy (US/UK/AU/EU --
+# there is no real Asia region captured anywhere in this pipeline): "North America" (US books),
+# then "International" split into its three real sub-regions (UK/EU/Australia).
+_BOOK_REGIONS: dict[str, str] = {
+    "draftkings": "us", "fanduel": "us", "betmgm": "us", "williamhill_us": "us",
+    "williamhill": "uk", "ladbrokes_uk": "uk", "coral": "uk", "paddypower": "uk",
+    "betway": "uk", "betvictor": "uk",
+    "sportsbet": "au", "ladbrokes_au": "au", "neds": "au", "pointsbetau": "au",
+    "betright": "au", "tab": "au", "unibet": "au",
+    "betclic_fr": "eu", "pmu_fr": "eu", "tipico_de": "eu", "unibet_nl": "eu", "unibet_se": "eu",
+}
+
+
+def _resolve_player_team(player_name: str, home_abbr: str, away_abbr: str,
+                          roster_by_team: dict[str, set[str]]) -> str | None:
+    """Real, best-effort player -> team resolution for Props' team-first grouping. Three real
+    passes, most to least certain: (1) team-defense prop entries ("Atlanta Falcons Defense" /
+    "... D/ST") literally start with that team's real full name -- deterministic, no fuzzy
+    matching needed; (2) exact match against that game's real roster snapshot; (3) prefix match
+    (handles a real, confirmed naming gap: the Odds API's "Kyle Pitts" vs the roster's own "Kyle
+    Pitts Sr."). Returns None (never a guess) when none of these resolve -- the caller buckets
+    unresolved players honestly rather than assigning a wrong team."""
+    for abbr, full_name in ((home_abbr, _TEAM_FULL_NAMES.get(home_abbr)),
+                             (away_abbr, _TEAM_FULL_NAMES.get(away_abbr))):
+        if full_name and player_name.startswith(full_name):
+            return abbr
+    for abbr in (home_abbr, away_abbr):
+        if player_name in roster_by_team.get(abbr, ()):
+            return abbr
+    for abbr in (home_abbr, away_abbr):
+        if any(roster_name.startswith(player_name) for roster_name in roster_by_team.get(abbr, ())):
+            return abbr
+    return None
+
 
 def _compute_market_signals(rows: list[dict]) -> list[dict]:
     by_group: dict[tuple[str, str], list[dict]] = {}
@@ -86,7 +145,7 @@ def _compute_market_signals(rows: list[dict]) -> list[dict]:
         current = pregame[-1] if pregame else None
 
         entry = {
-            "sportsbook": book, "market_type": mtype,
+            "sportsbook": book, "market_type": mtype, "region": _BOOK_REGIONS.get(book),
             "line_value": current["line_value"] if current else None,
             "odds": current["odds"] if current else None,
             "captured_at": current["captured_at"].isoformat() if current else None,
@@ -154,10 +213,13 @@ _PROP_MARKET_LABELS = {
 }
 
 
-def _compute_player_prop_signals(rows: list[dict]) -> list[dict]:
+def _compute_player_prop_signals(rows: list[dict], home_abbr: str, away_abbr: str,
+                                  roster_by_team: dict[str, set[str]]) -> list[dict]:
     """Real, deliberate mirror of `_compute_market_signals`'s own pregame-only + best/worst
     logic, grouped one level deeper (player + market, not just market) since a prop line is
-    meaningless without knowing which player it's for."""
+    meaningless without knowing which player it's for. Also resolves each player's real team
+    (restructure_dropdown_navigation.md's team-first Props grouping) via `_resolve_player_team`
+    -- `team` is None, never guessed, for a player that resolution can't confirm."""
     by_group: dict[tuple[str, str, str], list[dict]] = {}
     for r in rows:
         by_group.setdefault((r["player_name"], r["market_key"], r["sportsbook"]),
@@ -175,6 +237,7 @@ def _compute_player_prop_signals(rows: list[dict]) -> list[dict]:
         current = pregame[-1]
         entry = {
             "player_name": player,
+            "team": _resolve_player_team(player, home_abbr, away_abbr, roster_by_team),
             "market_key": mkey,
             "market_label": _PROP_MARKET_LABELS.get(mkey, mkey),
             "sportsbook": book,
@@ -412,7 +475,31 @@ def get_game(sport: str, game_id: str) -> dict:
             "ORDER BY captured_at ASC;",
             (game_id,),
         )
-        game["player_props"] = _compute_player_prop_signals(cur.fetchall())
+        prop_rows = cur.fetchall()
+
+        # Real roster snapshot for both teams -- resolves each prop's real team
+        # (restructure_dropdown_navigation.md's team-first Props grouping). `raw_roster_
+        # snapshots.team` uses real full names (unlike `games.home_team`/`away_team`'s real
+        # abbreviations), hence `_TEAM_FULL_NAMES`. Skipped entirely when there are no props to
+        # resolve -- no need for this extra real query on every game-detail request.
+        roster_by_team: dict[str, set[str]] = {}
+        if prop_rows:
+            home_full = _TEAM_FULL_NAMES.get(game["home_team"])
+            away_full = _TEAM_FULL_NAMES.get(game["away_team"])
+            cur.execute(
+                "SELECT team, player_name FROM raw_roster_snapshots "
+                "WHERE season = %s AND team IN (%s, %s);",
+                (game["season"], home_full, away_full),
+            )
+            full_to_abbr = {home_full: game["home_team"], away_full: game["away_team"]}
+            for row in cur.fetchall():
+                abbr = full_to_abbr.get(row["team"])
+                if abbr:
+                    roster_by_team.setdefault(abbr, set()).add(row["player_name"])
+
+        game["player_props"] = _compute_player_prop_signals(
+            prop_rows, game["home_team"], game["away_team"], roster_by_team,
+        )
 
         return game
 
@@ -436,7 +523,7 @@ def get_historical(sport: str) -> dict:
     with _get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT g.game_id, g.season, g.week, g.away_team, g.home_team, "
-            "p.projected_margin, p.home_win_probability, "
+            "p.projected_margin, p.projected_total, p.home_win_probability, "
             "r.away_final_score, r.home_final_score, mv.version_name "
             "FROM predictions p "
             "JOIN prediction_runs pr ON pr.id = p.run_id "
@@ -454,6 +541,13 @@ def get_historical(sport: str) -> dict:
             r["actual_margin"] = actual_margin
             r["margin_error"] = round(abs(r["projected_margin"] - actual_margin), 1)
             r["winner_correct"] = (r["projected_margin"] > 0) == (actual_margin > 0)
+            # Real total (O/U) comparison (fix_overlap_grouping_historical_props.md Issue 3) --
+            # same real projected_total column every prediction run already writes, alongside
+            # the real actual combined score -- no new data source, same real Phase 1/8 rows
+            # already powering the spread comparison above.
+            actual_total = r["home_final_score"] + r["away_final_score"]
+            r["actual_total"] = actual_total
+            r["total_error"] = round(abs(r["projected_total"] - actual_total), 1)
         return {"games": rows}
 
 
@@ -505,6 +599,24 @@ def list_model_versions(sport: str) -> list[dict]:
         return cur.fetchall()
 
 
+class _NoCacheStaticFiles(StaticFiles):
+    """Real, deliberate fix for the same real staleness-risk class sw.js's own docstring already
+    documents at length: Starlette's default StaticFiles response has NO explicit Cache-Control
+    header, so a browser is free to serve a JS/CSS file from its own disk cache on plain
+    heuristic freshness -- confirmed directly this session (a real edit's fresh content sat
+    invisible behind a browser-cached response with zero revalidation, well past any reasonable
+    "just deployed" window, in exactly the same "returning visitor never sees the real update"
+    failure mode already fixed once for the service worker's own cache). `no-cache` (not
+    `no-store`) is deliberate: it still lets the browser send a conditional request (real
+    If-None-Match/If-Modified-Since) and get a cheap real 304, it just forbids ever skipping that
+    revalidation -- correctness without giving up real caching efficiency."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # Real PWA static files (index.html, manifest.json, icon.svg, sw.js) -- mounted last so it
 # never shadows the real API routes above (Starlette matches routes in registration order).
-app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
+app.mount("/", _NoCacheStaticFiles(directory=_STATIC_DIR, html=True), name="static")

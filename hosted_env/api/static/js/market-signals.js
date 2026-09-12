@@ -48,3 +48,33 @@ export function renderMarketLines(marketLines) {
     return `<div class="market-group"><h4>${mtype}</h4>${rows}</div>`;
   }).join("");
 }
+
+// Real, deliberate region-first nav (restructure_dropdown_navigation.md Part A) -- adapted from
+// the task's literal "North America / International -> Europe | Asia/Other" wording to this
+// project's real, actually-captured taxonomy (US/UK/AU/EU; there is no real Asia region
+// anywhere in this pipeline). North America stays open by default (the primary region, same
+// convention fix_overlap_grouping_historical_props.md's Issue 2 asked for); the three real
+// international sub-regions collapse under one "International" group, directly resolving the
+// crowding that caused Issue 1's text-overlap bug -- a real, structural fix, not cosmetic.
+export function renderLinesNav(marketLines) {
+  const byRegion = { us: [], uk: [], eu: [], au: [] };
+  marketLines.forEach(m => { if (byRegion[m.region]) byRegion[m.region].push(m); });
+  const regionGroup = (label, rows, open) => rows.length
+    ? `<details class="region-group"${open ? " open" : ""}>
+         <summary>${label} <span class="region-count">${new Set(rows.map(r => r.sportsbook)).size} books</span></summary>
+         ${renderMarketLines(rows)}
+       </details>`
+    : "";
+  const naHtml = byRegion.us.length
+    ? regionGroup("North America", byRegion.us, true)
+    : '<div class="empty">No real North America lines captured yet.</div>';
+  const intlInner = [
+    regionGroup("UK", byRegion.uk, false),
+    regionGroup("EU", byRegion.eu, false),
+    regionGroup("Australia", byRegion.au, false),
+  ].join("");
+  const intlHtml = intlInner
+    ? `<details class="region-group"><summary>International</summary>${intlInner}</details>`
+    : "";
+  return naHtml + intlHtml;
+}

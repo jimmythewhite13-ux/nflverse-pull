@@ -1,8 +1,9 @@
 // Real per-game and per-team drill-down overlay.
 import { api } from "./api.js";
 import { statusPillClass, fmtKickoff } from "./format.js";
-import { renderMarketLines } from "./market-signals.js";
-import { renderPlayerProps } from "./player-props.js";
+import { renderLinesNav } from "./market-signals.js";
+import { renderPlayerPropsByTeam } from "./player-props.js";
+import { FULL_TEAM_NAME } from "./teams.js";
 
 export async function openDetail(gameId) {
   const detail = document.getElementById("detail");
@@ -19,8 +20,29 @@ export async function openDetail(gameId) {
         `).join("")
       : '<div class="empty">No real injury reports for either team right now.</div>';
 
-    const marketHtml = renderMarketLines(g.market_lines);
-    const propsHtml = renderPlayerProps(g.player_props || []);
+    // Real, two-level Odds navigation (restructure_dropdown_navigation.md Part A): Lines |
+    // Props at the top, real regional sub-groups under Lines (North America / International ->
+    // UK | EU | Australia -- this project's real, actually-captured taxonomy), real team-first
+    // sub-groups under Props (away team, home team, then any player the API couldn't
+    // confidently resolve to a team). Directly resolves fix_overlap_grouping_historical_
+    // props.md's Issue 2 crowding, not just cosmetic -- one real flat 21-book list per market
+    // is now several collapsed, scannable groups.
+    const linesHtml = renderLinesNav(g.market_lines);
+    const propsHtml = renderPlayerPropsByTeam(
+      g.player_props || [], g.away_team, g.home_team,
+      FULL_TEAM_NAME[g.away_team] || g.away_team, FULL_TEAM_NAME[g.home_team] || g.home_team,
+    );
+    const oddsHtml = `
+      <section>
+        <h3>Odds</h3>
+        <div class="detail-tabs">
+          <button class="detail-tab active" onclick="showOddsTab(this, 'lines')">Lines</button>
+          <button class="detail-tab" onclick="showOddsTab(this, 'props')">Props</button>
+        </div>
+        <div id="odds-tab-lines">${linesHtml}</div>
+        <div id="odds-tab-props" hidden>${propsHtml}</div>
+      </section>
+    `;
 
     // Real, honest "What we know so far" section for a game with no prediction yet -- real
     // current market lines (the one real data point actually available), plus an explicit,
@@ -33,8 +55,8 @@ export async function openDetail(gameId) {
           <h3>What we know so far</h3>
           <div class="prediction-pending" style="margin-bottom:12px">${g.prediction.reason}</div>
           <div class="not-available-note">Season Win Totals: not available from the current real data source.</div>
-          <div style="margin-top:10px">${marketHtml}</div>
         </section>
+        ${oddsHtml}
       `;
     } else if (g.prediction) {
       bodyHtml = `
@@ -44,10 +66,10 @@ export async function openDetail(gameId) {
           <div class="row"><span>Home win probability</span><span style="color:var(--signal)">${(g.prediction.home_win_probability * 100).toFixed(1)}%</span></div>
           <div class="row"><span>Model version</span><span>${g.prediction.version_name}</span></div>
         </section>
-        <section><h3>Market lines</h3>${marketHtml}</section>
+        ${oddsHtml}
       `;
     } else {
-      bodyHtml = `<section><h3>Market lines</h3>${marketHtml}</section>`;
+      bodyHtml = oddsHtml;
     }
 
     content.innerHTML = `
@@ -55,7 +77,6 @@ export async function openDetail(gameId) {
       <div class="meta" style="color:var(--muted)">Week ${g.week} &middot; ${fmtKickoff(g.kickoff_time)}</div>
       <span class="${statusPillClass(g.status)}">${g.status.replace(/_/g, " ")}</span>
       ${bodyHtml}
-      <section><h3>Player Props</h3>${propsHtml}</section>
       <section><h3>Injuries</h3>${injuriesHtml}</section>
     `;
   } catch (e) {
@@ -103,4 +124,13 @@ export async function openTeamDetail(team) {
 
 export function closeDetail() {
   document.getElementById("detail").classList.remove("open");
+}
+
+// Real Lines/Props top-level tab switch (restructure_dropdown_navigation.md Part A) -- same
+// simple show/hide pattern as switchView's own top-level tabs, scoped to the detail overlay.
+export function showOddsTab(btnEl, tab) {
+  document.getElementById("odds-tab-lines").hidden = tab !== "lines";
+  document.getElementById("odds-tab-props").hidden = tab !== "props";
+  btnEl.parentElement.querySelectorAll(".detail-tab").forEach(b => b.classList.remove("active"));
+  btnEl.classList.add("active");
 }

@@ -3,13 +3,13 @@
 // functions on window, then boots the real initial data load.
 import { api } from "./api.js";
 import { switchView } from "./views.js";
-import { openDetail, openTeamDetail, closeDetail } from "./detail.js";
+import { openDetail, openTeamDetail, closeDetail, showOddsTab } from "./detail.js";
 import { toggleWeekDropdown, selectWeek, loadCurrentWeek, loadGames } from "./week-nav.js";
 import { initTeamFilter, clearTeamFilter } from "./team-filter.js";
 import { toggleHistorical } from "./historical.js";
 
 Object.assign(window, {
-  switchView, openDetail, openTeamDetail, closeDetail,
+  switchView, openDetail, openTeamDetail, closeDetail, showOddsTab,
   toggleWeekDropdown, selectWeek, clearTeamFilter, toggleHistorical,
 });
 

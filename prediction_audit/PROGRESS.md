@@ -1881,3 +1881,21 @@ session's own 1174 real backtest rows from the already-synced live Postgres copy
 attempting to merge two divergent binary copies.
 
 Full test suite: 10,755 passed, both before and after every change in this batch.
+
+## Fourth batch (2026-09-12): Cheat Sheet player-prop value comparison
+
+cheat_sheet_props_extension.md -- real best/worst prop-value comparison added to the Cheat
+Sheet, mirroring the game-line logic, clearly labeled "player prop." Required check performed
+first: real prop capture history is exactly 1 distinct timestamp (once-daily cadence only just
+went live), 0 real (player, market, book) combinations have a second real capture -- confirmed
+directly, not assumed. Percentile-based prop movement detection deliberately NOT built yet (a
+single-point "distribution" would be statistically meaningless); an honest hold-back note with
+the real sample size and a reasoned ~2-3 week estimate shown instead. Value comparison ships now
+since it only needs one real snapshot.
+
+Real bug found and fixed while building this (same class already fixed for game lines):
+`_compute_player_prop_signals`'s best/worst logic compared raw over_odds across books without
+requiring the same real line_value -- fixed by grouping by line_value first. This also corrects
+the existing, already-shipped per-game Props view, not just the new Cheat Sheet feature.
+
+Full test suite: 10,755 passed.

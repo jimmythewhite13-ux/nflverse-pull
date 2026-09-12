@@ -1799,3 +1799,11 @@ worker's own cache, per that fix's own docstring). Fixed via a `_NoCacheStaticFi
 forcing `Cache-Control: no-cache` on every static response.
 
 Full test suite: 10,755 passed, both before and after every change in this batch.
+
+**GitHub failure-email test, confirmed real (2026-09-12)**: the user confirmed a real email
+actually arrived in their inbox for the deliberate test failure triggered at
+`2026-09-12T02:51:46Z`. Per verify_github_failure_email.md's own explicit conclusion, this closes
+that task AND phase9_10_check_and_error_alerting.md Part B with it -- no custom Discord/Slack
+webhook alerting is needed, since GitHub's own built-in behavior already works. The isolated
+`_test_failure_alert.yml` test workflow was deleted now that it's served its purpose. Postgres
+backup verification (postgres_backup_verification.md) explicitly tabled by the user for now.

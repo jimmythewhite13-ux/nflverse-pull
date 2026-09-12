@@ -73,6 +73,28 @@ function bestValueHtml(bestValue) {
   return `<div class="market-group">${rows}</div>`;
 }
 
+// Real player-prop value comparison (cheat_sheet_props_extension.md) -- same real, same-line-
+// only discipline as game lines, clearly labeled "player prop" so it's never visually confused
+// with a game-line entry.
+function bestPropValueHtml(bestPropValue) {
+  if (!bestPropValue.length) {
+    return '<div class="empty">No real, comparable best/worst prop price gap found across this week\'s slate yet.</div>';
+  }
+  const rows = bestPropValue.map(e => {
+    const lineTxt = e.line_value != null ? ` at ${e.line_value}` : "";
+    return `
+    <div class="line-row">
+      <div class="line-row-main">
+        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.player_name} <span class="region-count">player prop &middot; ${e.market_label}${lineTxt}</span></span>
+        <span class="line-row-odds">${e.gap}</span>
+      </div>
+      <div class="line-row-movement"><span class="movement">${bookNameHtml(e.best_book)} (${e.best_odds}) currently offers ${e.gap} points better real odds than ${bookNameHtml(e.worst_book)} (${e.worst_odds}) for the exact same real prop${lineTxt} (${e.matchup})</span></div>
+    </div>
+  `;
+  }).join("");
+  return `<div class="market-group">${rows}</div>`;
+}
+
 function unusualMovementHtml(unusualMovement, n) {
   if (!unusualMovement.length) {
     return `<div class="empty">No real game this week has moved further than 90% of the ${n} real, measured movements captured so far.</div>`;
@@ -103,9 +125,19 @@ export async function renderCheatsheetSignals(week) {
     }
   }
   const d = cachedCheatsheetData;
+  // Real, honest hold-back note (cheat_sheet_props_extension.md's own explicit requirement) --
+  // props only started capturing this week, so there isn't yet a real distribution to compute a
+  // percentile-based "unusual movement" flag from for props specifically (the game-line
+  // movement section above already covers game lines; this note is prop-specific).
+  const propMovementNote = d.prop_movement_eligible_n === 0
+    ? `<div class="not-available-note" style="margin:4px 0 10px">Player-prop movement detection: not enough real history yet -- props only started capturing once daily this week, and 0 real (player, market, book) combinations have a second real capture so far. Revisit once a real, multi-capture distribution exists (roughly 2-3 weeks of the once-daily cadence).</div>`
+    : "";
   container.innerHTML = `
     <h4 style="margin:10px 0 4px">Best Real Line Value This Week</h4>
     ${bestValueHtml(d.best_value)}
+    <h4 style="margin:14px 0 4px">Best Real Player Prop Value This Week</h4>
+    ${bestPropValueHtml(d.best_prop_value)}
+    ${propMovementNote}
     <h4 style="margin:14px 0 4px">Statistically Unusual Line Movement</h4>
     ${unusualMovementHtml(d.unusual_movement, d.movement_distribution_n)}
   `;

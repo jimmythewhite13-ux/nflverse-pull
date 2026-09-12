@@ -255,16 +255,25 @@ def _compute_player_prop_signals(rows: list[dict], home_abbr: str, away_abbr: st
 
     # Real best/worst across books for the SAME player + market -- e.g. the best real price to
     # bet Patrick Mahomes Over 274.5 passing yards, comparing only books quoting that exact
-    # player+stat, never across different players or different markets.
+    # player+stat, never across different players or different markets. Real, deliberate
+    # same-line requirement (cheat_sheet_props_extension.md surfaced the same real issue
+    # already fixed for game lines): two real books quoting DIFFERENT real lines for the same
+    # player+market aren't a real, bettable "same wager" comparison -- grouped by line_value
+    # too (None counts as equal, e.g. every real player_anytime_td entry) before picking
+    # best/worst, so a raw odds gap is never shown across two different real numbers.
     for (_, _), entries in latest_by_player_market.items():
-        comparable = [e for e in entries if e["over_odds"] is not None]
-        if len(comparable) < 2:
-            continue
-        best = max(comparable, key=lambda e: e["over_odds"])
-        worst = min(comparable, key=lambda e: e["over_odds"])
-        for e in comparable:
-            e["best_value"] = e is best and best is not worst
-            e["worst_value"] = e is worst and best is not worst
+        by_line: dict[float | None, list[dict]] = {}
+        for e in entries:
+            if e["over_odds"] is not None:
+                by_line.setdefault(e["line_value"], []).append(e)
+        for comparable in by_line.values():
+            if len(comparable) < 2:
+                continue
+            best = max(comparable, key=lambda e: e["over_odds"])
+            worst = min(comparable, key=lambda e: e["over_odds"])
+            for e in comparable:
+                e["best_value"] = e is best and best is not worst
+                e["worst_value"] = e is worst and best is not worst
 
     result = [e for entries in latest_by_player_market.values() for e in entries]
     result.sort(key=lambda e: (e["player_name"], e["market_key"], e["sportsbook"]))
@@ -527,7 +536,8 @@ def get_cheatsheet(sport: str, week: int) -> dict:
         )
         games = cur.fetchall()
         if not games:
-            return {"best_value": [], "unusual_movement": [], "movement_distribution_n": 0}
+            return {"best_value": [], "best_prop_value": [], "unusual_movement": [],
+                     "movement_distribution_n": 0, "prop_movement_eligible_n": 0}
 
         game_ids = [g["game_id"] for g in games]
         cur.execute(
@@ -541,9 +551,37 @@ def get_cheatsheet(sport: str, week: int) -> dict:
         for r in cur.fetchall():
             by_game.setdefault(r["game_id"], []).append(r)
 
+        # Real, player-prop extension (cheat_sheet_props_extension.md) -- same real value-
+        # comparison logic as game lines, mirrored for the real, already-captured prop data.
+        # Real, explicit check performed first (not assumed): only ONE real capture timestamp
+        # exists for props so far (the once-daily cadence only just went live), so a real
+        # percentile-based "unusual movement" flag is NOT built here -- there is no real
+        # distribution to compute one from yet (0 real (player, market, book) groups have 2+
+        # real captures, confirmed directly). Shipping a percentile from that would be exactly
+        # the "tiny sample masquerading as a real distribution" this task explicitly warns
+        # against. Real value-comparison IS built now, since it only needs one real snapshot.
+        cur.execute(
+            "SELECT game_id, player_name, market_key, sportsbook, line_value, over_odds, "
+            "under_odds, captured_at, kickoff_time FROM raw_player_prop_captures "
+            "WHERE game_id = ANY(%s) AND flagged_excluded_source = FALSE "
+            "ORDER BY captured_at ASC;",
+            (game_ids,),
+        )
+        by_game_props: dict[str, list[dict]] = {}
+        for r in cur.fetchall():
+            by_game_props.setdefault(r["game_id"], []).append(r)
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM ("
+            "  SELECT 1 FROM raw_player_prop_captures WHERE flagged_excluded_source = FALSE "
+            "  GROUP BY game_id, player_name, market_key, sportsbook HAVING COUNT(*) > 1"
+            ") t;"
+        )
+        prop_movement_eligible_n = cur.fetchone()["n"]
+
         distribution = _real_movement_distribution(conn)
 
         best_value = []
+        best_prop_value = []
         unusual_movement = []
         for g in games:
             signals = _compute_market_signals(by_game.get(g["game_id"], []))
@@ -601,12 +639,39 @@ def get_cheatsheet(sport: str, week: int) -> dict:
                         "movement": round(max_move, 1), "percentile": percentile,
                     })
 
+            # Real player-prop best-value -- same real signal computation the per-game Props
+            # view already uses, so this list is never a second, diverging real implementation.
+            prop_rows = by_game_props.get(g["game_id"], [])
+            if prop_rows:
+                prop_signals = _compute_player_prop_signals(
+                    prop_rows, g["home_team"], g["away_team"], {},
+                )
+                by_player_market: dict[tuple[str, str], list[dict]] = {}
+                for e in prop_signals:
+                    by_player_market.setdefault((e["player_name"], e["market_key"]), []).append(e)
+                for (player, mkey), entries in by_player_market.items():
+                    best = next((e for e in entries if e.get("best_value")), None)
+                    worst = next((e for e in entries if e.get("worst_value")), None)
+                    if best and worst:
+                        gap = abs(float(best["over_odds"]) - float(worst["over_odds"]))
+                        if gap > 0:
+                            best_prop_value.append({
+                                "game_id": g["game_id"], "matchup": matchup,
+                                "player_name": player, "market_label": best["market_label"],
+                                "best_book": best["sportsbook"], "worst_book": worst["sportsbook"],
+                                "best_odds": best["over_odds"], "worst_odds": worst["over_odds"],
+                                "line_value": best["line_value"], "gap": round(gap, 1),
+                            })
+
         best_value.sort(key=lambda e: e["gap"], reverse=True)
+        best_prop_value.sort(key=lambda e: e["gap"], reverse=True)
         unusual_movement.sort(key=lambda e: e["percentile"], reverse=True)
         return {
             "best_value": best_value[:10],
+            "best_prop_value": best_prop_value[:10],
             "unusual_movement": unusual_movement,
             "movement_distribution_n": len(distribution),
+            "prop_movement_eligible_n": prop_movement_eligible_n,
         }
 
 

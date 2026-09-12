@@ -1577,3 +1577,124 @@ both documents in full against this session's own fresh re-runs, row by row, not
 Both documents follow the project's established correction convention: a dated notice at the
 top, the real table rows updated in place with the new correction called out per row, and the
 original (now-superseded) numbers preserved below for the record, not deleted.
+
+## Real `ODDS_API_KEY` GitHub secret found broken since rotation, fixed (2026-09-11)
+
+Full system verification pass (all live pieces, not assumed) found one real, active production
+issue: every real automated line-capture run since `2026-09-11T14:42:48Z` had been failing with
+`HTTP 401 -- {"error_code":"INVALID_KEY"}`, invisible on the workflow's own pass/fail badge
+because `market_lines.py` handles a failed pull gracefully (logs it, commits the MISSING record,
+exits 0) rather than crashing -- only found by reading real log content directly, same discipline
+that caught the earlier `NFLVERSE_DB_PULL` incident. Root cause confirmed: the local `.env` copy
+of the key was independently verified valid (`HTTP 200` against the real API) while the GitHub
+secret was not -- same exact pattern as `NFLVERSE_DB_PULL` (the secret value most likely still had
+the `ODDS_API_KEY=` prefix baked in from how it was copied). User fixed it via
+`(Get-Content .env | Where-Object {...}) -replace '^ODDS_API_KEY=','' | gh secret set ODDS_API_KEY`
+(PowerShell, not the bash `<()` process-substitution form). Verified fixed via a real triggered
+run's log: `{'status': 'SUCCESS', 'rows_written': 1473}`, with all 21 approved books present.
+
+## International sportsbooks -- verified fully live end-to-end (2026-09-11)
+
+Following the key fix above, this was the first real opportunity for the 18 newly-added
+international books (UK/AU/EU, added earlier but never actually exercised through a working
+key) to flow through the live pipeline. Confirmed directly, not assumed:
+- Live API check on a real upcoming game (`2026_01_CHI_CAR`): **45 real market_lines entries**
+  across all 21 approved books (3 original US + Caesars + 6 UK + 7 AU + 5 EU), zero truncation.
+- A real Playwright screenshot of the live deployed PWA confirmed **exactly 45 `.line-row`**
+  elements render in the actual frontend -- matching the API response 1:1, not just "the
+  mechanism exists."
+
+No code changes were needed here -- this was pure verification that a previously-built, but
+never-exercised, feature genuinely works end to end.
+
+## Player props -- built, scoped, and shipped live (2026-09-11)
+
+**Real cost measured before any code was written** (this project's established discipline,
+same as the international-region decision): a direct test call against the live Odds API
+(`/v4/sports/americanfootball_nfl/events/{id}/odds`, which bills PER-EVENT, unlike the bulk
+game-odds endpoint) showed **20 credits/event** for 5 markets across all 4 regions vs.
+**5 credits/event** for the same 5 markets US-only -- a real, permanent 4x cost. The user's
+original ask (all-region, twice-daily + hour-before-kickoff cadence, ~15 markets spanning
+TDs/yards/receptions/attempts/completions/tackles/sacks/INTs) was measured at
+**1,600-3,520 credits/week** depending on tracking-window length, against a real remaining
+quota of 317-344 across this session's own measurement calls -- not sustainable. The user then
+explicitly narrowed scope in two steps: first to **US-only + "core 4 + QB interceptions"**
+(`player_anytime_td`, `player_pass_yds`, `player_rush_yds`, `player_reception_yds`,
+`player_pass_interceptions`), then to **once-daily cadence** for the beta period ("for now
+during the beta process let's do a once a day trigger," superseding the originally-specified
+twice-daily + pre-kickoff design), then explicitly said "go live."
+
+**What was built**:
+- `raw_player_prop_captures` (SQLite + Postgres) -- new table mirroring `raw_market_captures`'s
+  real allow-list/default-deny trigger pattern exactly. Deliberately separate from the
+  pre-existing `prop_predictions`/`prop_market_lines` tables (Step 14's own schema, still
+  "0 rows, all-time" per the 2026-09-10 finding above) -- those require a real model projection
+  to exist first (a separate, not-yet-built predictive feature); this new table holds raw
+  sportsbook lines only, same relationship `raw_market_captures` has to the game-level model.
+- `prediction_audit/ingestion/player_props.py` -- new capture script, same post-kickoff exclusion
+  and approved-book filter as `market_lines.py`, plus a real per-event cadence gate (currently
+  simplified to a once-daily duplicate-run safety net per the beta-scope decision above; a
+  dedicated closing-line/pre-kickoff capture is a deferred, post-beta enhancement, not forgotten).
+- API (`hosted_env/api/main.py`): new `player_props` field on the game-detail endpoint, same
+  pregame-only + best/worst-across-books logic as game lines, grouped by player+market.
+- PWA: new "Player Props" section in the game drill-down (`player-props.js`).
+- `.github/workflows/player_props_capture.yml`: cron `0 13 * * *` (once daily, 13:00 UTC), now
+  live -- enabled only after a real, forced manual test (one real event, 116 real rows written,
+  verified through self-enforcement check + Postgres sync + local API + a real Playwright
+  render) confirmed the whole path works, per the user's own explicit "test it works first"
+  sequencing.
+
+Real remaining quota at last check: **312 credits** (confirmed via a free `/sports` call). Real
+weekly cost at this scope: ~80 credits/week -- comfortably sustainable, unlike the original ask.
+Full test suite: 10,755 passed, both before and after.
+
+## Consolidated outstanding queue -- all 6 items closed (2026-09-11)
+
+1. **PWA infrastructure + sync (`pwa_infrastructure_and_sync_buildout.md`)**: found ALREADY DONE
+   in an earlier commit the same day (`790c844`) with its own real evidence -- manifest/icons/
+   service worker real and correct, frontend already split into real modules, responsive layout
+   verified at 4 real widths, Postgres sync confirmed recurring hourly, Season Win Totals
+   confirmed a real provider gap (422 INVALID_MARKET, not a wiring bug). One real gap found on
+   re-check: `player-props.js` (shipped later the same day) was missing from `sw.js`'s
+   `SHELL_FILES` cache list -- fixed, cache bumped v3→v5 across this session's file additions.
+2. **Historical/backtest tab (`historical_backtest_view.md`)**: new tab surfacing the real,
+   CORRECTED Phase 1 (2025, 224 games, `v35.0-hfa-raw-estimator-fix`) and Phase 8 (2024, 220
+   games, `v35.0-degraded-ol-2024-secondary-check-hfa-raw-estimator-fix`) model_versions --
+   deliberately those two specifically, not the other superseded runs sitting in the same
+   tables. New one-time backfill (`prediction_audit/sync_historical_to_postgres.py`,
+   deliberately NOT part of the recurring hourly sync since this data is frozen) moved 444 real
+   games/predictions/results into Postgres. Shows **every** real game from these two versions,
+   never a curated subset -- confirmed directly both real hits and real misses exist
+   (129/224 correct 2025, 143/220 correct 2024). New "RECONSTRUCTED" badge in a real third color
+   (teal `#A9C9CC`/`#24363A`), visually distinct from live signal-yellow and pending-slate.
+   Verified live via Playwright: filtered to Seahawks, opened a real miss (Seahawks beat
+   Cardinals as underdogs, 2025 Wk 4) -- correctly tagged "Winner missed," confirming real misses
+   genuinely render, not just hits.
+3. **Team filter (`interface_mockup_home_drilldown.html`)**: ported the mockup's verified
+   autocomplete reference implementation (hidden suggestions until typing, live-highlighted
+   matches, click-to-select, clearable "Showing: X" chip) into production, replacing the prior
+   bare live-substring filter. Adapted to drive the app's real `state.teamFilter` +
+   `renderCurrentView()` rather than the mockup's static DOM show/hide. New `teams.js` holds
+   shared team/abbreviation data (avoids a circular import between `views.js` and the new
+   `historical.js`). Verified live via Playwright.
+4. **Plain sportsbook links**: every book name in both market-lines and player-props sections
+   now links to that book's own real, plain site -- no tracking, no affiliate params
+   (`format.js`'s new `bookUrl`/`bookNameHtml`, all 22 approved real books). Verified live:
+   20 real links rendered correctly on one game's drill-down, correct hrefs.
+5. **Opening/closing line tracking (`alt_providers_and_line_tracking_check.md` Part B)**:
+   re-checked with real, current data (not re-used from when only one capture timestamp
+   existed). **19 distinct real capture timestamps** now exist; **269 real games** have a valid
+   closing-tier row. For the one real, clean completed game (`2026_01_SF_LA`): genuine odds
+   movement confirmed between opening and closing (e.g. FanDuel spread juice −114→−112), and the
+   closing tier's own caveat re-confirmed (the labeled closing capture is genuinely the LAST real
+   capture before kickoff, nothing after). One honest caveat found: `2026_01_NE_SEA` (whose
+   captures predate the CLV post-kickoff-exclusion fix) shows no closing-tier row at all --
+   correct, conservative behavior (the view refuses to mislabel a contaminated last-capture),
+   not a bug.
+6. **Alternative odds provider evaluation (`alt_providers_and_line_tracking_check.md` Part A)**:
+   confirmed closed without further evaluation work -- its own stated trigger condition (player
+   props coming in prohibitively expensive) never fired, since real measured cost came in at
+   ~80 credits/week against 312 remaining.
+
+Full test suite: 10,755 passed. All pushed to `main`, deployed live, and re-verified against the
+live production API/PWA after each deploy -- not just locally.

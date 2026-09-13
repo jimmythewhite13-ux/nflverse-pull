@@ -139,6 +139,12 @@ details.region-group > .not-available-note, details.region-group > .prop-player 
 details.region-group > .market-group:first-of-type { margin-top: 6px; }
 details.region-group details.region-group { margin: 0 10px 8px; }
 .region-count { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: normal; }
+/* Real, dedicated class (prop_type_display_and_td_investigation.md Part A, 2026-09-12) -- the
+   specific market/prop type (e.g. "Anytime TD", "receiving yards") is the second thing a
+   reader needs after the player/matchup name to make sense of a Best Value row, so it gets its
+   own bold, full-brightness label instead of reusing `.region-count`'s small, muted styling
+   (which stays as-is for its own real, separate "N books"/"N lines" count usages elsewhere). */
+.market-type-label { font-size: 13px; font-weight: 700; color: var(--text); }
 #detail {
   position: fixed; inset: 0; background: var(--bg); overflow-y: auto; padding: 16px;
   display: none;

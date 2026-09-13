@@ -63,7 +63,7 @@ function bestValueHtml(bestValue) {
     return `
     <div class="line-row">
       <div class="line-row-main">
-        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.matchup} <span class="region-count">${e.market_type}${headerLineTxt}</span></span>
+        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.matchup} <span class="market-type-label">${e.market_type}${headerLineTxt}</span></span>
         <span class="line-row-odds">${e.gap}</span>
       </div>
       <div class="line-row-movement"><span class="movement">${bookNameHtml(e.best_book)} (${e.best_odds}) currently offers ${e.gap} points better real odds than ${bookNameHtml(e.worst_book)} (${e.worst_odds}) for the exact same real ${betDesc}</span></div>
@@ -85,7 +85,7 @@ function bestPropValueHtml(bestPropValue) {
     return `
     <div class="line-row">
       <div class="line-row-main">
-        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.player_name} <span class="region-count">player prop &middot; ${e.market_label}${lineTxt}</span></span>
+        <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.player_name} <span class="region-count">player prop &middot;</span> <span class="market-type-label">${e.market_label}${lineTxt}</span></span>
         <span class="line-row-odds">${e.gap}</span>
       </div>
       <div class="line-row-movement"><span class="movement">${bookNameHtml(e.best_book)} (${e.best_odds}) currently offers ${e.gap} points better real odds than ${bookNameHtml(e.worst_book)} (${e.worst_odds}) for the exact same real prop${lineTxt} (${e.matchup})</span></div>

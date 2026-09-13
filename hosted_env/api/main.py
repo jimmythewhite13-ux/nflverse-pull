@@ -582,6 +582,27 @@ def _percentile_rank(distribution: list[float], value: float) -> float:
     return round(at_or_below / len(distribution) * 100, 1)
 
 
+def _implied_probability(odds: float) -> float:
+    """Real implied win probability from a real American-odds price."""
+    return 100 / (odds + 100) if odds > 0 else -odds / (-odds + 100)
+
+
+def _implied_prob_gap(best_odds: float, worst_odds: float) -> float:
+    """Real, scale-invariant "how much do these two real books actually disagree" measure, in
+    real implied-probability points -- confirmed live (prop_type_display_and_td_investigation.md,
+    2026-09-12) that ranking by raw American-odds difference is NOT apples-to-apples across
+    market types: player_anytime_td's real raw-odds gap (mean 225.1) dwarfs receiving/rushing
+    yards props (mean 3.4-3.8) purely because TD longshot payouts use much bigger raw numbers,
+    not because books genuinely disagree that much more -- in real probability terms the gap is
+    only ~3x bigger (2.51pp vs 0.48-0.83pp), not ~60x. The SAME real root cause was independently
+    found to already affect the existing game-line Best Value list (moneyline's raw gap mean 83.4
+    vs spread/total's 13.8-20.3, for a real probability-space gap that's only moderately bigger,
+    4.57pp vs 2.82-2.91pp) -- both real rankings now use this shared, scale-fair measure instead.
+    The raw odds gap itself is still what's DISPLAYED (that's the real, literal number a bettor
+    profits from) -- only the cross-market-type RANKING criterion changed."""
+    return abs(_implied_probability(best_odds) - _implied_probability(worst_odds))
+
+
 @app.get("/sports/{sport}/cheatsheet")
 def get_cheatsheet(sport: str, week: int) -> dict:
     """Real, purely observational Cheat Sheet content (cheat_sheet_market_signals_part1.md) --
@@ -750,8 +771,21 @@ def get_cheatsheet(sport: str, week: int) -> dict:
                                 "line_value": best["line_value"], "gap": round(gap, 1),
                             })
 
-        best_value.sort(key=lambda e: e["gap"], reverse=True)
-        best_prop_value.sort(key=lambda e: e["gap"], reverse=True)
+        # Real, deliberate ranking change (prop_type_display_and_td_investigation.md,
+        # 2026-09-12): both lists now rank by real implied-probability disagreement, not raw
+        # odds difference -- see `_implied_prob_gap`'s own docstring for the real, verified
+        # finding this fixes (moneyline/anytime_td naturally use much bigger raw-odds numbers
+        # than spread/total/yardage props, which made them dominate a raw-odds-sorted list
+        # regardless of real market disagreement). The raw `gap` field is unchanged and still
+        # what's displayed -- only the sort criterion changed.
+        best_value.sort(
+            key=lambda e: _implied_prob_gap(float(e["best_odds"]), float(e["worst_odds"])),
+            reverse=True,
+        )
+        best_prop_value.sort(
+            key=lambda e: _implied_prob_gap(float(e["best_odds"]), float(e["worst_odds"])),
+            reverse=True,
+        )
         unusual_movement.sort(key=lambda e: e["percentile"], reverse=True)
         return {
             "best_value": best_value[:10],

@@ -1994,3 +1994,44 @@ Part D (an `is_closeable` flag on NFL's edges/predictions table) is explicitly c
 that file's own Part C (a real query on off-main-line book coverage) and was not started.
 
 Full test suite: 10,755 passed.
+
+## Seventh batch (2026-09-12): Prop-type display prominence + Anytime-TD investigation
+
+prop_type_display_and_td_investigation.md -- Part A/B.
+
+**Real, related finding surfaced while investigating** (not the doc's own direct ask, found by
+checking `pmu_fr`'s real data): across all 27 real games where `pmu_fr` and 3+ other books
+captured the same moneyline, `pmu_fr` favored the home team relative to consensus in 27/27
+games (mean +6.07pp) -- not organic variance (27/27 same direction is a ~1-in-134-million
+coincidence if genuinely random). User's call: document, don't fix -- `pmu_fr` stays as-is.
+
+**Part B real investigation**: pulled the real value-gap distribution across all 5 prop
+markets. In RAW American-odds terms, `player_anytime_td`'s gap (mean 225.1) dwarfed the other
+4 (2.2-54.5) -- but in real, scale-invariant IMPLIED-PROBABILITY terms, the gap was only ~3-5x
+bigger (2.51pp vs 0.48-0.83pp), confirming this was mostly a metric-scale artifact (TD longshot
+payouts naturally use much bigger raw numbers), not a query bug. The identical root cause was
+found to already affect the ALREADY-SHIPPED game-line Best Value list (moneyline raw gap mean
+83.4 vs spread/total's 13.8-20.3, real probability-space gap only moderately bigger at
+4.57pp vs 2.82-2.91pp) -- not asked for, but the same class of issue, reported and fixed
+alongside per user confirmation.
+
+**Real fix**: both `best_value` and `best_prop_value` now rank by real implied-probability gap
+(`_implied_prob_gap` in `hosted_env/api/main.py`) instead of raw odds difference; the raw odds
+gap is still what's displayed (that's the real number a bettor profits from) -- only the
+cross-market-type ranking criterion changed.
+
+**Real, honest result after the fix**: Anytime TD still ranks at the top of Best Prop Value --
+confirmed this is now a GENUINE finding, not an artifact: even in probability-space, TD's top
+individual entries (max 12.86pp) genuinely exceed every other market's top entries (next
+highest: interceptions 6.25pp, reception yards 2.85pp). Also directly confirmed this affects
+star players, not just depth players (Justin Herbert and Justin Jefferson both appear in the
+top Anytime TD entries) -- undercutting "obscure long-shot props are just harder to price" as
+the full explanation.
+
+**Part A**: added a dedicated `.market-type-label` CSS class (bold, full-brightness) instead of
+reusing the small/muted `.region-count` class (left untouched for its own real "N books"/"N
+lines" usages) -- applies to all 5 real prop markets and to game-line market types alike, not
+just Anytime TD. Verified live in the browser: both "moneyline" and "Anytime TD" labels now
+render bold immediately after the matchup/player name.
+
+Full test suite: 10,755 passed.

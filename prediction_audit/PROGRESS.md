@@ -2241,3 +2241,38 @@ game -- can never be exceeded again regardless of future content volume. Verifie
 animation still correctly returns to 0 after the transition settles.
 
 Full test suite: 10,755 passed.
+
+## Fourteenth batch (2026-09-13): Duplicate real book feeds confirmed and deduplicated
+
+Follow-up to a reviewer's flagged concern about the still-open book-bias investigation.
+
+**Real, definitive finding**: `coral`/`ladbrokes_uk` are not two independent real books -- they
+are the same real data feed under two brand names. Checked every real (game, market, timestamp)
+group where both captured a value: **336/336 (100%) byte-identical** line_value AND odds, every
+time -- not correlation, literal duplication. Consistent with `market_lines.py`'s own
+already-documented fact that both share the exact same real corporate parent (LC International
+Ltd, license #54743, post Ladbrokes/Coral merger). Checked whether this generalizes: `ladbrokes_
+au`/`neds` (both Entain Group Pty Ltd) are also 100% identical (112/112). Real, direct contrast
+confirming this isn't a database artifact: genuinely separate real companies (`betclic_fr`/
+`pmu_fr`) show 0% identical across 216 real comparable groups. This fully explains the earlier
+identical +1.64pp bias finding: it was one real book's own modest pricing tendency, counted
+twice.
+
+**Real fix** (explicit go-ahead: deduplicate everywhere, not just document): new
+`canonical_book()`/`DUPLICATE_BOOK_GROUPS` in `market_lines.py` (alongside the real license
+research that already lives there), collapsing a real duplicate pair to one representative name.
+Wired into `resolve_is_closeable_spread` (so a real closing-line consensus isn't inflated by
+counting one real source as two) and the weekly-review book-bias scanner (confirmed live: now
+reports exactly one real finding per duplicate pair instead of two for the same underlying
+signal).
+
+**Also resolved, with evidence, three other flagged concerns**: (1) credential loud-failure
+alerting is already closed (GitHub's built-in email confirmed via a real test and the user's own
+confirmation, 2026-09-12); (2) Phase 9/10 re-derivation was already completed in full on
+2026-09-11 (real, row-by-row re-derivation against the corrected raw-HFA-estimator data --
+selection unchanged, Candidate 2/HFA-A alone, but the underlying reasoning materially changed);
+(3) EPL Part A is complete (built, self-consistency verified, real drift-detection evidence
+generated). All three had been flagged as possibly still-open by a reviewer working from an
+earlier snapshot of this record.
+
+Full test suite: 10,755 passed.

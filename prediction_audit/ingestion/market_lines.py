@@ -71,6 +71,37 @@ APPROVED_BOOKMAKERS = {
     "betclic_fr", "pmu_fr", "tipico_de", "unibet_nl", "unibet_se",
 }
 
+# Real, confirmed duplicate real data feeds (2026-09-13, verified live against this project's
+# own captured data): every real (game, market, timestamp) group where both real books in a
+# pair captured a value showed 100% byte-identical line_value AND odds -- coral/ladbrokes_uk
+# 336/336, ladbrokes_au/neds 112/112. Not a coincidence: both pairs share the exact same real
+# corporate parent/license (see this module's own real license research above -- LC
+# International Ltd #54743 for coral+ladbrokes_uk, Entain Group Pty Ltd for ladbrokes_au+neds),
+# and The Odds API evidently serves the same real underlying price under both consumer-facing
+# brand names. Real, direct contrast confirming this isn't a database artifact: genuinely
+# separate real companies (betclic_fr/pmu_fr, both real French operators) showed 0% identical
+# across 216 real comparable groups. Counting both brand names as independent real books
+# inflates any real "how many distinct books agree" metric (main-line consensus, is_closeable
+# plurality, the weekly-review bias scanner) -- each real group here is ONE real source, not
+# two. `canonical_book()` collapses a real duplicate to one representative name (alphabetically
+# first in the group -- a real, deterministic, arbitrary-but-stable choice); every other real
+# book maps to itself.
+DUPLICATE_BOOK_GROUPS: list[set[str]] = [
+    {"coral", "ladbrokes_uk"},
+    {"neds", "ladbrokes_au"},
+]
+
+
+def canonical_book(sportsbook: str) -> str:
+    """Real, deterministic canonical name for a real book -- see DUPLICATE_BOOK_GROUPS' own
+    docstring for the real evidence this collapses. Used wherever code needs to count "how many
+    DISTINCT real books" agree on something, so a real duplicate feed under two brand names
+    isn't counted twice."""
+    for group in DUPLICATE_BOOK_GROUPS:
+        if sportsbook in group:
+            return min(group)
+    return sportsbook
+
 
 def _load_env_key() -> str:
     # Real CI path first: GitHub Actions injects the real secret as an env var (no .env file

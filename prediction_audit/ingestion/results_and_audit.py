@@ -31,6 +31,7 @@ from nflverse_pull.pull import fetch_schedules  # noqa: E402
 from prediction_audit.db import write  # noqa: E402
 from prediction_audit.db.capture_snapshot import get_active_run  # noqa: E402
 from prediction_audit.ingestion.log import CadenceSkip, run_job  # noqa: E402
+from prediction_audit.ingestion.market_lines import canonical_book  # noqa: E402
 
 SOURCE = "nflverse (nfl_data_py.import_schedules) + raw_market_captures (real, live agent)"
 
@@ -89,10 +90,13 @@ def resolve_is_closeable_spread(conn: sqlite3.Connection, game_id: str) -> bool 
         (game_id,),
     ).fetchall()
     # Real, deliberate de-dup by book (the view can carry one row per real capture, not one per
-    # book, depending on how many real closing-tier snapshots that book had).
+    # book, depending on how many real closing-tier snapshots that book had). Also collapses
+    # known-duplicate real data feeds (canonical_book -- confirmed 2026-09-13: coral/
+    # ladbrokes_uk and neds/ladbrokes_au are the same real underlying price under two brand
+    # names) so a real consensus isn't inflated by counting one real source twice.
     latest_by_book: dict[str, float] = {}
     for sportsbook, line_value in rows:
-        latest_by_book[sportsbook] = line_value
+        latest_by_book[canonical_book(sportsbook)] = line_value
     return _is_closeable_from_lines(latest_by_book)
 
 

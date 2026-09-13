@@ -60,6 +60,7 @@ from prediction_audit.historical.systematic_bias_detection import (  # noqa: E40
     compute_bias_stats,
     fetch_real_predictions_vs_actuals,
 )
+from prediction_audit.ingestion.market_lines import canonical_book  # noqa: E402
 from prediction_audit.ingestion.season import current_nfl_season  # noqa: E402
 
 # Real cutover date the task doc itself specifies (Phase 14's own real prediction-freeze
@@ -114,6 +115,11 @@ def check_market_signal_health(conn) -> list[str]:
         # Real, generalized book-bias scanner -- same real methodology confirmed live this
         # session for pmu_fr (27/27 real games, one direction). Flags ANY book showing a
         # persistent, one-directional real deviation from consensus, not just pmu_fr again.
+        # Real, deliberate `canonical_book()` collapse (2026-09-13): coral/ladbrokes_uk and
+        # neds/ladbrokes_au are confirmed 100% duplicate real data feeds (same real corporate
+        # parent) -- without this, the SAME real underlying price gets counted as two
+        # "different" books both in the real consensus (inflating "others") and as two separate
+        # real findings below for what is genuinely one real signal.
         cur.execute(
             "SELECT game_id, sportsbook, odds, captured_at FROM raw_market_captures "
             "WHERE market_type='moneyline' AND flagged_excluded_source=FALSE "
@@ -121,7 +127,7 @@ def check_market_signal_health(conn) -> list[str]:
         )
         latest_by_game_book: dict[tuple[str, str], float] = {}
         for r in cur.fetchall():
-            key = (r["game_id"], r["sportsbook"])
+            key = (r["game_id"], canonical_book(r["sportsbook"]))
             if key not in latest_by_game_book:
                 latest_by_game_book[key] = float(r["odds"])
         by_game: dict[str, dict[str, float]] = {}

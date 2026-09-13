@@ -1899,3 +1899,52 @@ requiring the same real line_value -- fixed by grouping by line_value first. Thi
 the existing, already-shipped per-game Props view, not just the new Cheat Sheet feature.
 
 Full test suite: 10,755 passed.
+
+## Fifth batch (2026-09-12): Player-prop backtest coverage expansion (more QBs/teams + WR2/WR3)
+
+Explicit user request, direct follow-up to the position/player-level breakdown report: only
+19/32 real teams had any QB backtest coverage (similarly partial RB/WR/TE), traced to a real,
+pre-existing `ValueError` in the shared `resolve_qb_index_history`/`resolve_rb_index_history`/
+`resolve_wr_te_index_history` modules requiring real Y-1/Y-2/Y-3 season history -- silently
+dropping rookies/partial-history starters (confirmed: Atlanta's actual 2025 starter, Michael
+Penix Jr., hit this exact wall). Also extended coverage from WR1/TE1 only to WR1/WR2/WR3/TE1,
+matching the live methodology's own already-documented position scope.
+
+Real fix, decoupling player identification from Base Efficiency: `_qb_starter_as_of_week`/
+`_rb_starter_as_of_week`/`_wr_te_starter_as_of_week` identify the real starter from
+current-season volume alone (dropbacks/carries/targets), never raising for missing prior
+history; `_real_blended_metric` falls back to 100% real current-season weight instead of
+blending toward a fabricated 0.0 prior baseline for a real rookie, returning `None` (never a
+guess) only when zero real data exists at all.
+
+**Two further real bugs found live while building this, both the same root cause** (a
+full-season-calibrated minimum-volume floor silently applied to a partial "as of week N"
+slice): first in role identification (the shared `resolve_*_roles_as_of_week` functions rank
+off `compute_team_season_qb_stats`/`_rb_stats`/`_receiving_stats`'s own qualifying-filtered
+output -- 100 Dropbacks/50 Carries/40 Targets, sensible for a full season, wrong for a partial
+one), then again in Base Efficiency itself (this session's own first `_rb_ypc_by_season`/
+`_wr_te_ypt_by_season` reused those same two functions for their YPC/YPT columns). Both
+symptoms were previously misattributed entirely to the Y-1/Y-2/Y-3 rookie gap. Real fix in both
+places: genuinely threshold-free reimplementations computed directly from real pbp (also
+applied to RB Carry Share's pre-existing, identically-affected version). This also removed the
+module's only real use of NGS rushing/receiving data (dropped as dead weight, not silently left
+in, since Base Efficiency no longer routes through RB Index's/WR-TE Index's composite
+functions).
+
+**Real result** (full 224-game run, re-verified directly against the database after all three
+fixes): 5626 real rows (up from 1174), all 32/32 real teams covered across QB/RB/WR/TE (up from
+19/32 for QB and similarly partial elsewhere) -- Atlanta's Michael Penix Jr. confirmed present
+with 32 real rows. Real MAE: passing_yards 98.34, interceptions 0.69, rushing_yards 30.74 (down
+from 38.8), receiving_yards 25.35 (down from 30.4), receptions 1.84 (down from 2.2). Zero
+uncaught errors across every real game in the run. Synced to Postgres (the existing
+`player_prop_backtest`-specific delete-then-insert sync logic, unaffected by the unrelated
+`predictions_no_delete` immutability rule that applies only to `predictions`/`prediction_runs`).
+
+A real, benign process-management mistake also happened mid-session and is recorded here for
+honesty: an early attempt to background the full run via a nested `nohup ... &` wasn't actually
+killed when it appeared to stall, and kept running concurrently with a second, properly
+launched attempt -- both independently deleted-then-inserted at the end, doubling every row via
+a race. Caught by checking the real row count against the run's own printed total before
+trusting it; fixed by deleting and re-running once, cleanly, with no other process active.
+
+Full test suite: 10,755 passed.

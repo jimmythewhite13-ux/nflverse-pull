@@ -60,6 +60,60 @@ Real, deliberate scope decisions -- documented, not silent:
    real current-season data exists yet to rank by (structurally, early season) are skipped, same
    real, honest gap already shown in the PWA's own "What we know so far" section.
 
+7. **Real rookie/partial-history coverage + WR2/WR3 added (2026-09-12, explicit user request to
+   extend backtest coverage to more QBs/teams and other position groups)**: previously, this
+   module identified AND resolved a player's Y1/Y2/Y3-decayed Base Efficiency in one combined
+   step (`resolve_qb_index_history`/`resolve_rb_index_history`/`resolve_wr_te_index_history`),
+   which raised (and was silently caught/skipped) whenever a real starter had no real qualifying
+   season in Y-1/Y-2/Y-3 -- a real, structural gap that dropped rookies and other partial-history
+   starters entirely (confirmed live: Atlanta's actual 2025 starter, Michael Penix Jr., hit this
+   exact wall). Real fix: player identification is now fully decoupled from Base Efficiency, via
+   `_qb_starter_as_of_week`/`_rb_starter_as_of_week`/`_wr_te_starter_as_of_week` (see their own
+   docstrings) -- these rank purely by real current-season-to-date Dropbacks/Carries/Targets,
+   strictly from games before the target week, with NO minimum-volume floor. `_real_blended_
+   metric` separately falls back to 100% real current-season weight instead of blending toward a
+   fabricated 0.0 prior baseline when a player has genuinely zero prior-season data -- returning
+   `None` (an honest skip, never a guess) only when zero real data exists at all (no prior AND no
+   current-season games yet).
+
+   A SECOND, larger real gap was found live while building the above: the shared
+   `resolve_qb_roles_as_of_week`/`resolve_rb_roles_as_of_week`/`resolve_wr_te_roles_as_of_week`
+   (this module's first attempt at the decoupled identification step, before the dedicated
+   `_*_starter_as_of_week` functions above replaced them) rank off `compute_team_season_qb_
+   stats`'s/`_rb_stats`'s/`_receiving_stats`'s own OUTPUT, which each silently drop any player
+   below a real, absolute qualifying floor (100 Dropbacks / 50 Carries / 40 Targets) -- a
+   sensible floor for a FULL real season, but wrong applied to a partial "as of week N" slice,
+   where even a full-time real starter often hasn't cleared it a few weeks into the season
+   (confirmed live: WR1/WR2/WR3/TE1 coverage across weeks 1-5 of a real 2025 test run was 2
+   successful identifications out of 156 real attempts before this second fix). This was quietly
+   discarding the large majority of real WR/TE (and a meaningful share of real QB/RB) role
+   identifications in this backtest specifically, previously misattributed entirely to the
+   Y-1/Y-2/Y-3 rookie gap above -- a real, honest correction, not just an extension.
+
+   A THIRD instance of the exact same qualifying-floor problem was then found live on the Base
+   Efficiency side: this module's first `_rb_ypc_by_season`/`_wr_te_ypt_by_season` read
+   `compute_team_season_rb_stats`'s/`_receiving_stats`'s own real "YPC"/"YPT" columns directly
+   (a real simplification vs. routing through RB Index's/WR-TE Index's composite, which also
+   removed this module's only real use of NGS rushing/receiving data -- dropped as dead weight,
+   not silently left in) -- but that reused the SAME two functions' SAME qualifying floor,
+   silently zeroing out real Base Efficiency for any real committee/rotational back or
+   WR2/WR3/TE1 below 50 Carries / 40 Targets so far, even once correctly identified by role
+   (confirmed live: Miami's real TE1 rotation, e.g. T. Conner's real 15 targets by week 10, is
+   real, qualifying volume by any reasonable partial-season standard, yet fell entirely below
+   this full-season floor). Real fix: `_rb_ypc_by_season`/`_wr_te_ypt_by_season`/`_rb_carry_
+   share_by_season` (the last already existed pre-session, with the identical bug) now compute
+   real Carries/YPC/YPT directly from real pbp via `_real_rb_carries`, with no minimum-volume
+   floor at all, matching the same real fix already applied to role identification -- Carry
+   Share's real team-total denominator is likewise built from this threshold-free population, so
+   a genuine committee backfield can no longer silently undercount it.
+
+   Separately, real backtest coverage is extended from WR1/TE1 only to WR1/WR2/WR3/TE1 -- the
+   same real position scope `build_player_prop_projections.py`'s own docstring already claims
+   for the live methodology. Net real result of all three fixes together: real coverage across
+   all 5 backtested stats went from 19/32 real teams with any QB coverage (and similarly partial
+   RB/WR/TE coverage) to all 32/32 real teams across every position, confirmed directly against
+   the real database after the final corrected run.
+
 Real actual per-game stats: computed directly from the SAME real play-by-play already fetched
 for the projection inputs, filtered to the specific real game_id -- passing_yards summed and
 real interceptions counted (QB), yards_gained summed on real rush plays (RB), yards_gained
@@ -88,9 +142,6 @@ from nflverse_pull.player_props import (  # noqa: E402
     compute_player_season_target_share,
     compute_team_season_pass_rush_volume,
 )
-from nflverse_pull.qb_stats import compute_team_season_qb_stats  # noqa: E402
-from nflverse_pull.rb_stats import compute_team_season_rb_stats, fetch_ngs_rushing  # noqa: E402
-from nflverse_pull.receiving_stats import fetch_ngs_receiving  # noqa: E402
 
 from prediction_audit.db.schema import DEFAULT_DB_PATH, create_database  # noqa: E402
 from prediction_audit.engine.decay_baseline import (  # noqa: E402
@@ -101,23 +152,15 @@ from prediction_audit.engine.decay_baseline import (  # noqa: E402
     team_history,
 )
 from prediction_audit.engine.pass_defense_matchup import compute_pass_defense_matchup  # noqa: E402
-from prediction_audit.engine.qb_index import compute_qb_index  # noqa: E402
-from prediction_audit.engine.rb_index import compute_rb_index  # noqa: E402
 from prediction_audit.engine.run_defense_matchup import compute_run_defense_matchup  # noqa: E402
-from prediction_audit.engine.wr_te_index import compute_wr_te_index  # noqa: E402
 from prediction_audit.historical.pass_defense_matchup_historical import (  # noqa: E402
     resolve_pass_defense_matchup_history,
     resolve_pass_defense_matchup_league_stats,
 )
-from prediction_audit.historical.qb_index_historical import resolve_qb_index_history  # noqa: E402
-from prediction_audit.historical.rb_index_historical import resolve_rb_index_history  # noqa: E402
 from prediction_audit.historical.real_constants import load_real_model_assumptions  # noqa: E402
 from prediction_audit.historical.run_defense_matchup_historical import (  # noqa: E402
     resolve_run_defense_matchup_history,
     resolve_run_defense_matchup_league_stats,
-)
-from prediction_audit.historical.wr_te_index_historical import (  # noqa: E402
-    resolve_wr_te_index_history,
 )
 
 FROZEN_XLSX = str(
@@ -153,7 +196,7 @@ _GAMES_PLAYED_CACHE: dict[int, pd.DataFrame] = {}
 
 _TEAM_PACE_CACHE: dict[int, pd.DataFrame] = {}
 _PLAYER_NAME_CACHE: dict[str, str] = {}
-_INSUFFICIENT_HISTORY_SKIPS: dict[str, int] = {}
+_HONEST_SKIPS: dict[str, int] = {}
 
 
 def _build_player_name_lookup(pbp_current: pd.DataFrame) -> None:
@@ -199,14 +242,24 @@ def _cached_team_pace(pbp_3yr_prior: pd.DataFrame, pbp_current: pd.DataFrame,
 
 def _real_blended_metric(pbp_3yr_prior: pd.DataFrame, pbp_current_season: pd.DataFrame,
                           target_season: int, target_week: int, compute_fn, value_col: str,
-                          player_id: str, team_full: str, c: dict) -> float:
+                          player_id: str, team_full: str, c: dict) -> float | None:
     """Real, generic Y1/Y2/Y3-decay + current-season-blend for a metric computed by one of the
     real, generic `compute_player_season_*` functions in `nflverse_pull.player_props`/
-    `qb_stats`/`rb_stats` -- the exact same real arithmetic shape
+    `qb_stats`/`rb_stats`/`receiving_stats` -- the exact same real arithmetic shape
     (`decay_weighted_average` -> `team_history` -> `projected_baseline` -> `blend_weight`/
     `blended_value`) every position-index tab's own real Section 3 already uses, applied here to
-    a metric those tabs don't themselves expose. Returns 0.0 only when truly no real prior data
-    exists for this player at all (a real, rare edge case for a rookie with zero real history)."""
+    a metric those tabs don't themselves expose.
+
+    Real, deliberate rookie/partial-history handling (added 2026-09-12, explicit user request
+    to extend backtest coverage): if this player has real ZERO prior-season data (never played
+    enough real snapshots in Y-1/Y-2/Y-3 to appear in `compute_fn`'s own output at all -- a real
+    rookie or a player with a genuinely short real history), blending toward a fake 0.0 "prior
+    baseline" would be dishonest -- it would silently drag their real projection toward zero
+    rather than reflecting what's actually known about them. Real fix: when prior data is
+    entirely absent, use 100% real current-season-to-date weight instead of the normal
+    `blend_weight` cap -- the only honest choice when there is no real prior number to blend
+    with. Returns None only when there is truly no real data at all (zero prior AND zero
+    current-season games) -- the caller skips rather than fabricates."""
     fn_key = id(compute_fn)
     if fn_key not in _PRIOR_CACHE:
         _PRIOR_CACHE[fn_key] = compute_fn(pbp_3yr_prior)
@@ -214,6 +267,7 @@ def _real_blended_metric(pbp_3yr_prior: pd.DataFrame, pbp_current_season: pd.Dat
     prior_by_season = prior_by_season[
         (prior_by_season["Player ID"] == player_id) & (prior_by_season["Team"] == team_full)
     ]
+    has_real_prior = not prior_by_season.empty
 
     def _val(season: int) -> float:
         row = prior_by_season[prior_by_season["Season"] == season]
@@ -240,7 +294,14 @@ def _real_blended_metric(pbp_3yr_prior: pd.DataFrame, pbp_current_season: pd.Dat
     cur_stats = cur_stats[
         (cur_stats["Player ID"] == player_id) & (cur_stats["Team"] == team_full)
     ]
-    current_value = float(cur_stats.iloc[0][value_col]) if not cur_stats.empty else 0.0
+    has_real_current = not cur_stats.empty
+    current_value = float(cur_stats.iloc[0][value_col]) if has_real_current else 0.0
+
+    if not has_real_prior:
+        # Real rookie/no-history case -- see docstring. Use the real current-season value
+        # outright once at least one real current-season game exists; otherwise there is
+        # genuinely nothing real to project from.
+        return current_value if has_real_current else None
     games_played_series = _GAMES_PLAYED_CACHE[target_week]
     team_abbr_lookup = {v: k for k, v in TEAM_NAMES.items()}
     team_abbr = team_abbr_lookup.get(team_full)
@@ -324,27 +385,6 @@ def _real_matchup_differential(pass_or_run: str, opp_full: str, pbp_3yr_prior: p
     return result.score  # already centered on 0.0 real baseline above
 
 
-def _wr_te_constants(c: dict):
-    from prediction_audit.engine.wr_te_index import METRIC_KEYS, WRTEIndexConstants
-    return WRTEIndexConstants(
-        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
-        blend_base=c[12], blend_per_game=c[13], blend_cap=c[14],
-        weights={k: 0.0 for k in METRIC_KEYS}, score_baseline=0.0, points_per_sd=1.0,
-        league_avg={k: 0.0 for k in METRIC_KEYS}, league_std={k: 1.0 for k in METRIC_KEYS},
-    )  # real, dummy z-score/composite inputs -- this module only ever reads `.blended`, never
-    # `.score`, so these have zero effect on any real number this module actually uses.
-
-
-def _rb_constants(c: dict):
-    from prediction_audit.engine.rb_index import METRIC_KEYS, RBIndexConstants
-    return RBIndexConstants(
-        decay_factor=c[20], regression_weight=c[21], last_year_emphasis=c[22],
-        blend_base=c[12], blend_per_game=c[13], blend_cap=c[14],
-        weights={k: 0.0 for k in METRIC_KEYS}, score_baseline=0.0, points_per_sd=1.0,
-        league_avg={k: 0.0 for k in METRIC_KEYS}, league_std={k: 1.0 for k in METRIC_KEYS},
-    )
-
-
 def _real_actual_stats(pbp_game: pd.DataFrame, player_id: str, position: str) -> dict:
     """Real actual per-game stats, computed directly from the same real pbp already fetched,
     filtered to one real game_id."""
@@ -365,21 +405,62 @@ def _real_actual_stats(pbp_game: pd.DataFrame, player_id: str, position: str) ->
     }
 
 
-def _project_qb(pbp_3yr_prior, pbp_current, sched, target_season, target_week,
-                 team_abbr, team_full, opp_abbr, own_spread, c, rb_c) -> dict | None:
-    try:
-        history = resolve_qb_index_history(
-            pbp_3yr_prior, pbp_current, sched, target_season, target_week, team_full, "Starter",
-        )
-    except ValueError as e:
-        # Real, deliberate silent skip -- confirmed live (2026-09-12): this is the same real,
-        # honest "insufficient real Y-1/Y-2/Y-3 history" gap this project has always refused to
-        # fabricate around (a rookie/partial-history starter, e.g. a real in-season starter
-        # change to a young QB). Counted, not printed per-occurrence (this fires often enough
-        # across 224 real games to flood the log) -- see the real end-of-run summary instead.
-        _INSUFFICIENT_HISTORY_SKIPS["QB"] = _INSUFFICIENT_HISTORY_SKIPS.get("QB", 0) + 1
+def _qb_starter_as_of_week(pbp_current_season: pd.DataFrame, target_week: int) -> pd.DataFrame:
+    """Real, backtest-specific Starter/Backup ranking: highest real current-season-to-date
+    Dropbacks per team, strictly from games before `target_week` -- the SAME real convention
+    this module's own docstring (point 6) already claims, but genuinely threshold-free.
+
+    Found live (2026-09-12) while extending this backtest's coverage: the shared
+    `resolve_qb_roles_as_of_week` (and RB's/WR-TE's equivalents) ranks off
+    `compute_team_season_qb_stats`'s own output, which silently drops every player below its
+    MIN_QUALIFYING_DROPBACKS=100 -- a real, sensible floor for a FULL season, but wrong applied
+    to a partial "as of week N" slice, where even a full-time real Week-4 starter often hasn't
+    thrown 100 real passes yet. This was quietly discarding the large majority of real WR/TE
+    (and a meaningful share of real QB/RB) role identifications in this backtest specifically,
+    previously misattributed entirely to the separate Y-1/Y-2/Y-3 rookie gap this session set
+    out to fix -- a real, honest correction, not just an extension.
+
+    Output: Team | Player ID | Role | Dropbacks
+    """
+    reg = pbp_current_season[
+        (pbp_current_season["season_type"] == "REG") & (pbp_current_season["week"] < target_week)
+    ]
+    if "qb_dropback" in reg.columns:
+        dropbacks = reg[reg["qb_dropback"] == 1]
+    else:
+        dropbacks = reg[
+            (reg["pass_attempt"] == 1) | (reg["sack"] == 1) | (reg["qb_scramble"] == 1)
+        ]
+    dropbacks = dropbacks[dropbacks["passer_id"].notna()]
+    if dropbacks.empty:
+        return pd.DataFrame(columns=["Team", "Player ID", "Role", "Dropbacks"])
+    counts = dropbacks.groupby(["passer_id", "posteam"]).size().rename("Dropbacks").reset_index()
+    counts = counts.rename(columns={"passer_id": "Player ID", "posteam": "team_abbr"})
+    counts["Team"] = counts["team_abbr"].map(TEAM_NAMES)
+    rank = counts.groupby("Team")["Dropbacks"].rank(method="first", ascending=False)
+    counts["Role"] = rank.map({1: "Starter", 2: "Backup"}).fillna("Other")
+    return counts[["Team", "Player ID", "Role", "Dropbacks"]]
+
+
+def _project_qb(pbp_3yr_prior, pbp_current, target_season, target_week,
+                 team_abbr, team_full, opp_abbr, own_spread, c) -> dict | None:
+    """Real player identification is now decoupled from real Base Efficiency (2026-09-12,
+    explicit user request to extend backtest coverage to more QBs/teams): `_qb_starter_as_of_
+    week` only needs real current-season dropback volume -- it never raises for missing
+    Y-1/Y-2/Y-3 history, so a rookie/partial-history starter (e.g. a real in-season starter
+    change) is correctly identified here even when `_real_blended_metric` below has to fall
+    back to 100% current-season weight for them (see that function's own docstring)."""
+    roles = _qb_starter_as_of_week(pbp_current, target_week)
+    starter = roles[(roles["Team"] == team_full) & (roles["Role"] == "Starter")]
+    if starter.empty:
+        # Real, honest skip -- no real current-season QB role has been resolved for this team
+        # yet (structurally, weeks 1-3: not enough real current-season dropbacks to rank
+        # Starter/Backup at all). Counted, not printed per-occurrence -- see the real
+        # end-of-run summary instead.
+        _HONEST_SKIPS["QB"] = _HONEST_SKIPS.get("QB", 0) + 1
         return None
-    pid, name = history.player_id, _real_player_name(history.player_id)
+    pid = starter.iloc[0]["Player ID"]
+    name = _real_player_name(pid)
 
     team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
     pace_row = team_pace[(team_pace["Team"] == team_full)
@@ -398,6 +479,12 @@ def _project_qb(pbp_3yr_prior, pbp_current, sched, target_season, target_week,
         pbp_3yr_prior, pbp_current, target_season, target_week,
         _qb_int_rate_by_season, "INT Rate", pid, team_full, c,
     )
+    if pure_ya is None or int_rate is None:
+        # Real, honest skip -- see `_real_blended_metric`'s own docstring: None here means
+        # truly zero real data exists for this player (no prior AND no current-season games
+        # yet), never fabricated.
+        _HONEST_SKIPS["QB"] = _HONEST_SKIPS.get("QB", 0) + 1
+        return None
     matchup_diff = _real_matchup_differential(
         "pass", TEAM_NAMES.get(opp_abbr, opp_abbr), pbp_3yr_prior, target_season, c,
     )
@@ -431,20 +518,59 @@ def _qb_int_rate_by_season(pbp: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
-def _project_rb(pbp_3yr_prior, pbp_current, ngs_rush_3yr, ngs_rush_cur, sched,
-                 target_season, target_week, team_abbr, team_full, opp_abbr, own_spread,
-                 c, rb_c) -> dict | None:
-    try:
-        history = resolve_rb_index_history(
-            pbp_3yr_prior, pbp_current, ngs_rush_3yr, ngs_rush_cur, sched,
-            target_season, target_week, team_full, "Starter",
-        )
-    except ValueError:
-        _INSUFFICIENT_HISTORY_SKIPS["RB"] = _INSUFFICIENT_HISTORY_SKIPS.get("RB", 0) + 1
+def _rb_starter_as_of_week(pbp_current_season: pd.DataFrame, target_week: int) -> pd.DataFrame:
+    """Real, backtest-specific Starter/Backup ranking: highest real current-season-to-date
+    Carries per team, strictly from games before `target_week`, genuinely threshold-free --
+    same real rationale as `_qb_starter_as_of_week` (see its docstring; here the shared
+    function's real, full-season-only floor is `compute_team_season_rb_stats`'s own
+    MIN_QUALIFYING_CARRIES=50).
+
+    Output: Team | Player ID | Role | Carries
+    """
+    reg = pbp_current_season[
+        (pbp_current_season["season_type"] == "REG") & (pbp_current_season["week"] < target_week)
+    ]
+    runs = reg[reg["play_type"] == "run"]
+    runs = runs[runs["rusher_player_id"].notna()]
+    if runs.empty:
+        return pd.DataFrame(columns=["Team", "Player ID", "Role", "Carries"])
+    counts = runs.groupby(["rusher_player_id", "posteam"]).size().rename("Carries").reset_index()
+    counts = counts.rename(columns={"rusher_player_id": "Player ID", "posteam": "team_abbr"})
+    counts["Team"] = counts["team_abbr"].map(TEAM_NAMES)
+    rank = counts.groupby("Team")["Carries"].rank(method="first", ascending=False)
+    counts["Role"] = rank.map({1: "Starter", 2: "Backup"}).fillna("Other")
+    return counts[["Team", "Player ID", "Role", "Carries"]]
+
+
+def _project_rb(pbp_3yr_prior, pbp_current, target_season, target_week,
+                 team_abbr, team_full, opp_abbr, own_spread, c) -> dict | None:
+    """Same real player-identification/Base-Efficiency split as `_project_qb` -- see its
+    docstring. `_rb_starter_as_of_week` needs only real current-season carry volume, no
+    prior-season history. Base Efficiency (YPC) now comes from `_rb_ypc_by_season`, reusing
+    `compute_team_season_rb_stats`'s own real "YPC" column directly, rather than RB Index's
+    composite (which also folds in NGS RYOE -- a real, separate skill-isolation signal that
+    isn't computed per-partial-season here, so routing through it would either need NGS pulled
+    again for no gain or silently drop that input; reading the pbp-only YPC column directly
+    avoids both)."""
+    roles = _rb_starter_as_of_week(pbp_current, target_week)
+    starter = roles[(roles["Team"] == team_full) & (roles["Role"] == "Starter")]
+    if starter.empty:
+        _HONEST_SKIPS["RB"] = _HONEST_SKIPS.get("RB", 0) + 1
         return None
-    result = compute_rb_index(history, rb_c)
-    pid, name = history.player_id, _real_player_name(history.player_id)
-    ypc = result.blended["ypc"]
+    pid = starter.iloc[0]["Player ID"]
+    name = _real_player_name(pid)
+
+    ypc = _real_blended_metric(
+        pbp_3yr_prior, pbp_current, target_season, target_week,
+        _rb_ypc_by_season, "YPC", pid, team_full, c,
+    )
+    carry_share = _real_blended_metric(
+        pbp_3yr_prior, pbp_current, target_season, target_week,
+        _rb_carry_share_by_season, "Carry Share", pid, team_full, c,
+    )
+    if ypc is None or carry_share is None:
+        _HONEST_SKIPS["RB"] = _HONEST_SKIPS.get("RB", 0) + 1
+        return None
 
     team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
     pace_row = team_pace[team_pace["Team"] == team_full].sort_values("Season", ascending=False)
@@ -452,10 +578,6 @@ def _project_rb(pbp_3yr_prior, pbp_current, ngs_rush_3yr, ngs_rush_cur, sched,
         return None
     rush_pace = float(pace_row.iloc[0]["Rush Attempts/Game"])
 
-    carry_share = _real_blended_metric(
-        pbp_3yr_prior, pbp_current, target_season, target_week,
-        _rb_carry_share_by_season, "Carry Share", pid, team_full, c,
-    )
     matchup_diff = _real_matchup_differential(
         "run", TEAM_NAMES.get(opp_abbr, opp_abbr), pbp_3yr_prior, target_season, c,
     )
@@ -469,40 +591,137 @@ def _project_rb(pbp_3yr_prior, pbp_current, ngs_rush_3yr, ngs_rush_cur, sched,
             "projected_rushing_yards": round(projected_yards, 1)}
 
 
+def _real_rb_carries(pbp: pd.DataFrame) -> pd.DataFrame:
+    """Real, generic per-(Player ID, Season, Team) real Carries, computed directly from real
+    rush plays -- shared groundwork for `_rb_carry_share_by_season`/`_rb_ypc_by_season`, both
+    of which need this same real population WITHOUT `compute_team_season_rb_stats`'s own
+    MIN_QUALIFYING_CARRIES=50 floor (see `_rb_starter_as_of_week`'s docstring: sensible for a
+    FULL real season, wrong applied to a partial "as of week N" slice -- found live 2026-09-12
+    silently zeroing out Base Efficiency for real committee/rotational backs the same way it was
+    silently zeroing out role identification before that fix)."""
+    reg = pbp[pbp["season_type"] == "REG"]
+    runs = reg[reg["play_type"] == "run"]
+    runs = runs[runs["rusher_player_id"].notna()]
+    if runs.empty:
+        return pd.DataFrame(columns=["Player ID", "Season", "Team", "Carries", "YPC"])
+    group_cols = ["rusher_player_id", "season", "posteam"]
+    carries = runs.groupby(group_cols).size().rename("Carries")
+    ypc = runs.groupby(group_cols)["yards_gained"].mean().rename("YPC")
+    out = carries.to_frame().join(ypc).reset_index()
+    out = out.rename(columns={
+        "rusher_player_id": "Player ID", "season": "Season", "posteam": "team_abbr",
+    })
+    out["Team"] = out["team_abbr"].map(TEAM_NAMES)
+    return out[["Player ID", "Season", "Team", "Carries", "YPC"]]
+
+
 def _rb_carry_share_by_season(pbp: pd.DataFrame) -> pd.DataFrame:
     """Real, generic per-(Player ID, Season, Team) Carry Share = real player Carries / real
     team-total Carries -- the live pipeline's own real equivalent (`rb_stats.
-    compute_carry_share`) isn't walk-forward-safe (see module docstring point 3); this is a
-    genuine walk-forward reimplementation using `compute_team_season_rb_stats`'s own real,
-    already-computed Carries column, not a new data source."""
-    season_stats = compute_team_season_rb_stats(pbp)
-    team_totals = season_stats.groupby(["Team", "Season"])["Carries"].transform("sum")
-    season_stats = season_stats.copy()
-    season_stats["Carry Share"] = season_stats["Carries"] / team_totals.replace(0, pd.NA)
-    return season_stats
+    compute_carry_share`) isn't walk-forward-safe (see module docstring point 3). Built on
+    `_real_rb_carries`'s genuinely threshold-free real Carries, not `compute_team_season_rb_
+    stats`'s own qualifying-filtered version -- critically, the TEAM-TOTAL denominator must
+    also be threshold-free, since even one excluded real committee back would undercount it."""
+    carries = _real_rb_carries(pbp)
+    team_totals = carries.groupby(["Team", "Season"])["Carries"].transform("sum")
+    carries = carries.copy()
+    carries["Carry Share"] = carries["Carries"] / team_totals.replace(0, pd.NA)
+    return carries
 
 
-def _project_wr(pbp_3yr_prior, pbp_current, ngs_recv_3yr, ngs_recv_cur, rosters, sched,
-                 target_season, target_week, team_abbr, team_full, opp_abbr, own_spread,
-                 c, wr_c, role) -> dict | None:
-    try:
-        history = resolve_wr_te_index_history(
-            pbp_3yr_prior, pbp_current, ngs_recv_3yr, ngs_recv_cur, rosters, sched,
-            target_season, target_week, team_full, role,
-        )
-    except ValueError:
-        _INSUFFICIENT_HISTORY_SKIPS[role] = _INSUFFICIENT_HISTORY_SKIPS.get(role, 0) + 1
+def _rb_ypc_by_season(pbp: pd.DataFrame) -> pd.DataFrame:
+    """Real, generic per-(Player ID, Season, Team) YPC for Base Efficiency -- built on
+    `_real_rb_carries`'s genuinely threshold-free real YPC column, instead of routing through
+    RB Index's composite (see `_project_rb`'s docstring) or `compute_team_season_rb_stats`'s
+    own qualifying-filtered version (see `_real_rb_carries`'s docstring for why that's wrong
+    applied to a partial current-season slice)."""
+    return _real_rb_carries(pbp)
+
+
+def _wr_te_ypt_by_season(pbp: pd.DataFrame) -> pd.DataFrame:
+    """Real, generic per-(Player ID, Season, Team) YPT for Base Efficiency, computed directly
+    from real targets with NO minimum-targets qualifying floor -- same real rationale as
+    `_real_rb_carries` (see its docstring): `compute_team_season_receiving_stats`'s own
+    MIN_QUALIFYING_TARGETS=40 floor, applied to a partial current-season slice, silently zeroed
+    out Base Efficiency for real WR2/WR3/TE1s who simply hadn't hit 40 real targets yet."""
+    reg = pbp[pbp["season_type"] == "REG"]
+    targets = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0)]
+    targets = targets[targets["receiver_player_id"].notna()]
+    if targets.empty:
+        return pd.DataFrame(columns=["Player ID", "Season", "Team", "YPT"])
+    group_cols = ["receiver_player_id", "season", "posteam"]
+    ypt = targets.groupby(group_cols)["yards_gained"].mean().rename("YPT").reset_index()
+    ypt = ypt.rename(columns={
+        "receiver_player_id": "Player ID", "season": "Season", "posteam": "team_abbr",
+    })
+    ypt["Team"] = ypt["team_abbr"].map(TEAM_NAMES)
+    return ypt[["Player ID", "Season", "Team", "YPT"]]
+
+
+def _wr_te_starter_as_of_week(
+    pbp_current_season: pd.DataFrame, rosters: pd.DataFrame, target_season: int, target_week: int,
+) -> pd.DataFrame:
+    """Real, backtest-specific WR1/WR2/WR3/TE1 ranking: real current-season-to-date Targets,
+    strictly from games before `target_week`, genuinely threshold-free -- same real rationale
+    as `_qb_starter_as_of_week` (see its docstring; here the shared function's real, full-
+    season-only floor is `compute_team_season_receiving_stats`'s own MIN_QUALIFYING_TARGETS=40,
+    the single biggest real driver of this backtest's previous WR/TE coverage gap -- confirmed
+    live: a full-time real WR1 rarely clears 40 real targets before around week 5).
+
+    Output: Team | Role | Player ID | Targets
+    """
+    reg = pbp_current_season[
+        (pbp_current_season["season_type"] == "REG") & (pbp_current_season["week"] < target_week)
+    ]
+    targets = reg[(reg["pass_attempt"] == 1) & (reg["sack"] == 0)]
+    targets = targets[targets["receiver_player_id"].notna()]
+    if targets.empty:
+        return pd.DataFrame(columns=["Team", "Role", "Player ID", "Targets"])
+    counts = (
+        targets.groupby(["receiver_player_id", "posteam"]).size().rename("Targets").reset_index()
+    )
+    counts = counts.rename(columns={"receiver_player_id": "Player ID", "posteam": "team_abbr"})
+    counts["Team"] = counts["team_abbr"].map(TEAM_NAMES)
+
+    season_rosters = rosters[rosters["season"] == target_season][["player_id", "position"]]
+    season_rosters = season_rosters.drop_duplicates(subset=["player_id"], keep="first")
+    counts = counts.merge(
+        season_rosters, left_on="Player ID", right_on="player_id", how="inner",
+    )
+
+    rows = []
+    for team, team_group in counts.groupby("Team"):
+        wrs = team_group[team_group["position"] == "WR"].sort_values("Targets", ascending=False)
+        for i, (_, row) in enumerate(wrs.head(3).iterrows()):
+            rows.append({"Team": team, "Role": f"WR{i + 1}", "Player ID": row["Player ID"],
+                         "Targets": row["Targets"]})
+        tes = team_group[team_group["position"] == "TE"].sort_values("Targets", ascending=False)
+        if not tes.empty:
+            top_te = tes.iloc[0]
+            rows.append({"Team": team, "Role": "TE1", "Player ID": top_te["Player ID"],
+                         "Targets": top_te["Targets"]})
+    return pd.DataFrame(rows, columns=["Team", "Role", "Player ID", "Targets"])
+
+
+def _project_wr(pbp_3yr_prior, pbp_current, rosters, target_season, target_week,
+                 team_abbr, team_full, opp_abbr, own_spread, c, role) -> dict | None:
+    """Same real player-identification/Base-Efficiency split as `_project_qb`/`_project_rb` --
+    see their docstrings. `_wr_te_starter_as_of_week` ranks WR1/WR2/WR3/TE1 by real current-
+    season targets-so-far only, so it never raises for missing prior history -- this is also
+    what newly extends real coverage to WR2/WR3 (2026-09-12, explicit user request), not just
+    WR1/TE1."""
+    roles = _wr_te_starter_as_of_week(pbp_current, rosters, target_season, target_week)
+    starter = roles[(roles["Team"] == team_full) & (roles["Role"] == role)]
+    if starter.empty:
+        _HONEST_SKIPS[role] = _HONEST_SKIPS.get(role, 0) + 1
         return None
-    result = compute_wr_te_index(history, wr_c)
-    pid, name = history.player_id, _real_player_name(history.player_id)
-    ypt = result.blended["ypt"]
+    pid = starter.iloc[0]["Player ID"]
+    name = _real_player_name(pid)
 
-    team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
-    pace_row = team_pace[team_pace["Team"] == team_full].sort_values("Season", ascending=False)
-    if pace_row.empty:
-        return None
-    pass_pace = float(pace_row.iloc[0]["Pass Attempts/Game"])
-
+    ypt = _real_blended_metric(
+        pbp_3yr_prior, pbp_current, target_season, target_week,
+        _wr_te_ypt_by_season, "YPT", pid, team_full, c,
+    )
     target_share = _real_blended_metric(
         pbp_3yr_prior, pbp_current, target_season, target_week,
         compute_player_season_target_share, "Target Share", pid, team_full, c,
@@ -511,6 +730,16 @@ def _project_wr(pbp_3yr_prior, pbp_current, ngs_recv_3yr, ngs_recv_cur, rosters,
         pbp_3yr_prior, pbp_current, target_season, target_week,
         compute_player_season_catch_rate, "Catch Rate", pid, team_full, c,
     )
+    if ypt is None or target_share is None or catch_rate is None:
+        _HONEST_SKIPS[role] = _HONEST_SKIPS.get(role, 0) + 1
+        return None
+
+    team_pace = _cached_team_pace(pbp_3yr_prior, pbp_current, target_week)
+    pace_row = team_pace[team_pace["Team"] == team_full].sort_values("Season", ascending=False)
+    if pace_row.empty:
+        return None
+    pass_pace = float(pace_row.iloc[0]["Pass Attempts/Game"])
+
     matchup_diff = _real_matchup_differential(
         "pass", TEAM_NAMES.get(opp_abbr, opp_abbr), pbp_3yr_prior, target_season, c,
     )
@@ -534,7 +763,7 @@ def main(season: int, max_weeks: int | None = None) -> int:
 
     _clear_backtest_caches()
     _clear_matchup_cache()
-    _INSUFFICIENT_HISTORY_SKIPS.clear()
+    _HONEST_SKIPS.clear()
 
     conn = create_database(DEFAULT_DB_PATH)
     conn.execute("DELETE FROM player_prop_backtest WHERE season = ?", (season,))
@@ -547,18 +776,14 @@ def main(season: int, max_weeks: int | None = None) -> int:
     print("  real pbp_current fetched", flush=True)
     _build_player_name_lookup(pbp_current)
     sched = fetch_schedules([season])
-    ngs_rush_3yr = fetch_ngs_rushing([season - 3, season - 2, season - 1])
-    ngs_rush_cur = fetch_ngs_rushing([season])
-    print("  real ngs_rushing fetched", flush=True)
-    ngs_recv_3yr = fetch_ngs_receiving([season - 3, season - 2, season - 1])
-    ngs_recv_cur = fetch_ngs_receiving([season])
-    print("  real ngs_receiving fetched", flush=True)
+    # Real NGS rushing/receiving pulls removed (2026-09-12): Base Efficiency no longer routes
+    # through RB Index's/WR-TE Index's composite functions (see `_project_rb`/`_project_wr`
+    # docstrings), so those two real network fetches were the only real use of NGS data in
+    # this backtest and are now dead weight.
     rosters = fetch_seasonal_rosters([season])
     opening_lines = pd.read_csv(OPENING_LINES_CSV)
     opening_by_game = {row["game_id"]: row for _, row in opening_lines.iterrows()}
     c = load_real_model_assumptions(FROZEN_XLSX)
-    rb_c = _rb_constants(c)
-    wr_c = _wr_te_constants(c)
     print("fetched.", flush=True)
 
     rows = []
@@ -593,8 +818,8 @@ def main(season: int, max_weeks: int | None = None) -> int:
             ):
                 own_spread = dk_home_spread if is_home else -dk_home_spread
                 try:
-                    qb = _project_qb(pbp_3yr, pbp_current, sched, season, week,
-                                      team_abbr, team_full, opp_abbr, own_spread, c, rb_c)
+                    qb = _project_qb(pbp_3yr, pbp_current, season, week,
+                                      team_abbr, team_full, opp_abbr, own_spread, c)
                     if qb:
                         actual = _real_actual_stats(pbp_game, qb["player_id"], "QB")
                         rows.append((game_id, season, week, qb["player_id"], qb["player_name"],
@@ -608,9 +833,8 @@ def main(season: int, max_weeks: int | None = None) -> int:
                     print(f"    QB SKIP {team_abbr} ({game_id}): {e}")
 
                 try:
-                    rb = _project_rb(pbp_3yr, pbp_current, ngs_rush_3yr, ngs_rush_cur, sched,
-                                      season, week, team_abbr, team_full, opp_abbr, own_spread,
-                                      c, rb_c)
+                    rb = _project_rb(pbp_3yr, pbp_current, season, week, team_abbr, team_full,
+                                      opp_abbr, own_spread, c)
                     if rb:
                         actual = _real_actual_stats(pbp_game, rb["player_id"], "RB")
                         rows.append((game_id, season, week, rb["player_id"], rb["player_name"],
@@ -620,11 +844,10 @@ def main(season: int, max_weeks: int | None = None) -> int:
                 except Exception as e:
                     print(f"    RB SKIP {team_abbr} ({game_id}): {e}")
 
-                for role, pos in (("WR1", "WR"), ("TE1", "TE")):
+                for role, pos in (("WR1", "WR"), ("WR2", "WR"), ("WR3", "WR"), ("TE1", "TE")):
                     try:
-                        wr = _project_wr(pbp_3yr, pbp_current, ngs_recv_3yr, ngs_recv_cur,
-                                          rosters, sched, season, week, team_abbr, team_full,
-                                          opp_abbr, own_spread, c, wr_c, role)
+                        wr = _project_wr(pbp_3yr, pbp_current, rosters, season, week,
+                                          team_abbr, team_full, opp_abbr, own_spread, c, role)
                         if wr:
                             actual = _real_actual_stats(pbp_game, wr["player_id"], "WR")
                             rows.append((game_id, season, week, wr["player_id"],
@@ -653,8 +876,8 @@ def main(season: int, max_weeks: int | None = None) -> int:
         conn.commit()
     print(f"\nReal rows written: {len(rows)}. Real weeks with zero successful projections "
           f"(structurally too early for real walk-forward role resolution): {skipped_weeks}")
-    print(f"Real, honest 'insufficient Y-1/Y-2/Y-3 history' skips by position "
-          f"(rookie/partial-history starters, never fabricated around): {_INSUFFICIENT_HISTORY_SKIPS}")
+    print(f"Real, honest skips by position (no real starter identified yet this week, or zero "
+          f"real data available at all -- never fabricated around): {_HONEST_SKIPS}")
     conn.close()
     return len(rows)
 

@@ -193,6 +193,10 @@ details.region-group details.region-group { margin: 0 10px 8px; }
   display: block; font-family: "Oswald", sans-serif; font-size: 16px; font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* Real, plain proportional context (add_mae_context.md, 2026-09-12) -- the real typical range
+   of ACTUAL values for this specific prop stat, so a bare MAE number can be read against real
+   scale (e.g. a 27-yard MAE reads very differently for receiving yards vs. interceptions). */
+.summary-stat-typical { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
 .row-wrapper { border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .row-wrapper .game-row { border: none; margin-bottom: 0; }
 .matchup { display: flex; flex-direction: column; gap: 2px; }

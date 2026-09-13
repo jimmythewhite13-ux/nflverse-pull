@@ -21,6 +21,17 @@ const _STAT_LABELS = {
   receiving_yards: "Receiving Yards", receptions: "Receptions",
 };
 
+// Real, plain-language explainer (add_mae_context.md, 2026-09-12 explicit user request) --
+// wraps any "MAE" text in a native <abbr> so every real occurrence gets the same real,
+// hover-visible explanation, no separate tooltip library needed.
+const _MAE_EXPLAINER = "Mean Absolute Error — the average size of the model's miss, "
+  + "treating over- and under-predictions the same way. Lower is better.";
+function _maeAbbr(label) {
+  return label.replace(
+    /MAE/g, `<abbr title="${_MAE_EXPLAINER}" style="text-decoration-style:dotted;cursor:help">MAE</abbr>`,
+  );
+}
+
 // Real aggregate prop-backtest MAE per stat type (historical_player_prop_backtest.md) -- shown
 // alongside the game-level headline stats above, same "real distribution before any one
 // example" purpose. Renders nothing (not an empty error) when the backtest hasn't been run yet
@@ -31,11 +42,12 @@ function propSummaryHtml(propSummary) {
     <div class="summary-stat">
       <span class="summary-stat-label">${_STAT_LABELS[s.stat_type] || s.stat_type}</span>
       <span class="summary-stat-value">${s.mae}</span>
+      <span class="summary-stat-typical">typical real range: ${s.typical.low}–${s.typical.high} (mean ${s.typical.mean})</span>
     </div>
   `).join("");
   return `
     <div class="summary-card">
-      <div class="summary-season">Player Prop Backtest <span class="summary-n">(real MAE, walk-forward-safe replay of Player Prop Projections' own methodology)</span></div>
+      <div class="summary-season">Player Prop Backtest <span class="summary-n">(${_maeAbbr("real MAE")}, walk-forward-safe replay of Player Prop Projections' own methodology)</span></div>
       <div class="summary-stats" style="grid-template-columns:repeat(${propSummary.length},1fr)">${tiles}</div>
     </div>
   `;
@@ -71,8 +83,8 @@ function summaryHtml(summary) {
     <div class="summary-card">
       <div class="summary-season">${s.season} Season <span class="summary-n">(${s.n_games} real games)</span></div>
       <div class="summary-stats">
-        <div class="summary-stat"><span class="summary-stat-label">Margin MAE</span><span class="summary-stat-value">${s.margin_mae}</span></div>
-        <div class="summary-stat"><span class="summary-stat-label">Total MAE</span><span class="summary-stat-value">${s.total_mae}</span></div>
+        <div class="summary-stat"><span class="summary-stat-label">${_maeAbbr("Margin MAE")}</span><span class="summary-stat-value">${s.margin_mae}</span></div>
+        <div class="summary-stat"><span class="summary-stat-label">${_maeAbbr("Total MAE")}</span><span class="summary-stat-value">${s.total_mae}</span></div>
         <div class="summary-stat"><span class="summary-stat-label">Winner Acc.</span><span class="summary-stat-value">${s.winner_accuracy}%</span></div>
         <div class="summary-stat"><span class="summary-stat-label">Brier</span><span class="summary-stat-value">${s.brier}</span></div>
       </div>

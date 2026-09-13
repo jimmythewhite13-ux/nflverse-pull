@@ -2035,3 +2035,25 @@ just Anytime TD. Verified live in the browser: both "moneyline" and "Anytime TD"
 render bold immediately after the matchup/player name.
 
 Full test suite: 10,755 passed.
+
+## Eighth batch (2026-09-12): MAE plain-language explainer + real typical-range context
+
+add_mae_context.md. Added a native `<abbr title="...">MAE</abbr>` (dotted-underline, hover
+explainer: "Mean Absolute Error -- the average size of the model's miss, treating over- and
+under-predictions the same way. Lower is better.") wherever "MAE" text appears -- Margin MAE,
+Total MAE, and the Player Prop Backtest section header.
+
+For the Player Prop Backtest section specifically: each stat's real MAE now shows alongside its
+real typical range (p25-p75 of every real ACTUAL value already in the backtest dataset, plus
+mean -- a robust "typical" reading, not distorted by one real outlier game), computed directly
+from the same real rows the MAE itself is computed from, no new data source or assumed/estimated
+figures. Real result, letting a viewer judge proportional tightness directly: interceptions MAE
+0.69 vs typical range 0-1 (MAE alone spans most of the real range); passing yards MAE 98.34 vs
+typical 95-257; receiving yards MAE 25.35 vs typical 2-55; receptions MAE 1.84 vs typical 1-4;
+rushing yards MAE 30.74 vs typical 28-82. No recommendation language anywhere -- purely the real
+numbers side by side, no computed comparative sentence.
+
+Verified live in the browser (real computed-style check, not just a screenshot -- confirmed all
+5 stat tiles render the typical-range line with identical display/visibility/height).
+
+Full test suite: 10,755 passed.

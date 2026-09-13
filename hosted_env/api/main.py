@@ -996,15 +996,36 @@ def get_historical(sport: str) -> dict:
         prop_rows = cur.fetchall()
         props_by_game: dict[str, list[dict]] = {}
         mae_by_stat: dict[str, list[float]] = {}
+        # Real typical-range context (add_mae_context.md, 2026-09-12 explicit user request) --
+        # real ACTUAL values already fetched above, no new data source: lets a viewer judge
+        # whether a stat's real MAE is proportionally tight or loose for that specific stat
+        # (e.g. a 27-yard real MAE means something very different for receiving yards than for
+        # interceptions), rather than reading a bare number with no real sense of scale.
+        actual_by_stat: dict[str, list[float]] = {}
         for pr in prop_rows:
             error = round(abs(float(pr["projected_value"]) - float(pr["actual_value"])), 1)
             pr["error"] = error
             props_by_game.setdefault(pr["game_id"], []).append(pr)
             mae_by_stat.setdefault(pr["stat_type"], []).append(error)
+            actual_by_stat.setdefault(pr["stat_type"], []).append(float(pr["actual_value"]))
         for r in rows:
             r["player_props"] = props_by_game.get(r["game_id"], [])
+
+        def _real_typical_range(values: list[float]) -> dict:
+            # Real, robust "typical range" -- the middle 50% (p25-p75) of every real ACTUAL
+            # value observed in this backtest for this stat, not the full min-max span (which a
+            # single real outlier game -- a pick-six, a blowout garbage-time TD -- would distort
+            # for a "typical" reading) and not assumed/estimated from general knowledge.
+            s = sorted(values)
+            n = len(s)
+            lo = s[int(0.25 * (n - 1))]
+            hi = s[int(0.75 * (n - 1))]
+            return {"low": round(lo, 1), "high": round(hi, 1),
+                    "mean": round(sum(values) / n, 1)}
+
         prop_summary = [
-            {"stat_type": stat, "mae": round(sum(errs) / len(errs), 2), "n": len(errs)}
+            {"stat_type": stat, "mae": round(sum(errs) / len(errs), 2), "n": len(errs),
+             "typical": _real_typical_range(actual_by_stat[stat])}
             for stat, errs in sorted(mae_by_stat.items())
         ]
 

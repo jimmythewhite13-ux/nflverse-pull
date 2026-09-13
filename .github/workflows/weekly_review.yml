@@ -1,0 +1,46 @@
+name: Weekly review (real Tuesday-morning check)
+
+# weekly_review_automation.md, 2026-09-12 explicit user request. Tuesday, not any other day:
+# Monday Night Football is the last real game of any NFL week, so by Tuesday morning the full
+# week's real results exist -- this gives the maximum real runway (Tuesday through Wednesday,
+# into Thursday) to review and act on anything found before the next week's Thursday opener.
+#
+# Real, deliberate scope boundary, enforced structurally: this job has no write path to any
+# table and calls no ingestion/freeze script -- prediction_audit/ingestion/weekly_review.py only
+# ever reads and prints. Per Phase 14's standing governance: flags real findings for human
+# review, never adjusts anything itself. `contents: read` (not `write`) below is not a courtesy
+# -- it is the real, structural thing that would stop this job's own future author from adding
+# an autonomous write action here without deliberately changing this permission first.
+on:
+  schedule:
+    - cron: '0 15 * * 2'  # Tuesday, 15:00 UTC (~8am Pacific) -- adjust if this timing doesn't
+                            # leave enough buffer after real Monday-night games conclude
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  weekly-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Real, dated output goes to this run's own GITHUB_STEP_SUMMARY -- preserved on the
+      # Actions page for every real run, never a repo-committed file (no write path at all,
+      # matching the "flags, does not adjust" boundary above).
+      - name: Run real weekly review
+        env:
+          DATABASE_URL: ${{ secrets.NFLVERSE_DB_PULL }}
+        run: uv run python -m prediction_audit.ingestion.weekly_review >> "$GITHUB_STEP_SUMMARY"

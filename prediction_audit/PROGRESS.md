@@ -2057,3 +2057,59 @@ Verified live in the browser (real computed-style check, not just a screenshot -
 5 stat tiles render the typical-range line with identical display/visibility/height).
 
 Full test suite: 10,755 passed.
+
+## Ninth batch (2026-09-12): Systematic bias detection -- real baseline
+
+systematic_bias_detection.md. New `prediction_audit/historical/systematic_bias_detection.py`
+computes the real SIGNED mean error (predicted minus actual, not absolute) for margin and total,
+across Phase 1 (2025, 224 games) and Phase 8 (2024, 220 games), reusing the EXACT SAME real
+query `hosted_env/api/main.py`'s `get_historical()` already uses (including its own real
+DISTINCT ON duplicate-run dedup) so these numbers always stay consistent with what the live
+Historical tab shows. Real one-sample z-test (scipy isn't a real dependency of this project;
+a proper t-test at n=220-224 is statistically indistinguishable from a z-test -- t-critical at
+df=219 is 1.971 vs the normal's 1.960, implemented directly against stdlib `math.erf`).
+Verified the math against known synthetic cases (a true signal correctly comes back
+significant, pure noise correctly does not) before trusting it on the real data.
+
+**Real, honest result**: both seasons show a small real lean (2024: margin +1.031, total
+-0.773; 2025: margin +0.631, total +0.721), but NEITHER reaches real statistical significance
+(p=0.48/0.25 for margin, p=0.41/0.38 for total) -- exactly the doc's own anticipated legitimate
+outcome, not padded into a false finding. Margin's small lean points the same real direction
+both seasons; total's flips direction between seasons.
+
+Built `compute_bias_stats()` as a reusable, generic function (not a one-off print script)
+specifically so `weekly_review_automation.md`'s future recurring check can call it directly
+against the growing real 2026 sample once live predictions exist (starting Sept 29) -- the
+weekly-recurring half of this task genuinely can't be exercised yet since no real 2026
+predictions exist (confirmed live: the site itself says "No model currently marked
+PRODUCTION"), matching the doc's own stated timeline, not skipped by oversight.
+
+Full test suite: 10,755 passed.
+
+## Tenth batch (2026-09-13): Weekly review automation
+
+weekly_review_automation.md -- new `.github/workflows/weekly_review.yml` (Tuesday 15:00 UTC,
+per the doc's own real Monday-Night-Football-runway reasoning) running new
+`prediction_audit/ingestion/weekly_review.py`. Real, structural governance boundary (not just a
+comment): the job has `permissions: contents: read`, not `write` -- the script has no write path
+to any table and calls no ingestion/freeze script, per Phase 14's standing "flags, never adjusts"
+governance the doc itself restates.
+
+Real checks, run every week until 2026-09-29: (1) Cheat Sheet/market-signal health -- capture
+freshness plus a real, GENERALIZED one-directional-book-bias scanner (the exact real methodology
+that found `pmu_fr`'s 27/27-game home bias this session, built as a reusable check instead of a
+one-off). Run live against the real database, this immediately surfaced TWO further real,
+previously-unknown findings: `coral` and `ladbrokes_uk` each favor the home team in 14/14 real
+games (identical mean +1.64pp for both -- plausibly the same underlying odds feed, a real,
+factual observation, not confirmed further). (2) Confirms `systematic_bias_detection.
+compute_bias_stats` still imports and runs cleanly against the real 2024/2025 baseline. (3)
+Confirms the real DB tables/modules a live 2026 prediction will need exist and import cleanly --
+run live, all 6 required tables and all 3 required modules check out OK. Starting 2026-09-29,
+additionally recomputes the real signed-bias test and real margin/total MAE/winner-accuracy/
+Brier for the current live season's PRODUCTION predictions (honestly reports "none exist yet"
+until then, never fabricated).
+
+Real, dated output goes to each run's own `$GITHUB_STEP_SUMMARY` -- no new repo-committed file,
+matching the real no-autonomous-action boundary.
+
+Full test suite: 10,755 passed.

@@ -1948,3 +1948,49 @@ a race. Caught by checking the real row count against the run's own printed tota
 trusting it; fixed by deleting and re-running once, cleanly, with no other process active.
 
 Full test suite: 10,755 passed.
+
+## Sixth batch (2026-09-12): Key-number weighting for Cheat Sheet movement significance
+
+key_number_weighting.md -- checked this project's own real data first (6,967 real NFL REG
+games, 1999-2025, matching the exact sample size of the external study the doc cited) rather
+than importing commonly-cited "key number" lists as fact.
+
+**Real findings**: only margins 3 (3.26x local baseline), 7 (1.66x), and 14 (1.65x) show a
+genuine spike above the natural decay of the margin distribution -- the commonly-cited 6, 4,
+and 1 do NOT (0.5x-1.1x, just riding the decay curve). Totals show a real but much weaker
+effect (only 51 spikes, 1.63x); directly reproduced the doc's cited external finding that
+multiples of 7 land ~49% less often than the local average, while multiples of 3 show only a
+mild ~10% shortfall. Moneyline: checked real captured odds (9,579 rows) for price-band
+volatility clustering -- median movement is 0.00pp in every band (only 25 real capture
+timestamps exist so far), so per the doc's own explicit instruction, no moneyline feature was
+built.
+
+**Implementation**: `prediction_audit/historical/build_key_number_weights.py` computes real
+per-integer probability mass for margins/totals from nflverse schedule data and writes a static
+`hosted_env/api/key_number_weights.json` (that service has no nfl_data_py dependency). The
+Cheat Sheet's percentile-based "unusual movement" flag (`_real_movement_distribution` +
+`get_cheatsheet` in `hosted_env/api/main.py`) now ranks by real probability mass swept by a
+move, via continuous weights rather than a hardcoded key-number list -- lets the real
+distribution speak for itself without an arbitrary "is this a key number" cutoff. Handles a
+real home-signed spread pick'em crossing and a real flat-integer push-boundary case (11.6% of
+real captured lines are exact integers) correctly, verified directly against reasoned test
+cases.
+
+**Real bug found and fixed while verifying this live**: with real capture history still this
+sparse, a literal 0.0 movement could rank above the 90th percentile purely because so much of
+the reference distribution is also exactly 0.0 -- fixed with an explicit "never flag a truly
+unmoved line" guard.
+
+**Real, concrete evidence** (required by the doc, not just a claim): 2026_01_ARI_LAC and
+2026_01_CHI_CAR each show an identical 1.0-point raw movement, but ARI_LAC's move (crossing
+real margins 9 and 10, 7.22% combined real probability) correctly ranks higher (98.1th
+percentile) than CHI_CAR's (crossing only total=47, 3.19%, 93.5th percentile) -- confirmed live
+against the real deployed Postgres data.
+
+**Still outstanding**: the doc's "Part D" reference turned out to point to a separate file,
+`apply_epl_findings.md`, which is not present anywhere in this repo or the user's Downloads
+folder (only its own real, separate EPL/soccer project files are). Asked the user to resend it;
+Part D (an `is_closeable` flag on NFL's edges/predictions table) is explicitly conditional on
+that file's own Part C (a real query on off-main-line book coverage) and was not started.
+
+Full test suite: 10,755 passed.

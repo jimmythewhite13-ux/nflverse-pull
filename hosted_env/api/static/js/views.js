@@ -97,15 +97,19 @@ function bestPropValueHtml(bestPropValue) {
 
 function unusualMovementHtml(unusualMovement, n) {
   if (!unusualMovement.length) {
-    return `<div class="empty">No real game this week has moved further than 90% of the ${n} real, measured movements captured so far.</div>`;
+    return `<div class="empty">No real game this week ranks more significant than 90% of the ${n} real, measured movements captured so far.</div>`;
   }
+  // Real, deliberate wording (key_number_weighting.md, 2026-09-12): "more significant than"
+  // rather than "moved further than" -- ranking now weighs whether a move crosses a real,
+  // historically common margin/total (e.g. a spread crossing 3), not just raw point size, so
+  // a smaller move can rank above a larger one that crosses nothing of real historical note.
   const rows = unusualMovement.map(e => `
     <div class="line-row">
       <div class="line-row-main">
         <span onclick="openDetail('${e.game_id}')" style="cursor:pointer">${e.matchup}</span>
         <span class="line-row-odds">${e.movement}pt move</span>
       </div>
-      <div class="line-row-movement"><span class="movement major">This line has moved further than ${e.percentile}% of the ${n} real book/market movements captured so far this season</span></div>
+      <div class="line-row-movement"><span class="movement major">This move is more significant than ${e.percentile}% of the ${n} real book/market movements captured so far this season (weighted by which real historical margins/totals it crosses)</span></div>
     </div>
   `).join("");
   return `<div class="market-group">${rows}</div>`;

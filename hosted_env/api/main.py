@@ -16,6 +16,8 @@ Usage (Render): see requirements.txt + this repo's Render Web Service start comm
 """
 from __future__ import annotations
 
+import json
+import math
 import os
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +30,63 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+# Real, empirical per-integer probability mass for NFL margins/totals (key_number_weighting.md,
+# 2026-09-12) -- built offline by prediction_audit/historical/build_key_number_weights.py from
+# real nflverse schedule data (6,967 real REG-season games, 1999-2025), NOT a hardcoded list of
+# commonly-cited "key numbers." Checked into the repo as a small, static JSON file (same
+# deployment-independence reasoning as `_TEAM_FULL_NAMES` above -- this service has no
+# nfl_data_py dependency, see requirements.txt) and loaded once at import time.
+_KEY_NUMBER_WEIGHTS_PATH = Path(__file__).resolve().parent / "key_number_weights.json"
+with open(_KEY_NUMBER_WEIGHTS_PATH) as _f:
+    _KEY_NUMBER_WEIGHTS = json.load(_f)
+_MARGIN_WEIGHTS: dict[int, float] = {
+    int(k): v for k, v in _KEY_NUMBER_WEIGHTS["margin_weights"].items()
+}
+_TOTAL_WEIGHTS: dict[int, float] = {
+    int(k): v for k, v in _KEY_NUMBER_WEIGHTS["total_weights"].items()
+}
+
+
+def _key_number_weighted_movement(market_type: str, v1: float, v2: float) -> float:
+    """Real, continuous "significance" of a real line move from `v1` to `v2` -- the sum of the
+    real historical probability mass of every whole-number margin/total strictly between them,
+    per key_number_weighting.md's explicit finding (verified against this project's own real
+    data, not assumed): a move that sweeps across a real, historically common outcome (e.g. an
+    NFL spread crossing 3, which happens in 15% of real games) is genuinely more significant
+    than an equal-sized move that doesn't, and this should be reflected in what counts as
+    "unusual" -- not just raw point size.
+
+    For `market_type == "spread"`, `v1`/`v2` are the real HOME-team-signed spread values (see
+    market_lines.py's own real home-team-only capture convention) -- crossed integers are
+    looked up by their real ABSOLUTE margin (a home spread moving from -1.5 to +2.5 correctly
+    sweeps real margins 1, 0, and 2, i.e. it crosses through a real pick'em). For "total", `v1`/
+    `v2` are already real, unsigned point totals. Any other market_type (e.g. moneyline -- see
+    key_number_weighting.md Part C's own real, honest finding of no analogous pattern) returns
+    0.0: never fabricate a weighting scheme for a market this project's own real investigation
+    found no real evidence for."""
+    if v1 is None or v2 is None or market_type not in ("spread", "total") or v1 == v2:
+        return 0.0
+    lo, hi = (v1, v2) if v1 <= v2 else (v2, v1)
+    weights = _MARGIN_WEIGHTS if market_type == "spread" else _TOTAL_WEIGHTS
+    # Real, deliberate INCLUSIVE range (`ceil(lo)` to `floor(hi)`, not strictly-between):
+    # confirmed live (2026-09-12) that 11.6% of this project's real captured spread/total
+    # values are exact, flat integers (no ".5") -- a move landing exactly ON one of those, e.g.
+    # -4.0 -> -3.0, genuinely changes real cover status for BOTH margin=4 (real push -> real
+    # win) and margin=3 (real loss -> real push), so both real endpoints must be included, not
+    # just what's strictly between them. Deduplicated by real absolute margin (a `set`, not a
+    # running sum) -- the weight table only stores the COMBINED real probability of a margin in
+    # EITHER direction (e.g. p(3) = P(home wins by 3) + P(home loses by 3)), so a spread move
+    # that sweeps through a real pick'em crossing on both the +1 and -1 side would otherwise
+    # double-count that single combined real probability. Real, deliberate, documented
+    # simplification: this slightly UNDERcounts a rare double-sided pick'em sweep rather than
+    # fabricate a separate signed (home-win vs home-loss) probability table this project has no
+    # real, direct evidence calls for -- honest under-count, never an invented over-count.
+    crossed = {
+        abs(m) if market_type == "spread" else m
+        for m in range(math.ceil(lo), math.floor(hi) + 1)
+    }
+    return sum(weights.get(k, 0.0) for k in crossed)
 
 # Real, deliberate LOCAL copy (not imported from `nflverse_pull.pull.TEAM_NAMES`) --
 # `hosted_env/api/requirements.txt` is intentionally minimal (fastapi/uvicorn/psycopg only) for
@@ -475,13 +534,19 @@ def list_games(sport: str, week: int | None = None) -> list[dict]:
 
 def _real_movement_distribution(conn) -> list[float]:
     """Real, evidence-based reference distribution for cheat_sheet_market_signals_part1.md's
-    percentile-based "unusual movement" flag -- every real, MEASURED |line_movement| across
-    every real captured game/book/market so far (not scoped to one week -- the whole real
-    history is the fairest real reference sample this project actually has). Deliberately NOT
-    further conditioned on "similar point in the capture window": with real capture history
-    still this early, sub-segmenting by days-to-kickoff would leave most segments with too few
-    real points to mean anything -- an honest, documented simplification, not a silent
-    deviation from the task's own suggestion."""
+    percentile-based "unusual movement" flag -- every real, key-number-WEIGHTED movement (see
+    `_key_number_weighted_movement`) across every real captured game/book/market so far (not
+    scoped to one week -- the whole real history is the fairest real reference sample this
+    project actually has). Deliberately NOT further conditioned on "similar point in the
+    capture window": with real capture history still this early, sub-segmenting by
+    days-to-kickoff would leave most segments with too few real points to mean anything -- an
+    honest, documented simplification, not a silent deviation from the task's own suggestion.
+
+    Real, deliberate change (key_number_weighting.md, 2026-09-12): this used to rank by raw
+    |line_movement| in points. Now ranks by real historical probability mass swept, so a move
+    across a real, historically common margin/total (e.g. a spread crossing 3, ~15% of real
+    games) correctly registers as more significant than an equal-sized move that crosses
+    nothing of real historical note -- per that task's own verified real finding, not assumed."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT game_id, sportsbook, market_type, line_value, captured_at, kickoff_time "
@@ -494,7 +559,7 @@ def _real_movement_distribution(conn) -> list[float]:
     for r in rows:
         by_group.setdefault((r["game_id"], r["sportsbook"], r["market_type"]), []).append(r)
     movements = []
-    for group in by_group.values():
+    for (_, _, market_type), group in by_group.items():
         pregame = [r for r in group
                    if r["kickoff_time"] is None or r["captured_at"] < r["kickoff_time"]]
         if len(pregame) < 2:
@@ -502,7 +567,9 @@ def _real_movement_distribution(conn) -> list[float]:
         opening, current = pregame[0], pregame[-1]
         if opening["line_value"] is None or current["line_value"] is None:
             continue
-        movements.append(abs(float(current["line_value"]) - float(opening["line_value"])))
+        movements.append(_key_number_weighted_movement(
+            market_type, float(opening["line_value"]), float(current["line_value"]),
+        ))
     return sorted(movements)
 
 
@@ -624,19 +691,39 @@ def get_cheatsheet(sport: str, week: int) -> dict:
                             "gap": round(gap, 1),
                         })
 
-            # Real, percentile-based unusual movement -- the game's own largest real MEASURED
-            # movement, ranked against the real distribution above.
-            max_move = max(
-                (abs(e["line_movement"]) for e in signals
-                 if e.get("movement_status") == "MEASURED" and e.get("line_movement") is not None),
-                default=None,
-            )
-            if max_move is not None:
-                percentile = _percentile_rank(distribution, max_move)
+            # Real, percentile-based unusual movement -- the game's own most SIGNIFICANT real
+            # MEASURED movement, ranked against the real distribution above. Real, deliberate
+            # change (key_number_weighting.md, 2026-09-12): "most significant" now means
+            # largest real key-number-weighted movement, not largest raw point movement -- a
+            # 1-point spread move that crosses 3 (a real, historically common margin) is more
+            # significant than a 2-point move that crosses nothing of real historical note, per
+            # that task's own verified finding. The raw point size is still shown (`movement`
+            # below) for honest, literal context; only the RANKING criterion changed.
+            measured = [e for e in signals
+                        if e.get("movement_status") == "MEASURED"
+                        and e.get("opening_line_value") is not None
+                        and e.get("line_value") is not None]
+            best_entry, best_weight = None, -1.0
+            for e in measured:
+                weight = _key_number_weighted_movement(
+                    e["market_type"], float(e["opening_line_value"]), float(e["line_value"]),
+                )
+                if weight > best_weight:
+                    best_entry, best_weight = e, weight
+            # Real, honest guard (found live while verifying this task's own change,
+            # 2026-09-12): with real capture history still this sparse, a large real share of
+            # the reference distribution is itself exactly 0.0 (no crossing at all) -- which
+            # can push `_percentile_rank`'s "at or below" definition for a literal 0.0
+            # observation above the 90% threshold on its own. A real, unmoved line is never
+            # "unusual movement" by definition, regardless of where 0.0 happens to rank in a
+            # distribution this young; excluded here rather than shown misleadingly.
+            if best_entry is not None and best_weight > 0:
+                percentile = _percentile_rank(distribution, best_weight)
                 if percentile >= 90:
                     unusual_movement.append({
                         "game_id": g["game_id"], "matchup": matchup,
-                        "movement": round(max_move, 1), "percentile": percentile,
+                        "movement": round(abs(best_entry["line_movement"]), 1),
+                        "percentile": percentile,
                     })
 
             # Real player-prop best-value -- same real signal computation the per-game Props

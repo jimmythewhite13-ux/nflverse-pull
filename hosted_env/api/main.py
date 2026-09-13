@@ -133,6 +133,23 @@ def _fix_kickoff_tz(value: datetime | None) -> str | None:
     return real_eastern.astimezone(_UTC).isoformat()
 
 
+# Real, confirmed finding (2026-09-13, checked live against this project's own captured data,
+# not assumed): across all 27 real games where `pmu_fr` and 3+ other real books captured the
+# same moneyline, `pmu_fr` favored the home team relative to consensus in 27/27 games (mean
+# +6.07pp) -- not organic cross-book variance (independent real noise would scatter both
+# directions across 27 games; a uniform 27/27 skew is a real, systematic characteristic of this
+# specific book's own pricing, not a genuine two-way market inefficiency). `pmu_fr` is a real,
+# ANJ-licensed French operator (see market_lines.py's own APPROVED_BOOKMAKERS verification) --
+# this is NOT an "unapproved/untrustworthy source" problem (that's what `flagged_excluded_
+# source`/`approved_sportsbooks` already governs), so blanket-excluding it there would also
+# silently remove its real data from movement tracking and other contexts this specific bias
+# doesn't distort. Real, targeted fix instead: excluded ONLY from being selected as best/worst
+# in a cross-book VALUE comparison (where a book's own consistent bias would otherwise be
+# mistaken for a genuine price discrepancy) -- its real quote still displays normally
+# everywhere else (the per-game market-signal breakdown, line-movement tracking, etc.).
+_EXCLUDED_FROM_VALUE_COMPARISON = {"pmu_fr"}
+
+
 # Real, deliberately market-observational only -- see market_signal_features.md's own explicit
 # boundary: never "this is undervalued" or "bet this side," only factual statements about what
 # the real, current market is doing. `raw_market_captures.kickoff_time` (unlike the separate,
@@ -238,7 +255,12 @@ def _compute_market_signals(rows: list[dict]) -> list[dict]:
     # market_lines.py's own real, explicit home/Over-only filter) -- never fabricating a
     # two-sided comparison this data doesn't honestly support.
     for mtype, entries in latest_by_type.items():
-        comparable = [e for e in entries if e["line_value"] is not None or e["odds"] is not None]
+        comparable = [
+            e for e in entries if e["line_value"] is not None or e["odds"] is not None
+        ]
+        comparable = [
+            e for e in comparable if e["sportsbook"] not in _EXCLUDED_FROM_VALUE_COMPARISON
+        ]
         if len(comparable) < 2:
             continue
         # Real, deliberate two-key sort -- the line NUMBER matters most (a real bettor cares
@@ -326,6 +348,9 @@ def _compute_player_prop_signals(rows: list[dict], home_abbr: str, away_abbr: st
             if e["over_odds"] is not None:
                 by_line.setdefault(e["line_value"], []).append(e)
         for comparable in by_line.values():
+            comparable = [
+                e for e in comparable if e["sportsbook"] not in _EXCLUDED_FROM_VALUE_COMPARISON
+            ]
             if len(comparable) < 2:
                 continue
             best = max(comparable, key=lambda e: e["over_odds"])
@@ -372,6 +397,9 @@ def _compute_team_total_signals(rows: list[dict], home_abbr: str, away_abbr: str
     # different teams in the game, which are two genuinely different real numbers.
     for entries in latest_by_team.values():
         comparable = [e for e in entries if e["over_odds"] is not None]
+        comparable = [
+            e for e in comparable if e["sportsbook"] not in _EXCLUDED_FROM_VALUE_COMPARISON
+        ]
         if len(comparable) < 2:
             continue
         best = max(comparable, key=lambda e: e["over_odds"])

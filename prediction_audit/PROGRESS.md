@@ -2113,3 +2113,23 @@ Real, dated output goes to each run's own `$GITHUB_STEP_SUMMARY` -- no new repo-
 matching the real no-autonomous-action boundary.
 
 Full test suite: 10,755 passed.
+
+## Eleventh batch (2026-09-13): pmu_fr excluded from Best Value comparisons
+
+Follow-up, user revised the earlier "document, don't fix" call to "actually please fix" once
+the weekly-review scanner (above) confirmed the pattern was real and persistent. `pmu_fr` is a
+real, ANJ-licensed French operator (not an "unapproved source" -- that's what `flagged_excluded_
+source`/`approved_sportsbooks` already governs, and blanket-excluding it there would also
+silently drop its real data from movement tracking and other contexts this specific bias
+doesn't distort). Real, targeted fix instead: new `_EXCLUDED_FROM_VALUE_COMPARISON` set, applied
+in all three cross-book best/worst comparison functions (`_compute_market_signals`,
+`_compute_player_prop_signals`, `_compute_team_total_signals`) -- `pmu_fr` can no longer be
+selected as best or worst in a value comparison, but its real quote still displays normally
+everywhere else. Verified live: confirmed 0 appearances in Best Value's best/worst books.
+
+Real, related finding surfaced by this fix, reported not acted on (user's explicit call): with
+`pmu_fr` gone, `coral` now surfaces more often as "worst" -- the same weekly-review scanner
+already flagged `coral`/`ladbrokes_uk` as showing the identical pattern class, just smaller
+(+1.64pp vs pmu_fr's +6.07pp). Left as-is per explicit user decision, not silently expanded.
+
+Full test suite: 10,755 passed.

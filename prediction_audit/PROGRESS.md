@@ -2209,3 +2209,35 @@ difference -- a real property of this particular perturbation, not a gap in the 
 and both raw scores still caught it cleanly).
 
 Full test suite: 10,755 passed.
+
+## Thirteenth batch (2026-09-13): Full coverage audit + drill-down cutoff fix
+
+full_coverage_audit_request.md -- comprehensive live re-verification, not re-read from prior
+reports. Part 1 (system health): Odds API key, Postgres, all 7 GitHub Actions workflows (real
+log content pulled, not just badges), and Render all confirmed healthy live. Part 2 (re-verify
+"done" claims): unapproved-sportsbook DB rejection re-tested live (still correctly rejected);
+`pmu_fr` exclusion confirmed live in production; Week 1-3/Week 4 caveat banners confirmed
+correct and distinct; Historical aggregate stats confirmed matching. Part 3: consolidated every
+open item's real current status, including catching two STALE PROGRESS.md notes that read as
+still-open but are actually already closed (1H markets/team totals was built and shipped after
+an earlier "not built" note; the historical player-prop backtest was substantially rebuilt this
+session) -- and one genuinely still-open item newly named (systematic book-bias investigation:
+whether `coral`/`ladbrokes_uk`'s identical +1.64pp bias shares a common odds feed, not yet
+investigated). Part 4: independent from-scratch recomputation of 2025/2024 Historical MAE --
+2025 matched exactly; 2024's total_mae initially differed by 0.01, investigated (not dismissed),
+and traced to the live code's real two-step rounding (per-game round to 0.1, then average, then
+round to 0.01) -- confirmed reproducible exactly once methodology matched, not a data bug.
+
+**One real, confirmed regression found and reported per the audit's own instruction (flag, don't
+fix silently in the same pass)**: the Historical tab's drill-down used a fixed `max-height:
+400px` (`.drilldown.open` in app.css) with `overflow: hidden` on the parent -- confirmed live on
+a real game with substantial player-prop content (Ravens @ Chiefs, 22 real prop rows): real
+content needed 1288px, 888px (69%) was silently clipped with no way to scroll to it. Fixed
+(explicit go-ahead given) in `historical.js`'s `toggleHistorical()`: sets a real, per-game
+inline `max-height` from `scrollHeight` (the true content height, correctly measurable even
+while still clipped) at open time, instead of trusting one fixed number to cover every real
+game -- can never be exceeded again regardless of future content volume. Verified live:
+`clientHeight` now exactly equals `scrollHeight` (1288px, fully visible), and the collapse
+animation still correctly returns to 0 after the transition settles.
+
+Full test suite: 10,755 passed.

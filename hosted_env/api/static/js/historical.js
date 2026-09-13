@@ -209,13 +209,27 @@ export async function renderHistoricalView() {
   renderRows(cachedGames);
 }
 
+// Real, fixed bug (found live during a real audit, 2026-09-13): a fixed `max-height: 400px`
+// (see .drilldown.open in app.css) silently clipped any real game whose drilldown content
+// actually needed more room -- confirmed directly on a real game with substantial player-prop
+// content (Ravens @ Chiefs, real 22 prop rows): real content needed 1288px, 888px (69%) was
+// hidden with no way to scroll to it. Real fix: set the real, ACTUAL content height
+// (`scrollHeight`, which correctly measures the true height even while still clipped by
+// `overflow: hidden`) as an inline style at open time, instead of trusting one fixed real
+// number to cover every real game's content -- this can never be exceeded again regardless of
+// how much real content a future game has. The CSS class's own `max-height: 400px` stays as an
+// honest fallback only (never actually used once JS runs), not deleted outright.
 export function toggleHistorical(rowEl, idx) {
   const drop = document.getElementById(`hist-drilldown-${idx}`);
   const isOpen = drop.classList.contains("open");
-  document.querySelectorAll("#historical-view .drilldown.open").forEach(d => d.classList.remove("open"));
+  document.querySelectorAll("#historical-view .drilldown.open").forEach(d => {
+    d.classList.remove("open");
+    d.style.maxHeight = "";
+  });
   document.querySelectorAll("#historical-view .game-row.expanded").forEach(r => r.classList.remove("expanded"));
   if (!isOpen) {
     drop.classList.add("open");
+    drop.style.maxHeight = `${drop.scrollHeight}px`;
     rowEl.classList.add("expanded");
   }
 }

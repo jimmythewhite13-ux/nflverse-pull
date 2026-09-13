@@ -209,6 +209,11 @@ details.region-group details.region-group { margin: 0 10px 8px; }
   color: var(--historical); background: var(--historical-bg); white-space: nowrap;
 }
 .drilldown { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; background: var(--bg); }
+/* Real, honest fallback ONLY (2026-09-13 fix) -- `toggleHistorical()` in historical.js sets a
+   real, per-game inline max-height (`scrollHeight`) that overrides this at open time, since a
+   real game's content can exceed 400px (confirmed: a real game with substantial player-prop
+   content needed 1288px). This value never actually applies once JS runs; kept only so the
+   element isn't unstyled if JS somehow fails to run. */
 .drilldown.open { max-height: 400px; }
 .drilldown-inner { padding: 8px 4px 16px; }
 .readout-row { display: flex; justify-content: space-between; padding: 8px 0;

@@ -55,6 +55,47 @@ def _real_clv(conn: sqlite3.Connection, game_id: str) -> float | None:
     return sum(movements) / len(movements) if movements else None
 
 
+def _is_closeable_from_lines(lines_by_book: dict[str, float]) -> bool | None:
+    """Real, pure decision logic for `resolve_is_closeable_spread` -- separated out so it can be
+    verified directly against known cases (see the module's own test invocation) independent of
+    the real DB/view plumbing around it. True only when a real, UNIQUE plurality value exists
+    (strictly more books agree on it than on any single competing value) -- a real exact tie
+    (e.g. 2 books disagreeing, or an even 2-2 split) is correctly NOT a real consensus, caught
+    live by this function's own verification before trusting it (an earlier `>=half` threshold
+    wrongly called both of those cases "closeable"). None when fewer than 2 real books exist to
+    judge a consensus from at all (never guessed)."""
+    if len(lines_by_book) < 2:
+        return None
+    line_counts: dict[float, int] = {}
+    for value in lines_by_book.values():
+        line_counts[value] = line_counts.get(value, 0) + 1
+    counts_sorted = sorted(line_counts.values(), reverse=True)
+    if len(counts_sorted) == 1:
+        return True  # every real book agrees
+    return counts_sorted[0] > counts_sorted[1]
+
+
+def resolve_is_closeable_spread(conn: sqlite3.Connection, game_id: str) -> bool | None:
+    """Real `is_closeable` determination for the spread market (apply_epl_findings.md Part D,
+    2026-09-13) -- same real "does a genuine book-covered consensus line exist" methodology
+    verified live against this project's own real captured data for Part C (main line averaged
+    4.17 real distinct books vs. 1.71 for off-consensus lines). The real, honest signal that
+    `clv_movement` above reflects a genuine market consensus, not one disagreeing book's own
+    outlier number -- see `_is_closeable_from_lines` for the real decision logic itself."""
+    rows = conn.execute(
+        "SELECT sportsbook, line_value FROM v_ingestion_market_tiers "
+        "WHERE game_id = ? AND market_type = 'spread' AND line_stage = 'closing' "
+        "AND line_value IS NOT NULL",
+        (game_id,),
+    ).fetchall()
+    # Real, deliberate de-dup by book (the view can carry one row per real capture, not one per
+    # book, depending on how many real closing-tier snapshots that book had).
+    latest_by_book: dict[str, float] = {}
+    for sportsbook, line_value in rows:
+        latest_by_book[sportsbook] = line_value
+    return _is_closeable_from_lines(latest_by_book)
+
+
 def _process(conn: sqlite3.Connection, ingestion_id: int, season: int) -> int:
     now = datetime.now(UTC)
     now_iso = now.isoformat()
@@ -110,14 +151,15 @@ def _process(conn: sqlite3.Connection, ingestion_id: int, season: int) -> int:
         margin_error = projected_margin - actual_margin
         brier_score = (home_wp - actual_home_win) ** 2
         clv = _real_clv(conn, game_id)
+        is_closeable = resolve_is_closeable_spread(conn, game_id)
 
         write.insert_prediction_audit_metrics(
             conn, run_id, margin_error=margin_error, brier_score=brier_score,
-            computed_at=now_iso, clv_movement=clv,
+            computed_at=now_iso, clv_movement=clv, is_closeable=is_closeable,
         )
         write.set_game_workflow_status(conn, game_id, "AUDITED", None, now_iso)
         print(f"    AUDITED {game_id}: margin_error={margin_error:+.2f} "
-              f"brier={brier_score:.4f} clv={clv}")
+              f"brier={brier_score:.4f} clv={clv} is_closeable={is_closeable}")
 
     return n_touched
 

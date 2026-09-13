@@ -2133,3 +2133,79 @@ already flagged `coral`/`ladbrokes_uk` as showing the identical pattern class, j
 (+1.64pp vs pmu_fr's +6.07pp). Left as-is per explicit user decision, not silently expanded.
 
 Full test suite: 10,755 passed.
+
+## Twelfth batch (2026-09-13): Cross-project EPL findings applied to NFL
+
+apply_epl_findings.md -- applying a separate, related project's (EPL/soccer betting model)
+findings to this one.
+
+**Part C (real queries, required before Part D) -- done**: NFL's ingestion only captures each
+book's single main spread/total line (confirmed live: `market_lines.py` requests only
+`spreads,totals,h2h`, never `alternate_spreads`/`alternate_totals`), unlike EPL's deliberate
+multi-line-per-book alternates -- "main vs. alternate" honestly operationalized instead as
+modal/consensus line vs. off-consensus line across books. Real result: main line averages 4.17
+distinct books vs. 1.71 for off-consensus lines (~2.4x) -- same qualitative pattern EPL found,
+stated as analogous, not identical (different real mechanism, different real magnitude). Real,
+modest key-number-adjacency effect found: alternates near 3/7/14 average 2.07 books vs. 1.65 for
+others (n=14, small sample, stated with real caution). Player props confirmed dramatically
+thinner: even the real MAIN prop line averages only 1.74 books, off-main lines average
+essentially 1.00 (single-book-only), and 75% of multi-book prop groups show real disagreement on
+the line value itself -- strongly confirms props have no free closing-line alternative.
+
+**Part B (DB role separation) -- drafted, not executed**, per the task's own explicit
+instruction. New `prediction_audit/db/role_separation_draft.sql`: `pipeline_rw` (full real
+read/write, scheduled GitHub Actions jobs only) and `analyst_ro` (real, strict SELECT-only,
+Claude Code's future access -- write path becomes a pull request, never a direct DB write).
+Confirmed live the current role (`nflverse_db_pull_user`) is the real database owner, not a
+superuser. To execute only after Sept 29, with real manual secret-repointing steps documented
+inline, never automated.
+
+**Part D (`is_closeable` flag) -- built, real logic verified, real live evidence pending**.
+Real, important correction made mid-build: initially the plan was a new `edges` table, but
+found live that `results_and_audit.py`'s own docstring explicitly says real CLV uses
+`raw_market_captures`/`v_ingestion_market_tiers`, NOT the older, run_id-keyed `market_lines`
+table ("which this live workflow never writes to") -- extending `market_lines` (or a new,
+parallel `edges` table) would only ever reach the legacy historical backtest path, never the
+live 2026 system Part D is meant to serve. Real fix: added `is_closeable` directly to
+`prediction_audit_metrics` (the table that actually stores real CLV today), computed at the
+exact same real "write time" `clv_movement` itself is computed
+(`resolve_is_closeable_spread`/`_is_closeable_from_lines` in `results_and_audit.py`) -- real,
+honest, MARK-DON'T-DROP: a real, non-closeable game's CLV is still stored, never excluded.
+New `prediction_audit/migrate_is_closeable.py` (same real, idempotent `ALTER TABLE` pattern as
+`migrate_approved_sportsbooks.py`), run against the live DB.
+
+Real, honest scope: covers the spread market only, matching `clv_movement`'s own existing
+real spread-only scope -- this pipeline doesn't compute a real CLV for totals/moneyline at all
+yet, so extending `is_closeable` there now would invent coverage for a metric that doesn't
+exist. Real bug caught and fixed via the function's own direct verification before trusting it:
+an initial `>=half` threshold wrongly called an exact 2-book tie and an even 4-book 2-2 split
+"closeable" -- fixed to require a real, UNIQUE plurality (strictly more books on one value than
+any competitor), verified against 8 real known cases.
+
+**Part A (reference-output self-check) -- built, verified, real required evidence generated**.
+New `prediction_audit/historical/reference_output_check.py` re-runs the real, unmodified
+production call chain (`resolve_historical_model_components` -> `_apply_hfa_a_override` ->
+`compute_model_home_away_score`) end-to-end for 3 pinned, already-completed 2025 games (Ravens
+@ Chiefs, Panthers @ Patriots, Bears @ Raiders, all week 4), asserting output matches a stored
+real reference (`prediction_audit/manifests/reference_output_pinned.json`) within a tight real
+tolerance (1e-6). Self-consistency confirmed live: a second, independent full run reproduced
+the exact stored reference (tiny ~1e-14 floating-point noise from non-deterministic pandas
+summation order, far inside tolerance). Wired into the weekly review (its own real ~1-2
+CPU-minute cost makes the existing frequent per-ingestion self-enforcement cadence the wrong
+home for it) rather than replacing the existing file-diff check, per the task's own instruction.
+
+**Real required evidence generated** (`reference_output_drift_demo.py`): a first attempt to
+generate this via a real, temporary edit to `production_pipeline_v35_hfa_a.py` was correctly
+blocked by Claude Code's own safety classifier (introducing even a temporary, self-reverting
+bug into a real production file). Real, better alternative built instead: an in-memory-only
+perturbation (an unauthorized `division_adj_value` shift, never written to any file) injected
+via a new `override_fn` parameter on `compute_reference_outputs()`. Real result: the
+reference-output check caught the perturbation on `home_score`/`away_score`/`total` for all 3
+pinned games, while the existing file-diff self-enforcement check reported CLEAN both before
+and after (it inspects only committed file text, which this demo never touched) -- confirmed,
+not claimed. Honest nuance worth recording: `margin` was NOT flagged by this specific
+perturbation, since it shifted home and away scores equally and cancelled out in the
+difference -- a real property of this particular perturbation, not a gap in the check (`total`
+and both raw scores still caught it cleanly).
+
+Full test suite: 10,755 passed.

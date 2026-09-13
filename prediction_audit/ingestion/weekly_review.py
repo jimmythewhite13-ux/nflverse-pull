@@ -27,12 +27,17 @@ not a number invented here):
    and are queryable, and that the real ingestion/audit/sync modules it depends on still import
    cleanly, against the real current database state (not synthetic dummy data -- the real
    tables/modules ARE the realistic condition to check against).
+4. Reference-output self-check (apply_epl_findings.md Part A) -- re-runs the real, unmodified
+   production call chain end-to-end for 3 pinned, already-completed 2025 games and asserts
+   output matches a stored reference within tolerance, catching real drift the file-diff
+   self-enforcement check structurally cannot see (see `check_reference_output`'s own
+   docstring). Placed here rather than the frequent self-enforcement runs given its real cost.
 
 Starting 2026-09-29 onward, additionally:
-4. Real, updated systematic-bias calculation using all real 2026 PRODUCTION predictions graded
+5. Real, updated systematic-bias calculation using all real 2026 PRODUCTION predictions graded
    so far, with the real current sample size stated plainly (small-sample estimates are real but
    explicitly flagged as less reliable, per the task doc's own instruction).
-5. Real, updated weekly metrics (margin/total MAE, winner accuracy, Brier) for the current real
+6. Real, updated weekly metrics (margin/total MAE, winner accuracy, Brier) for the current real
    season, same real methodology `hosted_env/api/main.py`'s `get_historical()` already uses.
 
 Usage:
@@ -195,6 +200,34 @@ def check_downstream_readiness(conn) -> list[str]:
     return findings
 
 
+def check_reference_output() -> list[str]:
+    """Real reference-output self-check (apply_epl_findings.md Part A, 2026-09-13) -- runs
+    ALONGSIDE the existing file-diff self-enforcement check (prediction_audit/ingestion/
+    self_enforcement_check.py), not replacing it: that check diffs specific files/directories
+    against a git tag, but never inspects `production_pipeline_v35_hfa_a.py` beyond one narrow
+    override-scope check, and never inspects `src/nflverse_pull/*` at all -- a real gap where a
+    parameter/logic change there could alter real output undetected. This re-runs the real,
+    unmodified production call chain end-to-end for 3 pinned, already-completed 2025 games and
+    asserts output matches a stored real reference within a tight real tolerance -- see
+    `reference_output_check.py`'s own module docstring for the full real rationale.
+
+    Real, deliberate cadence choice: this fetches ~3 real seasons of pbp data and runs the real
+    full historical composition (~1-2 real CPU-minutes, confirmed live) -- genuinely more
+    expensive than every other check in this module, so it runs here (weekly) rather than in
+    the frequent per-ingestion self-enforcement runs."""
+    try:
+        from prediction_audit.historical.reference_output_check import (
+            check_reference_output as _check,
+        )
+        problems = _check()
+        if problems:
+            return [f"BROKEN -- {p}" for p in problems]
+        return ["OK -- all 3 pinned real 2025 games reproduce the stored reference output "
+                "within tolerance."]
+    except Exception as e:  # noqa: BLE001
+        return [f"BROKEN -- reference-output check itself failed to run: {e!r}"]
+
+
 def check_live_season_bias(conn, season: int) -> list[str]:
     """Real, updated signed-bias calculation for the current live real season's PRODUCTION
     predictions -- see module docstring point 4. Only meaningful once real 2026 predictions
@@ -296,14 +329,19 @@ def main() -> int:
             print(f"- {f}")
         print()
 
+        print("## 4. Reference-output self-check (real end-to-end model drift)\n")
+        for f in check_reference_output():
+            print(f"- {f}")
+        print()
+
         if live:
             season = current_nfl_season(datetime.now(UTC))
-            print(f"## 4. Real, updated systematic-bias calculation ({season} season)\n")
+            print(f"## 5. Real, updated systematic-bias calculation ({season} season)\n")
             for f in check_live_season_bias(conn, season):
                 print(f"- {f}")
             print()
 
-            print(f"## 5. Real, updated weekly metrics ({season} season)\n")
+            print(f"## 6. Real, updated weekly metrics ({season} season)\n")
             for f in check_live_season_metrics(conn, season):
                 print(f"- {f}")
             print()

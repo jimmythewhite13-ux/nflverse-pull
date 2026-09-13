@@ -456,6 +456,25 @@ CREATE TABLE IF NOT EXISTS prediction_audit_metrics (
     brier_score     REAL NOT NULL,   -- (home_win_probability - actual_home_win)^2
     clv_movement    REAL,            -- closing_line - opening_line, NULL if not yet durable
                                       -- (see v_ingestion_market_tiers' own real caveat)
+    is_closeable    INTEGER,         -- apply_epl_findings.md Part D (2026-09-13): real,
+                                      -- boolean-as-integer (this project's own SQLite
+                                      -- convention, e.g. flagged_excluded_source) -- 1 if the
+                                      -- real spread `clv_movement` above is genuinely
+                                      -- MEASURABLE (a real, book-covered closing-line
+                                      -- consensus existed for this game's spread, per
+                                      -- `resolve_is_closeable_spread`'s own real methodology),
+                                      -- 0 if not, NULL if not yet determinable (clv_movement
+                                      -- itself is also still NULL). Real, deliberate MARK-DON'T-
+                                      -- DROP discipline: a real, non-closeable game's CLV is
+                                      -- still computed and stored above, never excluded from
+                                      -- anything -- this column exists so CLV can be reported
+                                      -- split by real cohort (closeable vs. not), not to filter.
+                                      -- Real, current, honest scope: covers the spread market
+                                      -- only, matching `clv_movement`'s own existing real
+                                      -- spread-only scope -- this pipeline does not compute a
+                                      -- real CLV for totals or moneyline at all yet, so
+                                      -- extending is_closeable to those markets now would be
+                                      -- inventing coverage for a real metric that doesn't exist.
     computed_at     TEXT NOT NULL    -- ISO8601, real
 );
 """

@@ -198,16 +198,23 @@ def insert_data_quality(
 
 def insert_prediction_audit_metrics(
     conn: sqlite3.Connection, run_id: int, margin_error: float, brier_score: float,
-    computed_at: str, clv_movement: float | None = None,
+    computed_at: str, clv_movement: float | None = None, is_closeable: bool | None = None,
 ) -> None:
     """INSERT OR REPLACE, deliberately -- unlike a prediction, an audit metric MAY legitimately
     be recomputed for the same run_id (e.g. CLV becomes computable only once the closing tier
     is durable, some time after margin_error/brier_score already were) without that being a
-    real correction of the underlying prediction itself, which stays immutable regardless."""
+    real correction of the underlying prediction itself, which stays immutable regardless.
+
+    `is_closeable` (apply_epl_findings.md Part D, 2026-09-13): real, MARK-DON'T-DROP flag --
+    whether the real `clv_movement` above reflects a genuine, book-covered closing-line
+    consensus (see `resolve_is_closeable_spread`), never used to exclude anything from this
+    table. Stored as 1/0/NULL (SQLite has no native boolean), matching this project's own
+    established convention (e.g. `flagged_excluded_source`)."""
+    is_closeable_int = None if is_closeable is None else int(is_closeable)
     conn.execute(
         "INSERT OR REPLACE INTO prediction_audit_metrics (run_id, margin_error, brier_score, "
-        "clv_movement, computed_at) VALUES (?, ?, ?, ?, ?)",
-        (run_id, margin_error, brier_score, clv_movement, computed_at),
+        "clv_movement, is_closeable, computed_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (run_id, margin_error, brier_score, clv_movement, is_closeable_int, computed_at),
     )
     conn.commit()
 

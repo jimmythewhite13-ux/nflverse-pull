@@ -135,14 +135,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
 from nflverse_pull.current_roster import fetch_seasonal_rosters  # noqa: E402
 from nflverse_pull.efficiency import fetch_pbp  # noqa: E402
-from nflverse_pull.pull import TEAM_NAMES, fetch_schedules  # noqa: E402
 from nflverse_pull.player_props import (  # noqa: E402
     compute_player_season_catch_rate,
     compute_player_season_qb_yards_per_attempt,
     compute_player_season_target_share,
     compute_team_season_pass_rush_volume,
 )
-
+from nflverse_pull.pull import TEAM_NAMES, fetch_schedules  # noqa: E402
 from prediction_audit.db.schema import DEFAULT_DB_PATH, create_database  # noqa: E402
 from prediction_audit.engine.decay_baseline import (  # noqa: E402
     blend_weight,
@@ -343,11 +342,10 @@ def _real_matchup_differential(pass_or_run: str, opp_full: str, pbp_3yr_prior: p
             resolve_run_defense_matchup_history, resolve_run_defense_matchup_league_stats,
             compute_run_defense_matchup,
         )
-    from prediction_audit.engine.pass_defense_matchup import PassDefenseMatchupConstants
-    from prediction_audit.engine.run_defense_matchup import RunDefenseMatchupConstants
-
     from prediction_audit.engine.pass_defense_matchup import METRIC_KEYS as _PASS_KEYS
+    from prediction_audit.engine.pass_defense_matchup import PassDefenseMatchupConstants
     from prediction_audit.engine.run_defense_matchup import METRIC_KEYS as _RUN_KEYS
+    from prediction_audit.engine.run_defense_matchup import RunDefenseMatchupConstants
     metric_keys = _PASS_KEYS if pass_or_run == "pass" else _RUN_KEYS
     constants_cls = PassDefenseMatchupConstants if pass_or_run == "pass" else \
         RunDefenseMatchupConstants
@@ -395,12 +393,18 @@ def _real_actual_stats(pbp_game: pd.DataFrame, player_id: str, position: str) ->
             "interceptions": float(plays["interception"].fillna(0).sum()),
         }
     if position == "RB":
-        plays = pbp_game[(pbp_game["rusher_player_id"] == player_id) & (pbp_game["play_type"] == "run")]
+        plays = pbp_game[
+            (pbp_game["rusher_player_id"] == player_id) & (pbp_game["play_type"] == "run")
+        ]
         return {"rushing_yards": float(plays["yards_gained"].fillna(0).sum())}
     # WR/TE
-    plays = pbp_game[(pbp_game["receiver_player_id"] == player_id) & (pbp_game["pass_attempt"] == 1)]
+    plays = pbp_game[
+        (pbp_game["receiver_player_id"] == player_id) & (pbp_game["pass_attempt"] == 1)
+    ]
     return {
-        "receiving_yards": float(plays[plays["complete_pass"] == 1]["yards_gained"].fillna(0).sum()),
+        "receiving_yards": float(
+            plays[plays["complete_pass"] == 1]["yards_gained"].fillna(0).sum()
+        ),
         "receptions": float(plays["complete_pass"].fillna(0).sum()),
     }
 
